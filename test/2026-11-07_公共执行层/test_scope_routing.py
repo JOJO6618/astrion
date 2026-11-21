@@ -155,12 +155,10 @@ class FullAccessBackendValidationTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_full_access_request(terminal, FULL_ACCESS_ARGS)
 
-    def test_docker_backend_session_is_rejected_without_terminal_session(self):
-        backend = LocalExecutionBackend(_resource_owner(self.root, container_mode="docker"))
-        terminal = _validation_terminal(backend=backend, container_mode=None)
-        self.assertFalse(is_trusted_local_backend(terminal))
+    def test_docker_backend_session_is_rejected_at_construction(self):
+        # Docker owner 在构造 LocalExecutionBackend 时就必须拒绝；不能先生成后端再靠判权拦。
         with self.assertRaises(ValueError):
-            validate_full_access_request(terminal, FULL_ACCESS_ARGS)
+            LocalExecutionBackend(_resource_owner(self.root, container_mode="docker"))
 
 
 class _ParentTerminal:
@@ -353,16 +351,31 @@ class MediaReadRoutingTests(unittest.TestCase):
         # 磁盘上确实不存在：证明没有走本地 exists/resolve 判定
         self.assertFalse((self.root / "ghost.png").exists())
 
-    def test_container_metadata_unsupported_still_reads_binary(self):
+    def test_unsupported_metadata_is_not_read_or_ignored(self):
+        # Host 元数据不支持/拒绝时不能读二进制，也不能回退读控制端文件。
         files = _StubFiles(
-            {"success": True, "code": "metadata_unsupported_in_container"}, b"container-bytes"
+            {"success": False, "code": "metadata_unsupported_in_container",
+             "error": "metadata unsupported"},
+            b"controller-bytes",
         )
         result = asyncio.run(
             handle_read_mediafile(self.root, {"path": "clip.mp4"}, backend=_StubBackend(files))
         )
-        self.assertTrue(result["success"], result)
-        self.assertEqual(result["type"], "video")
-        self.assertEqual(base64.b64decode(result["b64"]), b"container-bytes")
+        self.assertFalse(result["success"])
+        self.assertEqual(result["error"], "metadata unsupported")
+        self.assertEqual([call[0] for call in files.calls], ["inspect_path"])
+        self.assertFalse((self.root / "clip.mp4").exists())
+
+    def test_inspect_reports_absent_file_without_reading(self):
+        # 元数据成功但目标不存在，不得继续 read_binary，也不得在控制端找同名文件。
+        files = _StubFiles({"success": True, "exists": False, "is_file": False}, b"")
+        result = asyncio.run(
+            handle_read_mediafile(self.root, {"path": "clip.mp4"}, backend=_StubBackend(files))
+        )
+        self.assertFalse(result["success"])
+        self.assertIn("clip.mp4", result["error"])
+        self.assertEqual([call[0] for call in files.calls], ["inspect_path"])
+        self.assertFalse((self.root / "clip.mp4").exists())
 
     def test_backend_denial_is_reported_without_local_fallback(self):
         files = _StubFiles({"success": False, "error": "denied-by-backend"}, b"")

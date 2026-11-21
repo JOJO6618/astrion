@@ -116,10 +116,6 @@ export async function mounted() {
   this.$nextTick(() => {
     this.autoResizeInput();
   });
-  this.resourceBindContainerVisibilityWatcher();
-  this.resourceStartContainerStatsPolling();
-  this.resourceStartProjectStoragePolling();
-  this.resourceStartUsageQuotaPolling();
 
   // 设置拖拽上传
   this.setupDragAndDrop();
@@ -149,9 +145,6 @@ export function beforeUnmount() {
   this.stopProjectGitSummaryIdleRefresh?.();
   this.stopTerminalCountIdleRefresh?.();
   this.stopStatusIdleRefresh?.();
-  this.resourceStopContainerStatsPolling();
-  this.resourceStopProjectStoragePolling();
-  this.resourceStopUsageQuotaPolling();
   this.stopConnectionHeartbeat();
   teardownShowImageObserver();
 

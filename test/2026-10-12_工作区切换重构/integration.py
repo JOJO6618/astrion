@@ -15,8 +15,7 @@ _TEMP = tempfile.TemporaryDirectory(dir=Path(__file__).parent, prefix='isolated-
 RUNTIME = Path(_TEMP.name)
 os.environ.update(ASTRION_IGNORE_DOTENV='1', ASTRION_DATA_ROOT=str(RUNTIME),
                   DATA_DIR=str(RUNTIME / 'data'), LOGS_DIR=str(RUNTIME / 'logs'),
-                  DEPLOY_CONFIG_DIR=str(RUNTIME / 'deploy'), TERMINAL_SANDBOX_MODE='host',
-                  USER_SPACE_DIR=str(RUNTIME / 'users'), API_USER_SPACE_DIR=str(RUNTIME / 'api'))
+                  DEPLOY_CONFIG_DIR=str(RUNTIME / 'deploy'), TERMINAL_SANDBOX_MODE='host')
 
 from flask import Flask
 from server.context.data import WorkspaceData, _STORES
@@ -52,8 +51,6 @@ class DataIntegrationTests(unittest.TestCase):
         self.terminals.start(); self.addCleanup(self.terminals.stop)
         self.runtime = patch('server.context.resources.WebTerminal', side_effect=AssertionError('read allocated a runtime'))
         self.runtime.start(); self.addCleanup(self.runtime.stop)
-        self.container = patch('server.context.resources.state.container_manager', ensure_container=SimpleNamespace())
-        self.container.start(); self.addCleanup(self.container.stop)
         self.skills = patch('server.context.resources.sync_workspace_skills', side_effect=AssertionError('read copied skills'))
         self.skills.start(); self.addCleanup(self.skills.stop)
         self.rates = patch('modules.exchange_rates.get_rate', return_value=None)

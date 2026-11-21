@@ -59,8 +59,7 @@ from modules.personalization_manager import (
 )
 from modules.upload_security import UploadSecurityError
 from server.security import rate_limited
-from modules.user_manager import UserWorkspace
-from modules.usage_tracker import QUOTA_DEFAULTS
+from modules.workspace import UserWorkspace
 from modules.sub_agent import TERMINAL_STATUSES
 from modules.versioning_manager import ConversationVersioningManager, VersioningError
 from modules.shallow_versioning import ShallowVersioningManager
@@ -72,12 +71,12 @@ from utils.tool_result_formatter import format_tool_result_for_context
 from utils.conversation_manager import ConversationManager
 from utils.api_client import APIClient
 
-from .auth_helpers import api_login_required, resolve_admin_policy, get_current_user_record, get_current_username
+from .auth_helpers import api_login_required, resolve_admin_policy, get_current_username
 from .gateway_auth import api_login_or_host_token_required
 from .context.data_decorators import with_workspace_data
 from .context.data import get_workspace_data
 from .context.resources import find_runtime
-from .context import with_terminal, get_gui_manager, get_upload_guard, build_upload_error_response, ensure_conversation_loaded, reset_system_state, get_user_resources, get_or_create_usage_tracker
+from .context import with_terminal, get_gui_manager, get_upload_guard, build_upload_error_response, ensure_conversation_loaded, reset_system_state, get_user_resources
 from .utils_common import (
     build_review_lines,
     REVIEW_CONTENT_MODES,
@@ -95,17 +94,6 @@ from .utils_common import (
 from .state import (
     RECENT_UPLOAD_EVENT_LIMIT,
     RECENT_UPLOAD_FEED_LIMIT,
-    user_manager,
-    container_manager,
-    get_last_active_ts,
-)
-from .usage import record_user_activity
-from .conversation_stats import (
-    build_admin_dashboard_snapshot,
-    compute_workspace_storage,
-    collect_user_token_statistics,
-    collect_upload_events,
-    summarize_upload_events,
 )
 from .deep_compression import run_deep_compression, heal_stale_compression_flag
 from modules.execution_plane import get_execution_backend
@@ -287,17 +275,12 @@ def _sanitize_scope_component(value: Any, default: str = "default") -> str:
 
 
 def _resolve_input_draft_path(workspace: UserWorkspace, username: str) -> Tuple[Path, str]:
+    if username != "host" or workspace.username != "host":
+        raise ValueError("A Host identity is required")
     base_dir = Path(workspace.data_dir).expanduser().resolve() / "composer_drafts"
-    if workspace.username == "host":
-        workspace_id = getattr(workspace, "workspace_id", None) or "default"
-        scope = f"host_workspace:{workspace_id}"
-        filename = f"{_sanitize_scope_component(workspace_id)}.json"
-        return (base_dir / "host" / filename).resolve(), scope
-    safe_user = _sanitize_scope_component(username or "user", default="user")
-    workspace_id = getattr(workspace, "workspace_id", None) or session.get("workspace_id") or "default"
-    safe_workspace = _sanitize_scope_component(workspace_id)
-    scope = f"user:{safe_user}:project:{safe_workspace}"
-    return (base_dir / "docker" / f"{safe_workspace}.json").resolve(), scope
+    workspace_id = getattr(workspace, "workspace_id", None) or "default"
+    filename = f"{_sanitize_scope_component(workspace_id)}.json"
+    return (base_dir / "host" / filename).resolve(), f"host_workspace:{workspace_id}"
 
 
 def _read_input_draft_payload(path: Path) -> Dict[str, Any]:
@@ -443,13 +426,9 @@ def _resolve_target_terminal_for_workspace(
         session_workspace_id=session.get("workspace_id"),
         current_terminal_project_path=str(getattr(current_terminal, "project_path", None)),
     )
-    if _is_host_mode_request(username):
-        catalog, _ = resolve_host_workspace()
-        if not any(item.get("workspace_id") == workspace_id for item in (catalog.get("workspaces") or [])):
-            raise ValueError(tr("conversation.workspace_not_found"))
-    else:
-        if workspace_id not in user_manager.list_user_workspaces(username):
-            raise ValueError(tr("conversation.project_not_found"))
+    catalog, _ = resolve_host_workspace()
+    if not any(item.get("workspace_id") == workspace_id for item in (catalog.get("workspaces") or [])):
+        raise ValueError(tr("conversation.workspace_not_found"))
     try:
         target_terminal, target_workspace = get_user_resources(
             username, workspace_id=workspace_id, update_session=False
@@ -762,18 +741,11 @@ def search_conversations(data_context, workspace: UserWorkspace, username: str):
             })
 
         # 跨工作区搜索：收集全部工作区后逐区搜索，按工作区分组返回
-        if _is_host_mode_request(username):
-            catalog, _current_host_ws = resolve_host_workspace()
-            workspace_entries = [
-                (str(ws.get("workspace_id") or ""), str(ws.get("label") or ws.get("workspace_id") or ""))
-                for ws in (catalog.get("workspaces") or [])
-            ]
-        else:
-            user_workspaces = user_manager.list_user_workspaces(username) or {}
-            workspace_entries = [
-                (str(ws_id), str((info or {}).get("label") or ws_id))
-                for ws_id, info in user_workspaces.items()
-            ]
+        catalog, _ = resolve_host_workspace()
+        workspace_entries = [
+            (str(ws.get("workspace_id") or ""), str(ws.get("label") or ws.get("workspace_id") or ""))
+            for ws in (catalog.get("workspaces") or [])
+        ]
 
         groups = []
         total = 0
@@ -1454,7 +1426,7 @@ def restore_conversation_versioning_checkpoint(conversation_id, terminal: WebTer
 def compress_conversation(conversation_id, terminal: WebTerminal, workspace: UserWorkspace, username: str):
     """深层压缩指定对话（in-place）：生成 compact 文件、标记历史前缀为已压缩，按设置决定是否续接。"""
     try:
-        policy = resolve_admin_policy(get_current_user_record())
+        policy = resolve_admin_policy()
         if policy.get("ui_blocks", {}).get("block_compress_conversation"):
             return jsonify({"success": False, "error": tr("conversation.compress_blocked_by_admin")}), 403
         normalized_id = conversation_id if conversation_id.startswith('conv_') else f"conv_{conversation_id}"
@@ -1889,7 +1861,7 @@ def duplicate_conversation(conversation_id, terminal: WebTerminal, workspace: Us
 @with_terminal
 def review_conversation_preview(conversation_id, terminal: WebTerminal, workspace: UserWorkspace, username: str):
     """生成对话回顾预览（不落盘，只返回前若干行文本）"""
-    policy = resolve_admin_policy(get_current_user_record())
+    policy = resolve_admin_policy()
     if policy.get("ui_blocks", {}).get("block_conversation_review"):
         return jsonify({"success": False, "error": tr("conversation.review_blocked_by_admin")}), 403
     try:
@@ -1931,7 +1903,7 @@ def review_conversation_preview(conversation_id, terminal: WebTerminal, workspac
 @with_terminal
 def review_conversation(conversation_id, terminal: WebTerminal, workspace: UserWorkspace, username: str):
     """生成完整对话回顾 Markdown 文件"""
-    policy = resolve_admin_policy(get_current_user_record())
+    policy = resolve_admin_policy()
     if policy.get("ui_blocks", {}).get("block_conversation_review"):
         return jsonify({"success": False, "error": tr("conversation.review_blocked_by_admin")}), 403
     try:
@@ -2114,7 +2086,6 @@ def execute_command_api(terminal: WebTerminal, workspace: UserWorkspace, usernam
                 "message": tr("conversation.command_required")
             }), 400
 
-        record_user_activity(username)
         result = _execute_system_command(terminal, command)
         status_code = 200 if result.get('success') else 400
         return jsonify(result), status_code

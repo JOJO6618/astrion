@@ -9,8 +9,9 @@
 ## 1) 当前项目结构（按代码现状）
 
 - **后端入口**
-  - `main.py`: 统一启动入口（当前默认走 Web 模式 + thinking_mode=True）
-  - `server/app.py`: 推荐的 Web 服务入口（封装并转发到 `server/app_legacy.py`）
+  - `main.py`: 统一启动入口（默认走 Host Web + thinking_mode=True）
+  - `server/app.py`: Host Web 和桌面端入口（转发至 `server/app_legacy.py`）
+  - `server/headless_app.py`: CLI 入口。与 full 共用 `server/host_startup.py`，装配自己的 Flask 蓝图。
   - `web_server.py`: 兼容入口，已标记 deprecated，但仍可启动
 - **后端核心目录**
   - `server/`: Flask 业务主线（chat/task/status/context 已拆分为子包：`server/chat/`、`server/status/`、`server/tasks/`、`server/context/`（用户资源/身份/个性化，原 `server/context.py` 已拆包并保留兼容 re-export）；**REST 任务轮询为唯一实时通道**——Socket.IO 已于 2026-09-11 整体移除，详见 §12.5）
@@ -18,7 +19,7 @@
   - `server/runtime/`: 公共任务入口（2026-09 Gateway 化阶段二新增）：`context.py` 定义 RuntimeContext 三层模型（TrustedPrincipal/TaskParams/InternalDirectives），`service.py` 提供 RuntimeService（create_task/cancel/guidance/get_task_events）；契约见 `docs/runtime_contract.md`
   - `core/`: 终端与工具编排（`main_terminal.py`、`web_terminal.py`、`main_terminal_parts/*`；其中 `main_terminal_parts/context/` 和 `main_terminal_parts/tools_definition` 已拆分为 base + mixin 子包）
   - `modules/`: 可复用能力模块（terminal/file/memory/sub_agent/upload_security/user 等；`file_manager`、`persistent_terminal`、`terminal_ops`、`mcp_client_manager` 已拆分为子包）；`composer_drafts.py` 负责原子草稿、CAS revision 与保存水位；`server/composer_drafts.py` 负责对话身份、字段校验和恢复确认，`server/attachment_paths.py` 共用附件路径通知，`server/runtime_guidance.py` 在安全边界注入引导，`conversation_modes.py` 共用生效模式规则，`skills_revision.py`／`skills_sync.py` 负责工作区技能版本与准备。`utils/conversation_manager/preparation.py` 合并执行侧存储准备。
-  - `modules/execution_plane/`（2026-11-07）：`base/files/protocols` 定义显式执行接口，`access` 选择后端，`local/resources` 复用 Host/Docker 能力并支持脱离模型／Flask装配；`files_metadata/processes/terminals/environment/integrations` 提供元数据、后台、终端、环境和插件入口，`fake*` 为内存替身。默认 MainTerminal 同样绑定 Local，已绑定后端失败不得回落控制端。当前不是生产 Remote 协议，剩余本机假设与验证范围见 `docs/execution_contract.md`。
+  - `modules/execution_plane/`（2026-11-07）：`base/files/protocols` 定义显式执行接口，`access` 选择后端，`local/resources` 复用 Host 能力并支持脱离模型／Flask装配；`files_metadata/processes/terminals/environment/integrations` 提供元数据、后台、终端、环境和插件入口，`fake*` 为内存替身。默认 MainTerminal 同样绑定 Local，已绑定后端失败不得回落控制端。当前不是生产 Remote 协议，剩余本机假设与验证范围见 `docs/execution_contract.md`。
   - `modules/git_worktree/`（2026-11-14）：对话级执行根与工作树服务；`carry` 保留暂存分层，`binding/notices/children` 管理持久绑定与安全点通知，`query/commands/paths` 处理只读查询、平台命令和路径语义。后端入口 `server/status/worktree.py`，前端 `stores/gitWorktree.ts` 与 `WorktreeMenu.vue`，契约 `docs/git_worktree.md`。
   - `config/`: 配置拆分（`api.py`, `limits.py`, `terminal.py`, `paths.py` ...），由 `config/__init__.py` 聚合并加载 `.env`
   - `utils/`: API client、日志、上下文与对话工具等公共函数（`api_client`、`tool_result_formatter`、`context_manager`、`conversation_manager` 已拆分为子包；原入口文件保留为兼容入口）
@@ -42,7 +43,6 @@
   - `docs/cli_ui_display_spec.md`: CLI 显示层设计说明
   - `docs/cli_slash_commands_spec.md`: CLI `/` 指令设计说明
 - **其他子项目/资源**
-  - `android-webview-app/`: Android WebView 客户端工程
   - `modules/sub_agent/`: definitions/named定义公开接口；manager/persistence负责共享记录与恢复；task/engine/runtime管理轮次和MCP；cancellation负责即时停止、来源和取消结果补齐；communication/model/history分别负责问答、API流、压缩及用量；execution负责固定内置权限。新状态sub_agent_runtime.json，子上下文sub_agent_tasks/<task_id>/conversation.json。
   - `modules/multi_agent/`: 只保留通信状态、消息协议和日志，无角色或主对话类型。旧角色不再打包；离线迁移脚本在scripts/migrate_multi_agent_conversations.py。
   - `easyagent/`: 旧版 Node.js 子智能体实现，暂时保留但已不再使用

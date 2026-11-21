@@ -23,13 +23,11 @@ import time
 from datetime import datetime
 from collections import defaultdict, deque, Counter
 from config.model_profiles import get_default_model_key, get_model_profile, get_registered_model_keys
-from modules import admin_policy_manager
 from modules.custom_tool_registry import CustomToolRegistry
 import server.state as state  # 共享单例
 from server.auth import auth_bp
 from server.host_password import host_password_bp
 from server.crosspet_settings import crosspet_settings_bp
-from server.entry_assets import serve_entry_html
 from server.files import files_bp
 from server.admin import admin_bp
 from server.conversation import conversation_bp
@@ -42,7 +40,8 @@ from server.storage_stats import storage_stats_bp
 from server.project_memory_migration import project_memory_migration_bp
 from server.status import status_bp
 from server.tasks.web import get_tasks_blueprint
-from server.api_v1 import api_v1_bp
+from server.host_startup import initialize_host, start_background_jobs
+from server.model_catalog import model_catalog_bp
 from server.multi_agent import multi_agent_bp
 from server.workflow_page import workflow_page_bp
 from server.schedules import schedules_bp
@@ -244,23 +243,19 @@ from config import (
     DEFAULT_PROJECT_PATH,
     LOGS_DIR,
     AGENT_VERSION,
-    MAX_ACTIVE_USER_CONTAINERS,
     PROJECT_MAX_STORAGE_MB,
     PROJECT_MAX_STORAGE_BYTES,
     UPLOAD_SCAN_LOG_SUBDIR,
     WEB_SERVER_PORT,
     WEB_SERVER_HOST,
-    TERMINAL_SANDBOX_MODE,
 )
-from modules.user_manager import UserManager, UserWorkspace
+from modules.workspace import UserWorkspace
 from modules.gui_file_manager import GuiFileManager
 from modules.upload_security import UploadQuarantineManager, UploadSecurityError
 from modules.personalization_manager import (
     load_personalization_config,
     save_personalization_config,
 )
-from modules.user_container_manager import UserContainerManager
-from modules.usage_tracker import UsageTracker, QUOTA_DEFAULTS
 from utils.tool_result_formatter import format_tool_result_for_context
 from utils.conversation_manager import ConversationManager
 from utils.api_client import APIClient
@@ -286,7 +281,6 @@ class EndpointFilter(logging.Filter):
     """过滤掉噪声请求日志。"""
     BLOCK_PATTERNS = (
         "GET /api/project-storage",
-        "GET /api/container-status",
     )
 
     def filter(self, record: logging.LogRecord) -> bool:
@@ -319,7 +313,7 @@ app.register_blueprint(storage_stats_bp)
 app.register_blueprint(project_memory_migration_bp)
 app.register_blueprint(status_bp)
 app.register_blueprint(get_tasks_blueprint())
-app.register_blueprint(api_v1_bp)
+app.register_blueprint(model_catalog_bp)
 app.register_blueprint(multi_agent_bp)
 app.register_blueprint(workflow_page_bp)
 app.register_blueprint(schedules_bp)
@@ -333,18 +327,11 @@ app.register_blueprint(opencode_quota_bp)
 app.register_blueprint(providers_bp)
 app.register_blueprint(project_git_bp)
 
-# 周额度价值采样：随进程启动，每小时一次（账本为金额唯一来源）
-from modules.weekly_quota import start_tracker as _start_weekly_quota_tracker
-
-_start_weekly_quota_tracker()
-
 # 安全钩子（CSRF 校验 + 响应头）
 attach_security_hooks(app)
 
 # 统一复用 state 中的单例，避免拆分后出现状态分叉
-user_manager = state.user_manager
 custom_tool_registry = state.custom_tool_registry
-container_manager = state.container_manager
 user_terminals = state.user_terminals
 terminal_rooms = state.terminal_rooms
 connection_users = state.connection_users
@@ -356,12 +343,10 @@ MONITOR_SNAPSHOT_CHAR_LIMIT = state.MONITOR_SNAPSHOT_CHAR_LIMIT
 MONITOR_MEMORY_ENTRY_LIMIT = state.MONITOR_MEMORY_ENTRY_LIMIT
 RATE_LIMIT_BUCKETS = state.RATE_LIMIT_BUCKETS
 FAILURE_TRACKERS = state.FAILURE_TRACKERS
-usage_trackers = state.usage_trackers
 
 MONITOR_SNAPSHOT_CACHE = state.MONITOR_SNAPSHOT_CACHE
 MONITOR_SNAPSHOT_CACHE_LIMIT = state.MONITOR_SNAPSHOT_CACHE_LIMIT
 
-ADMIN_ASSET_DIR = (Path(app.static_folder) / 'admin_dashboard').resolve()
 ADMIN_CUSTOM_TOOLS_DIR = (Path(app.static_folder) / 'custom_tools').resolve()
 ADMIN_CUSTOM_TOOLS_DIR = (Path(app.static_folder) / 'custom_tools').resolve()
 RECENT_UPLOAD_EVENT_LIMIT = 150
@@ -378,11 +363,6 @@ FAILED_LOGIN_LIMIT = state.FAILED_LOGIN_LIMIT
 FAILED_LOGIN_LOCK_SECONDS = state.FAILED_LOGIN_LOCK_SECONDS
 PROJECT_STORAGE_CACHE = state.PROJECT_STORAGE_CACHE
 PROJECT_STORAGE_CACHE_TTL_SECONDS = state.PROJECT_STORAGE_CACHE_TTL_SECONDS
-USER_IDLE_TIMEOUT_SECONDS = state.USER_IDLE_TIMEOUT_SECONDS
-LAST_ACTIVE_FILE = state.LAST_ACTIVE_FILE
-_last_active_lock = state._last_active_lock
-_last_active_cache = state._last_active_cache
-_idle_reaper_started = False
 TITLE_PROMPT_PATH = state.TITLE_PROMPT_PATH
 
 
@@ -408,91 +388,6 @@ def sanitize_filename_preserve_unicode(filename: str) -> str:
     # Windows/Unix 通用文件名长度安全上限
     return cleaned[:255]
 
-
-def _load_last_active_cache():
-    """从持久化文件加载最近活跃时间，失败时保持空缓存。"""
-    try:
-        LAST_ACTIVE_FILE.parent.mkdir(parents=True, exist_ok=True)
-        if not LAST_ACTIVE_FILE.exists():
-            return
-        data = json.loads(LAST_ACTIVE_FILE.read_text(encoding="utf-8"))
-        if isinstance(data, dict):
-            for user, ts in data.items():
-                try:
-                    _last_active_cache[user] = float(ts)
-                except (TypeError, ValueError):
-                    continue
-    except Exception:
-        # 读取失败时忽略，避免影响启动
-        pass
-
-
-def _persist_last_active_cache():
-    """原子写入最近活跃时间缓存。"""
-    try:
-        tmp = LAST_ACTIVE_FILE.with_suffix(".tmp")
-        tmp.write_text(json.dumps(_last_active_cache, ensure_ascii=False, indent=2), encoding="utf-8")
-        tmp.replace(LAST_ACTIVE_FILE)
-    except Exception:
-        # 写入失败不影响主流程，记录即可
-        debug_log("[IdleReaper] 写入 last_active 文件失败")
-
-
-def record_user_activity(username: Optional[str], ts: Optional[float] = None):
-    """记录用户最近活跃时间，刷新容器 handle 并持久化。"""
-    if not username:
-        return
-    now = ts or time.time()
-    with _last_active_lock:
-        _last_active_cache[username] = now
-        _persist_last_active_cache()
-    handle = container_manager.get_handle(username)
-    if handle:
-        handle.touch()
-
-
-def get_last_active_ts(username: str, fallback: Optional[float] = None) -> Optional[float]:
-    """兼容旧调用，实际委托给 state 版本以保证缓存能被句柄时间更新。"""
-    return state.get_last_active_ts(username, fallback)
-
-
-def idle_reaper_loop():
-    """后台轮询：长时间无消息则回收用户容器。"""
-    while True:
-        try:
-            now = time.time()
-            handle_map = container_manager.list_containers()
-            for username, handle in list(handle_map.items()):
-                last_ts = get_last_active_ts(username, handle.get("last_active"))
-                if not last_ts:
-                    continue
-                if now - last_ts >= USER_IDLE_TIMEOUT_SECONDS:
-                    debug_log(f"[IdleReaper] 回收容器: {username} (idle {int(now - last_ts)}s)")
-                    container_manager.release_container(username, reason="idle_timeout")
-            time.sleep(60)
-        except Exception as exc:
-            debug_log(f"[IdleReaper] 后台循环异常: {exc}")
-            time.sleep(60)
-
-
-def start_background_jobs():
-    """启动一次性的后台任务（容器空闲回收 + 对话级 terminal TTL 回收）。"""
-    global _idle_reaper_started
-    if _idle_reaper_started:
-        return
-    _idle_reaper_started = True
-    _load_last_active_cache()
-    threading.Thread(target=idle_reaper_loop, daemon=True).start()
-    try:
-        from .context import start_conversation_terminal_reaper
-        start_conversation_terminal_reaper()
-    except Exception as exc:
-        debug_log(f"[ConvTerminalReaper] 启动失败: {exc}")
-    try:
-        from modules.scheduled_tasks import get_service
-        get_service().start()
-    except Exception as exc:
-        debug_log(f"[ScheduledTasks] 启动失败: {exc}")
 
 TITLE_DEBUG_DIR = Path(LOGS_DIR).expanduser().resolve() / "title_debug"
 TITLE_DEBUG_FILE = TITLE_DEBUG_DIR / "title_generation.log"
@@ -735,91 +630,6 @@ GOAL_MODE_DEBUG_LOG_FILE = Path(LOGS_DIR).expanduser().resolve() / "goal_mode_de
 UPLOAD_FOLDER_NAME = ".astrion/user_upload"
 
 
-def is_logged_in() -> bool:
-    from server.auth_helpers import is_logged_in as shared_is_logged_in
-    return shared_is_logged_in()
-
-
-def login_required(view_func):
-    @wraps(view_func)
-    def wrapped(*args, **kwargs):
-        if not is_logged_in():
-            return redirect('/login')
-        return view_func(*args, **kwargs)
-
-    return wrapped
-
-
-def api_login_required(view_func):
-    @wraps(view_func)
-    def wrapped(*args, **kwargs):
-        if not is_logged_in():
-            return jsonify({"error": tr("auth.session_expired")}), 401
-        return view_func(*args, **kwargs)
-
-    return wrapped
-
-
-def get_current_username() -> Optional[str]:
-    return session.get('username')
-
-
-def get_current_user_record():
-    username = get_current_username()
-    if not username:
-        return None
-    return user_manager.get_user(username)
-
-
-def get_current_user_role(record=None) -> str:
-    role = session.get('role')
-    if role:
-        return role
-    if record is None:
-        record = get_current_user_record()
-    return (record.role if record and record.role else 'user')
-
-
-def is_admin_user(record=None) -> bool:
-    role = get_current_user_role(record)
-    return isinstance(role, str) and role.lower() == 'admin'
-
-def resolve_admin_policy(record=None) -> Dict[str, Any]:
-    """获取当前用户生效的管理员策略。"""
-    if record is None:
-        record = get_current_user_record()
-    username = record.username if record else None
-    role = get_current_user_role(record)
-    invite_code = getattr(record, "invite_code", None)
-    try:
-        return admin_policy_manager.get_effective_policy(username, role, invite_code)
-    except Exception as exc:
-        debug_log(f"[admin_policy] 加载失败: {exc}")
-        return admin_policy_manager.get_effective_policy(username, role, invite_code)
-
-
-def admin_required(view_func):
-    @wraps(view_func)
-    def wrapped(*args, **kwargs):
-        record = get_current_user_record()
-        if not record or not is_admin_user(record):
-            return redirect('/new')
-        return view_func(*args, **kwargs)
-
-    return wrapped
-
-
-def admin_api_required(view_func):
-    @wraps(view_func)
-    def wrapped(*args, **kwargs):
-        record = get_current_user_record()
-        if not record or not is_admin_user(record):
-            return jsonify({"success": False, "error": tr("legacy.admin_required")}), 403
-        return view_func(*args, **kwargs)
-
-    return wrapped
-
-
 def get_upload_guard(workspace: UserWorkspace) -> UploadQuarantineManager:
     """构建上传隔离管理器"""
     return UploadQuarantineManager(workspace)
@@ -976,42 +786,8 @@ def detect_tool_failure(result_data: Any) -> bool:
 
 
 def initialize_system(path: str, thinking_mode: bool = False):
-    """初始化系统（多用户版本仅负责写日志和配置）"""
-    DEBUG_LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with DEBUG_LOG_FILE.open('w', encoding='utf-8') as f:
-        f.write(f"调试日志开始 - {datetime.now()}\n")
-        f.write(f"默认工作区路径: {path}\n")
-        f.write(f"默认思考模式: {'思考' if thinking_mode else '快速'}（对话中可切换）\n")
-        f.write(f"自动修复: {'开启' if AUTO_FIX_TOOL_CALL else '关闭'}\n")
-        f.write(f"最大迭代: {MAX_ITERATIONS_PER_TASK}\n")
-        f.write(f"最大工具调用: {MAX_TOTAL_TOOL_CALLS}\n")
-        f.write("="*80 + "\n")
-    print(f"{OUTPUT_FORMATS['info']} 初始化 Web 系统...")
-    print(f"{OUTPUT_FORMATS['info']} 数据目录: {DATA_DIR}")
-    print(f"{OUTPUT_FORMATS['info']} 调试日志: {DEBUG_LOG_FILE}")
-    app.config['DEFAULT_THINKING_MODE'] = thinking_mode
-    app.config['DEFAULT_RUN_MODE'] = "thinking" if thinking_mode else "fast"
-
-    # host 模式启动即生成 CLI Bearer token（原惰性生成依赖首个 Bearer 请求触发，
-    # CLI 无 token 不发请求会形成鸡生蛋死锁；启动时生成根治）
-    if TERMINAL_SANDBOX_MODE == "host":
-        try:
-            from server.gateway_auth import get_or_create_host_api_token
-            if get_or_create_host_api_token():
-                print(f"{OUTPUT_FORMATS['success']} Host API token 已就绪（CLI Bearer 通道）")
-        except Exception as _e:
-            print(f"{OUTPUT_FORMATS['warning']} Host API token 生成失败: {_e}")
-        # 首次启动（catalog 为空）自动建一个桌面默认工作区：无工作区会让桌面标签条、
-        # /new 路由进入「引导态」，用户必须手动建一个才能开始对话。
-        try:
-            from modules.host_workspace_manager import ensure_default_host_workspace
-            created = ensure_default_host_workspace()
-            if created:
-                print(f"{OUTPUT_FORMATS['success']} 已创建默认工作区: {created.get('path')}")
-        except Exception as _e:
-            print(f"{OUTPUT_FORMATS['warning']} 默认工作区创建失败: {_e}")
-    _mode_label = "宿主机模式（单用户）" if TERMINAL_SANDBOX_MODE == "host" else "多用户模式（Web）"
-    print(f"{OUTPUT_FORMATS['success']} Web 系统初始化完成（{_mode_label}）")
+    """Initialize the full server before it starts accepting requests."""
+    initialize_host(app, path, thinking_mode)
 
 
 def run_server(path: str, thinking_mode: bool = False, port: int = DEFAULT_PORT, debug: bool = False):
@@ -1058,11 +834,6 @@ def parse_arguments():
         help="新对话默认使用思考模式（对话中可随时切换）"
     )
     return parser.parse_args()
-
-
-@app.route('/resource_busy')
-def resource_busy_page():
-    return serve_entry_html('resource_busy.html'), 503
 
 
 @app.route('/api/client_debug_log', methods=['POST'])

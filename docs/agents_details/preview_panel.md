@@ -26,17 +26,13 @@
 
 **安全模型**：预览内容（智能体写的 HTML / 代理的 dev server）若以主应用同源端点提供，iframe `sandbox="allow-scripts allow-same-origin"` 对同源内容等于无沙箱（预览页 JS 可读父 DOM/localStorage、带会话 cookie 调应用 API）。调研结论（`.astrion/sub_agent_results/agent_2_4/preview_isolation_research.md`）：业界全部用「换源」隔离，无一靠 sandbox flag/CSP。
 
-**本机访问（localhost/127.0.0.1/[::1]）= 独立预览服务器**（`server/preview_server.py`）：主应用懒启动只绑 127.0.0.1 的随机高位端口迷你 Flask（werkzeug make_server，daemon 线程）；路径带每对话 token（优先用 `metadata.preview_token`；写盘被主任务整文件回写冲掉时由 `_derived_preview_token()` 按对话 ID 进程内派生兜底，重启后前端重新拉取即换新）；两道关卡=Host 头白名单（防 DNS rebinding）+ token 注册表反查（注册表存会话身份四元组而非 terminal 引用——对话级 terminal 会被 24h 回收，身份可随时经 `get_user_resources(update_session=False)` 重建工作区级 terminal，容器句柄工作区级共享）。cookie 侧：会话 cookie 已是 SameSite=Strict+HttpOnly，且预览源与主应用不同 host=不同站，跨站请求不带 cookie；同 host 访问场景由 CSRF token+无 CORS 头兜底。下发链路：`build_preview_runtime()`（preview.py）在 targets/bootstrap/messages 三处响应里带 `preview_base`+`preview_token`，前端 store（previewBase/previewToken）经 `previewUrlFor()` 推导 iframe 地址；任务事件流只推数组，base/token 由最近一次拉取保持。
+**本机访问（localhost/127.0.0.1/[::1]）= 独立预览服务器**（`server/preview_server.py`）：主应用懒启动只绑 127.0.0.1 的随机高位端口迷你 Flask（werkzeug make_server，daemon 线程）；路径带每对话 token（优先用 `metadata.preview_token`；写盘被主任务整文件回写冲掉时由 `_derived_preview_token()` 按对话 ID 进程内派生兜底，重启后前端重新拉取即换新）；两道关卡=Host 头白名单（防 DNS rebinding）+ token 注册表反查（注册表存会话身份四元组而非 terminal 引用——对话级 terminal 会被 24h 回收，身份可随时经 `get_user_resources(update_session=False)` 重建工作区级 terminal）。cookie 侧：会话 cookie 已是 SameSite=Strict+HttpOnly，且预览源与主应用不同 host=不同站，跨站请求不带 cookie；同 host 访问场景由 CSRF token+无 CORS 头兜底。下发链路：`build_preview_runtime()`（preview.py）在 targets/bootstrap/messages 三处响应里带 `preview_base`+`preview_token`，前端 store（previewBase/previewToken）经 `previewUrlFor()` 推导 iframe 地址；任务事件流只推数组，base/token 由最近一次拉取保持。
 
-**⚠️ 预览服务器解析工作区必须用显式身份（2026-10-29 修复，硬约束）**：预览服务器是独立 Flask app，没有主应用 session。`_resolve_context()` 调用 `get_user_resources()` 时**必须传 `identity=RuntimeIdentity(host_mode=True, host_workspace_id=<注册时工作区>, role=<注册时角色>)`**；否则内部 `request_identity()` 读到的 `host_mode` 恒为 False，`resolve_workspace` 会走非 host 分支造出 `<DATA_DIR>/users/<u>/projects/<ws>/project` 假工作区，并用与主应用**相同的缓存键** `(owner, workspace_id, None)` 把 project_path 错误的 terminal 写进全局终端池。bootstrap 改为「查询不建执行实例」后，重启/压缩（终端被回收）后第一个碰 terminal 的往往就是预览 iframe → 工作区级 terminal 全进程跑偏 → 文件预览一律返回「文件不可用或不在可访问范围内」，直到进程重启。双保险：解析结果 `workspace.workspace_id` 与注册值不一致时直接拒绝（不返回 terminal），绝不从别的工作区服务文件。
+**预览服务器解析工作区必须用显式身份**。独立 Flask app 没有主应用 session，`_resolve_context()` 必须传 `RuntimeIdentity(host_mode=True, host_workspace_id=<注册时工作区>, role=<注册时角色>)`。Host 资源解析要求此身份，且结果的 `workspace.workspace_id` 必须与注册值一致。
 
-**docker/web 模式 = 预览整体禁用（2026-09-27 用户拍板）**：红队演练确认 docker 是唯一把端口暴露到公网的部署形态，远端回退的同源端点=会话级注入缺口（漏洞详情与重启前提见项目记忆 `preview_security_redteam`）。唯一判定=`modules/preview_targets.py::is_preview_enabled()`（=IS_HOST_MODE），四处门控：①记录入口（`record_file_target`/`record_url_targets` 直接返回）；②端点（targets 返回空/remove·file·proxy 403，`build_preview_runtime` 回 empty）；③序列化（bootstrap/messages 端点 `preview_targets` 强制置空，老对话残留数据不下发）；④prompt（冻结段为空）。前端无目标自然隐藏，docker 老对话数据残留无害。
-
-**远端域名访问（host 模式经反向代理/域名访问的边角场景）= 回退旧同源端点**（/api/preview/file|proxy 保留，仅 host 模式可用）：浏览器到不了 127.0.0.1 预览服务器，`build_preview_runtime` 对非回环 Host 返回 None，前端回退旧端点——残余风险已知（有 CSRF+无 CORS 兜底），彻底解决需泛子域名（本地无 DNS/证书不可用）。
-
-- **host 模式**：服务器目标 iframe **直连 localhost URL**（保真 + HMR 可用，与主应用天然跨源）；文件目标走预览服务器 `/<token>/file/<path>`。
-- **docker 代理架构（代码保留，docker 禁用后实际不可达）**：服务器目标走预览服务器 `/<token>/proxy/<port>/…`。**关键架构**：docker 模式下智能体的命令经 `docker exec` 跑在独立的工具箱容器里（独立网络命名空间），后端进程的 127.0.0.1 根本到不了容器内的服务器（2026-09-27 实测 502 根因）——代理按 `terminal.container_session.mode == "docker"` 分流，docker 时经 `_docker_exec_fetch`（`docker exec <容器> curl -sS -i`，容器句柄自带 container_name/sandbox_bin）在容器内取数，host 时 httpx 直连。curl 路径不跟随重定向，3xx 透传且 Location 经 `_rewrite_location` 改道代理前缀；两条链路统一剥离 X-Frame-Options/CSP、HTML 重写绝对路径 src/href/action + 注入 base（base/前缀都按请求路径推导，兼容两种挂载点）、请求头剔除 accept-encoding。**SSRF 防护：仅允许代理当前对话已登记的端口**。
-- **已知限制（MVP）**：代理不转发 WebSocket（HMR 在代理预览中失效，需手动刷新）；页面内 JS 动态 import/fetch 的绝对路径不重写；docker 路径每请求一次 docker exec（约 50-150ms 开销），资源多的页面加载偏慢。
+- 本机浏览器预览服务器目标时直连 localhost URL，文件目标走独立预览服务器的 `/<token>/file/<path>`。
+- 通过反向代理或域名访问时，`build_preview_runtime()` 对非回环 Host 返回空值，浏览器回退到 `/api/preview/file` 或 `/api/preview/proxy`。同源回退沿用现有 CSRF 与 CORS 约束。
+- 代理经 HTTP 客户端连接本机已登记的端口，限制为当前对话的预览目标。代理重写 HTML 资源路径与重定向。WebSocket 和 JavaScript 动态 import／fetch 的绝对路径仍受现有代理限制。
 
 ### 16.3 前端
 

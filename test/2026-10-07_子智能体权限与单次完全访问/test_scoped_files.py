@@ -17,7 +17,6 @@ from modules.sub_agent.creation import SubAgentCreationMixin
 from modules.sub_agent.manager import SubAgentManager
 from modules.sub_agent.tools import handle_read_mediafile
 from modules.custom_tool_registry import CustomToolRegistry, is_reserved_tool_name
-from modules.docker_scoped_exec import wrap_scoped_docker_command
 
 
 class ScopedFilesTests(unittest.TestCase):
@@ -154,36 +153,6 @@ class ScopedFilesTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 registry.upsert_tool({"id": name, "execution_code": "print('substituted')"})
         self.assertFalse((self.base / "custom" / "run_command").exists())
-
-    def test_docker_seccomp_denies_cross_process_memory_access(self):
-        from modules.docker_scoped_launcher import _install_seccomp
-        from unittest.mock import Mock
-        calls = []
-        def resolve_name(name):
-            calls.append(name.decode())
-            return len(calls)
-        library = Mock()
-        library.seccomp_init.return_value = 1
-        library.seccomp_syscall_resolve_name.side_effect = resolve_name
-        library.seccomp_rule_add.return_value = 0
-        library.seccomp_load.return_value = 0
-        with patch("modules.docker_scoped_launcher.ctypes.util.find_library", return_value="fake"), \
-             patch("modules.docker_scoped_launcher.ctypes.CDLL", return_value=library):
-            _install_seccomp()
-        for name in ("process_vm_readv", "process_vm_writev", "ptrace", "pidfd_getfd", "io_uring_setup"):
-            self.assertIn(name, calls)
-        self.assertEqual(library.seccomp_rule_add.call_count, len(calls))
-        library.seccomp_load.assert_called_once_with(1)
-
-    def test_docker_workspace_scope_requires_launcher_without_fallback(self):
-        with bind_execution_scope(self.scope):
-            command = wrap_scoped_docker_command("/workspace", ["/bin/bash", "-lc", "echo ok"])
-        self.assertIn("-I", command)
-        self.assertIn("-S", command)
-        self.assertTrue(any("Landlock ABI >=3" in part for part in command))
-        full = ExecutionScope("sub_agent", "child", self.root, "full_access")
-        with bind_execution_scope(full), self.assertRaises(ValueError):
-            wrap_scoped_docker_command("/workspace", ["true"])
 
 
 if __name__ == "__main__":

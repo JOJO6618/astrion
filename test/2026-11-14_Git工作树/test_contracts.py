@@ -188,10 +188,13 @@ class ContractTests(unittest.TestCase):
                                 disabled_tools=set(), model_key=None, _apply_intent_to_tools=lambda tools: tools)
         for name in ('core', 'file', 'terminal', 'search_web', 'agent', 'context', 'misc', 'workflow', 'browser', 'custom', 'mcp'):
             setattr(owner, '_build_' + name + '_tools', lambda: [])
-        self.assertEqual(ToolsDefinitionMainMixin.define_tools(owner), [])
+        # 其他内置工具（如定时任务）常驻；这里只断言工作树工具由开关控制。
+        disabled_names = {item['function']['name'] for item in ToolsDefinitionMainMixin.define_tools(owner)}
+        self.assertFalse({'enter_worktree', 'exit_worktree'} & disabled_names)
         owner.context_manager.conversation_metadata['git_worktree_enabled'] = True
         tools = ToolsDefinitionMainMixin.define_tools(owner)
-        self.assertEqual({item['function']['name'] for item in tools}, {'enter_worktree', 'exit_worktree'})
+        enabled_names = {item['function']['name'] for item in tools}
+        self.assertLessEqual({'enter_worktree', 'exit_worktree'}, enabled_names)
 
     def test_creation_snapshot_changes_only_new_agent_documents(self):
         prefs = {'git_worktree_enabled': False}

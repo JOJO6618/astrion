@@ -7,7 +7,7 @@
 #   3. 若没有 .env（首次启动），自动运行配置向导
 #   4. 启动 python -m server.app
 #
-# 端口/监听地址/模式等由 .env 决定（见 config/server.py、config/paths.py）。
+# 端口/监听地址等由 .env 决定（见 config/server.py、config/paths.py；主仓固定 host 模式）。
 # 透传的命令行参数会传给 server.app（如 --port / --path / --thinking-mode）。
 #
 # 用法：

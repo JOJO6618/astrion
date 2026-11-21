@@ -1,66 +1,19 @@
 # modules/persistent_terminal.py - 持久化终端实例（修复版）
 
-import asyncio
 import subprocess
-import os
 import sys
-import time
-import signal
-from pathlib import Path
-from typing import Optional, Callable, Dict, List, Tuple
-from datetime import datetime
 import threading
-import queue
-from collections import deque
-import shutil
-import uuid
-import codecs
-from modules.host_sandbox_runner import (
-    HostSandboxError,
-    build_host_sandbox_shell_plan,
-    host_sandbox_enabled,
-)
+from datetime import datetime
+from pathlib import Path
+from typing import List, Optional, Dict
+
 try:
-    from config import (
-        OUTPUT_FORMATS,
-        TERMINAL_OUTPUT_WAIT,
-        TERMINAL_INPUT_MAX_CHARS,
-        TERMINAL_SANDBOX_MODE,
-        TERMINAL_SANDBOX_IMAGE,
-        TERMINAL_SANDBOX_MOUNT_PATH,
-        TERMINAL_SANDBOX_SHELL,
-        TERMINAL_SANDBOX_NETWORK,
-        TERMINAL_SANDBOX_CPUS,
-        TERMINAL_SANDBOX_MEMORY,
-        TERMINAL_SANDBOX_BINDS,
-        TERMINAL_SANDBOX_BIN,
-        TERMINAL_SANDBOX_NAME_PREFIX,
-        TERMINAL_SANDBOX_ENV,
-        TERMINAL_SANDBOX_REQUIRE,
-    )
+    from config import OUTPUT_FORMATS
 except ImportError:
-    import sys
-    from pathlib import Path
     project_root = Path(__file__).resolve().parents[1]
     if str(project_root) not in sys.path:
         sys.path.insert(0, str(project_root))
-    from config import (
-        OUTPUT_FORMATS,
-        TERMINAL_OUTPUT_WAIT,
-        TERMINAL_INPUT_MAX_CHARS,
-        TERMINAL_SANDBOX_MODE,
-        TERMINAL_SANDBOX_IMAGE,
-        TERMINAL_SANDBOX_MOUNT_PATH,
-        TERMINAL_SANDBOX_SHELL,
-        TERMINAL_SANDBOX_NETWORK,
-        TERMINAL_SANDBOX_CPUS,
-        TERMINAL_SANDBOX_MEMORY,
-        TERMINAL_SANDBOX_BINDS,
-        TERMINAL_SANDBOX_BIN,
-        TERMINAL_SANDBOX_NAME_PREFIX,
-        TERMINAL_SANDBOX_ENV,
-        TERMINAL_SANDBOX_REQUIRE,
-    )
+    from config import OUTPUT_FORMATS
 
 
 class LifecycleMixin:
@@ -300,14 +253,6 @@ class LifecycleMixin:
                     'session': self.session_name,
                     'time': datetime.now().isoformat()
                 })
-
-            if self.using_container:
-                # 终端经 docker exec 附着到 UserContainerManager 拥有的用户容器，
-                # 关闭终端只结束 exec 进程，绝不停容器本身（容器生命周期由容器
-                # 管理器负责）。历史上「终端自建临时容器」路径使用的
-                # _stop_sandbox_container 已随该路径一并删除。
-                self.using_container = False
-                self.execution_mode = "host"
 
             print(f"{OUTPUT_FORMATS['info']} 终端会话关闭: {self.session_name}")
             return True

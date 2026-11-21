@@ -18,12 +18,7 @@ try:
         MAX_CONTEXT_SIZE,
         DATA_DIR,
         PROMPTS_DIR,
-        TERMINAL_SANDBOX_MOUNT_PATH,
-        TERMINAL_SANDBOX_CPUS,
-        TERMINAL_SANDBOX_MEMORY,
         PROJECT_MAX_STORAGE_MB,
-        TERMINAL_SANDBOX_MODE,
-        LINUX_SAFETY,
     )
     from config.model_profiles import (
         get_model_prompt_replacements,
@@ -41,12 +36,7 @@ except ImportError:
         MAX_CONTEXT_SIZE,
         DATA_DIR,
         PROMPTS_DIR,
-        TERMINAL_SANDBOX_MOUNT_PATH,
-        TERMINAL_SANDBOX_CPUS,
-        TERMINAL_SANDBOX_MEMORY,
         PROJECT_MAX_STORAGE_MB,
-        TERMINAL_SANDBOX_MODE,
-        LINUX_SAFETY,
     )
     from config.model_profiles import (
         get_model_prompt_replacements,

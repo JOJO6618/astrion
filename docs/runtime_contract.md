@@ -87,6 +87,8 @@
 
 2026-10-26 Chat 扩展：`TrustedPrincipal.conversation_kind` 默认 `agent`；Agent 仍要求非空工作区，可信 Chat 身份必须是 `chat + workspace_id=None`，禁止伪造工作区。`TaskParams` 的 `chat_operation_id/chat_parent_id/chat_regenerate_turn_id/chat_edit_message_id/chat_settings` 由 Chat 适配层校验。首消息创建与受理命令幂等，分支层将固定 turn 路径交给共用循环；`server/tasks/chat_mode.py` 不调用 Agent `get_user_resources`。Chat 仍复用 TaskManager 登记、主任务门闸、取消、任务事件及显示锁，最终树提交和完整工具取消配对后才发布终态。详细边界见 `docs/chat_mode.md`。
 
+Host 主仓的认证来源为浏览器 Host 会话和本机 Gateway Bearer。旧租户身份字段可用于识别历史记录，执行与工作区访问均要求可信 Host 身份。
+
 ### 4.2 服务接口（首版最小集）
 
 | 方法 | 语义 | 裁决/互斥 |
@@ -112,7 +114,6 @@
 | 调用方 | 现状入口 | 上下文来源 | 门闸获取/释放 | 取消传播 | 迁移方式 |
 |---|---|---|---|---|---|
 | Web 聊天 | `POST /api/tasks`（tasks/api.py:200） | Flask session 快照 | 执行内 process_message_task 获取/finally 释放 | REST cancel by task_id | 适配层构造 principal+params → create_task |
-| API v1 | `POST /api/v1/workspaces/<id>/messages`（api_v1.py:320） | Bearer token 注入 session（is_api_user/role="api" 关键字段） | 同上 | 同上 | 同上；**is_api_user/role 必须进 principal，丢失会静默串资源管理器** |
 | Workflow 激活/停用 | workflow_runtime_api.py:184/:264 | @with_terminal 显式构造 RuntimeContext | HTTP 层预占 + token 移交 + 失败回滚（restore_notices） | 同上 | 短期：仅下沉 Task 创建调用，编排留 HTTP 层；长期：会话补建/门闸移交/回滚下沉工作流服务 |
 | 完成通知派发 | chat_flow_task_main.py:613 | web_terminal 属性显式构造 | 轮询器预占 + token 移交；**含异常回退路径（:645-675）** | 同上 | 构造 helper 统一（RuntimeContext.from_terminal） |
 | 多智能体 idle 派发 | chat_flow_task_main.py:1416 | web_terminal 属性显式构造 + task_type="notice" | 无预占（notice 豁免 chat 互斥） | 同上 | 保留 notice 豁免语义 |

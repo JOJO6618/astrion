@@ -22,19 +22,7 @@ const commandBlocking = useCommandBlockingStore();
  * 共享上下文由 usePersonalizationContext（PersonalizationDrawer / SettingsShell 各自 provide 同一份）注入。
  */
 const ctx = inject<Record<string, any>>('personalizationDrawer')!;
-const {
-  personalization,
-  form,
-  isAppShell,
-  appCurrentVersionText,
-  appHasUpdate,
-  appUpdateStateText,
-  appUpdateChecking,
-  checkAppUpdate,
-  downloadLatestApp,
-  subAgentModels,
-  wsDescKey
-} = ctx;
+const { personalization, form, subAgentModels, wsDescKey } = ctx;
 
 // 运行数据目录：两个桌面壳（macOS Electron / Windows Tauri）都支持——
 // 壳侧各自实现了 /rundata/info|apply|restart 与启动前迁移，网页版不显示该区块。
@@ -596,44 +584,6 @@ onMounted(() => {
         </div>
       </div>
     </Teleport>
-
-    <div v-if="isAppShell" class="stg-section-divider">
-      <span class="stg-section-divider__label">{{ $t('personalization.appUpdateTitle') }}</span>
-    </div>
-    <div v-if="isAppShell" class="stg-card">
-      <div v-if="isAppShell" class="stg-action-row">
-        <span class="stg-row-copy">
-          <span class="stg-row-title">{{ $t('personalization.appUpdateTitle') }}</span>
-          <span class="stg-row-desc">{{
-            $t('personalization.appUpdateDesc', {
-              version: appCurrentVersionText,
-              state: appUpdateStateText
-            })
-          }}</span>
-        </span>
-        <button
-          v-if="appHasUpdate"
-          type="button"
-          class="stg-primary-button"
-          @click="downloadLatestApp"
-        >
-          {{ $t('common.download') }}
-        </button>
-        <button
-          v-else
-          type="button"
-          class="stg-secondary-button"
-          :disabled="appUpdateChecking"
-          @click="checkAppUpdate"
-        >
-          {{
-            appUpdateChecking
-              ? $t('personalization.appChecking')
-              : $t('personalization.appCheckUpdate')
-          }}
-        </button>
-      </div>
-    </div>
   </section>
 </template>
 

@@ -32,14 +32,14 @@ from modules.skills_manager import (
 )
 from modules.upload_security import UploadSecurityError
 from modules.host_sandbox_policy import load_policy, save_policy
-from modules.user_manager import UserWorkspace
+from modules.workspace import UserWorkspace
 from core.web_terminal import WebTerminal
 from core.tool_loading import build_registry_payload
 from config.model_profiles import get_model_context_window
 
-from server.auth_helpers import api_login_required, resolve_admin_policy, get_current_user_record, get_current_username, get_current_user_role
+from server.auth_helpers import api_login_required, resolve_admin_policy, get_current_username, get_current_user_role
 from server.gateway_auth import api_login_or_host_token_required
-from server.context import with_terminal, get_gui_manager, get_upload_guard, build_upload_error_response, ensure_conversation_loaded, get_or_create_usage_tracker
+from server.context import with_terminal, get_gui_manager, get_upload_guard, build_upload_error_response, ensure_conversation_loaded
 from server.security import rate_limited
 from server.utils_common import debug_log
 from server.state import PROJECT_MAX_STORAGE_MB
@@ -89,11 +89,7 @@ def _build_tool_categories_snapshot_fallback(username: str, config: Dict[str, An
     categories: Dict[str, Any] = {}
     forced_states: Dict[str, Any] = {}
     try:
-        from modules import admin_policy_manager
-        record = get_current_user_record()
-        role = get_current_user_role(record) if record else "admin"
-        invite_code = getattr(record, "invite_code", None) if record else None
-        policy = admin_policy_manager.get_effective_policy(username, role, invite_code)
+        policy = resolve_admin_policy()
         categories = policy.get("categories") or {}
         forced_states = policy.get("forced_category_states") or {}
     except Exception as exc:
@@ -265,7 +261,7 @@ def update_model(terminal: WebTerminal, workspace: UserWorkspace, username: str)
             return jsonify({"success": False, "error": tr("chat_settings.missing_model_key")}), 400
 
         # 管理员禁用模型校验
-        policy = resolve_admin_policy(get_current_user_record())
+        policy = resolve_admin_policy()
         disabled_models = set(policy.get("disabled_models") or [])
         if model_key in disabled_models:
             return jsonify({
@@ -362,7 +358,7 @@ def update_model(terminal: WebTerminal, workspace: UserWorkspace, username: str)
 def get_personalization_settings(terminal: Optional[WebTerminal], workspace: Optional[UserWorkspace], username: str):
     """获取个性化配置（无工作区时也可读取——配置模型不要求先建工作区）"""
     try:
-        policy = resolve_admin_policy(get_current_user_record())
+        policy = resolve_admin_policy()
         if policy.get("ui_blocks", {}).get("block_personal_space"):
             return jsonify({"success": False, "error": tr("chat_settings.personal_space_admin_disabled")}), 403
         data_dir = _personalization_data_dir(workspace)
@@ -419,7 +415,7 @@ def update_personalization_settings(terminal: Optional[WebTerminal], workspace: 
     """更新个性化配置（无工作区时也可写入——配置模型不要求先建工作区）"""
     payload = request.get_json() or {}
     try:
-        policy = resolve_admin_policy(get_current_user_record())
+        policy = resolve_admin_policy()
         if policy.get("ui_blocks", {}).get("block_personal_space"):
             return jsonify({"success": False, "error": tr("chat_settings.personal_space_admin_disabled")}), 403
         data_dir = _personalization_data_dir(workspace)

@@ -61,7 +61,6 @@
       <template v-else-if="fileType === 'image'">
         <img
           class="sfc-image"
-          :class="{ 'sfc-image--android': isAndroidApp }"
           :src="contentUrl"
           :alt="displayName"
           @click="openFullImage()"
@@ -139,13 +138,6 @@ const canCopy = computed(() =>
 
 // HTML 文件额外提供全屏预览入口（卡片内仍按代码高亮展示）
 const isHtmlFile = computed(() => /\.html?$/i.test(props.path));
-
-const isAndroidApp = computed(() => {
-  return (
-    typeof (window as any).AndroidDownloadBridge !== 'undefined' ||
-    typeof (window as any).AndroidThemeBridge !== 'undefined'
-  );
-});
 
 // 根据路径推断 Prism 语言（修复历史遗留：原代码引用了未定义的 displayLang，
 // 高亮从未真正生效，静默 fallback 为纯文本）
@@ -627,12 +619,5 @@ onMounted(() => {
   margin: 0 auto;
   cursor: zoom-in;
   padding: 12px;
-}
-
-.sfc-image--android {
-  cursor: default;
-  pointer-events: none;
-  -webkit-user-select: none;
-  user-select: none;
 }
 </style>

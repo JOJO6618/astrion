@@ -1,47 +1,10 @@
-# modules/terminal_ops.py - 终端操作模块（修复Python命令检测）
+# modules/terminal_ops/command.py - 命令校验与工作目录解析（Host-only）
 
-import os
-import sys
-import asyncio
-import subprocess
-import shutil
-import time
-import signal
-import re
 from pathlib import Path
-from typing import Dict, Optional, Tuple, TYPE_CHECKING
-from types import SimpleNamespace
-try:
-    from config import (
-        TERMINAL_COMMAND_TIMEOUT,
-        OUTPUT_FORMATS,
-        MAX_RUN_COMMAND_CHARS,
-        HOST_SANDBOX_NETWORK_PERMISSION,
-    )
-except ImportError:
-    project_root = Path(__file__).resolve().parents[1]
-    if str(project_root) not in sys.path:
-        sys.path.insert(0, str(project_root))
-    from config import (
-        TERMINAL_COMMAND_TIMEOUT,
-        OUTPUT_FORMATS,
-        MAX_RUN_COMMAND_CHARS,
-        HOST_SANDBOX_NETWORK_PERMISSION,
-    )
-from modules.host_sandbox_runner import (
-    HostSandboxError,
-    NETWORK_PERMISSION_RESTRICTED,
-    build_host_sandbox_plan,
-    build_host_sandbox_readonly_plan,
-    host_sandbox_enabled,
-)
-from modules.i18n import tr
-from modules.scoped_execution_policy import scoped_work_path
-from modules.execution_scope import current_execution_scope
+from typing import Optional, Tuple
 
-if TYPE_CHECKING:
-    from modules.user_container_manager import ContainerHandle
-    from modules.terminal_manager import TerminalManager
+from modules.execution_scope import current_execution_scope
+from modules.scoped_execution_policy import scoped_work_path
 
 
 class CommandMixin:
@@ -67,4 +30,4 @@ class CommandMixin:
         if scope is None or not scope.is_sub_agent:
             base = Path(getattr(self, 'execution_root', self.project_path))
             working_dir = str((base / working_dir).resolve()) if working_dir else str(base)
-        return scoped_work_path(self.project_path, working_dir)
+        return scoped_work_path(self.project_path, working_dir, scope)

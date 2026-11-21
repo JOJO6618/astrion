@@ -2,29 +2,8 @@
 import { t } from '@/locales';
 import { ICONS, TOOL_CATEGORY_ICON_MAP } from '../utils/icons';
 
-/* host/docker 模式缓存：模式是部署级属性几乎不变，首屏用缓存值渲染
-   工作区入口按钮（按钮显隐依赖这两个 flag），socket 连接后校正并回写，
-   避免按钮在初始化完成前「延迟零点几秒才出现」。 */
-const WORKSPACE_MODE_STORAGE_KEY = 'agents_workspace_mode';
-
-const loadCachedWorkspaceMode = (): 'host' | 'docker' | null => {
-  try {
-    const v = window.localStorage.getItem(WORKSPACE_MODE_STORAGE_KEY);
-    return v === 'host' || v === 'docker' ? v : null;
-  } catch {
-    return null;
-  }
-};
-
-export const persistWorkspaceMode = (isHostMode: boolean): void => {
-  try {
-    window.localStorage.setItem(WORKSPACE_MODE_STORAGE_KEY, isHostMode ? 'host' : 'docker');
-  } catch {
-    /* ignore */
-  }
-};
-
-const cachedWorkspaceMode = loadCachedWorkspaceMode();
+/* 主仓只剩 Host 一种部署形态：工作区身份直接采用可信的 Host 状态，
+   不再从 /api/status 的 container.mode 或 localStorage 模式缓存推导。 */
 
 export function dataState() {
   return {
@@ -201,8 +180,8 @@ export function dataState() {
     pathAuthorizationWorkspaceReadableDraft: '',
     pathAuthorizationDraft: '',
     pathAuthorizationSaving: false,
-    versioningHostMode: cachedWorkspaceMode === 'host',
-    dockerProjectMode: cachedWorkspaceMode === 'docker',
+    // Host-only 主仓：工作区导航始终按 Host 工作区语义装配。
+    versioningHostMode: true,
     // 零工作区引导模式：新装应用尚无工作区时由 loadInitialData 进入，
     // 创建首个工作区成功后据此触发一次完整重新初始化，无需手动刷新页面
     workspaceBootstrapActive: false,

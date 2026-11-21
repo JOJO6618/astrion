@@ -7,13 +7,11 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from modules.container_file_proxy import CONTAINER_FILE_SCRIPT
-from modules.execution_plane.files import LocalFileSystem
 from modules.execution_plane.local import LocalExecutionBackend
 from modules.file_manager import FileManager
-from modules.project_memory import NOTICE_NAME, docker_bind_directory, legacy_files, scan_index, tool_directory
+from modules.project_memory import NOTICE_NAME, legacy_files, scan_index, tool_directory
 from modules.project_memory_migration import WorkspaceMemories, clean_workspace, copy_workspace, verify_workspace
-from modules.user_container_manager import ContainerHandle, UserContainerManager
+from modules.workspace_memory_context import owner_location
 
 
 class MigrationTest(unittest.TestCase):
@@ -28,17 +26,25 @@ class MigrationTest(unittest.TestCase):
         self.source = self.legacy / 'topic.md'
         self.source.write_bytes(b'---\nname: topic\ndescription: index text\n---\nold data\n')
 
-    def workspace(self, docker=False):
-        return WorkspaceMemories('test', 'default', 'Test project', self.project, self.data, docker,
+    def workspace(self):
+        return WorkspaceMemories('host', 'default', 'Test project', self.project, self.data,
                                  tuple(legacy_files(self.project)))
 
     def copy(self, workspace):
         return copy_workspace(workspace, lambda: None)
 
-    def test_host_switch_reads_only_external_topics_and_leaves_notice(self):
+    def owner(self, container_session=None):
         manager = FileManager(str(self.project), data_dir=str(self.data))
-        owner = SimpleNamespace(project_path=self.project, data_dir=self.data, file_manager=manager)
+        owner = SimpleNamespace(project_path=self.project, data_dir=self.data,
+                                file_manager=manager, container_session=None)
         owner.execution_backend = LocalExecutionBackend(owner)
+        # A legacy identity is attached only after the Host backend is bound, so
+        # the test exercises the memory/tool guard rather than backend creation.
+        owner.container_session = container_session
+        return owner
+
+    def test_host_switch_reads_only_external_topics_and_leaves_notice(self):
+        owner = self.owner()
         workspace = self.workspace()
         self.assertEqual(Path(tool_directory(owner)), workspace.destination)
         self.assertEqual(scan_index(owner), [])
@@ -106,73 +112,21 @@ class MigrationTest(unittest.TestCase):
         self.assertEqual(external.read_text(), 'outside secret')
         self.assertTrue((self.legacy / 'link.md').is_symlink())
 
-    def test_docker_old_path_is_selected_until_verified_cleanup(self):
-        workspace = self.workspace(docker=True)
-        self.assertIsNone(docker_bind_directory(str(self.project), str(self.data)))
-        copies = self.copy(workspace)
-        verify_workspace(workspace, copies, lambda: None)
-        self.assertIsNone(docker_bind_directory(str(self.project), str(self.data)))
-        clean_workspace(workspace, copies)
-        self.assertEqual(docker_bind_directory(str(self.project), str(self.data)), workspace.destination)
-        self.assertEqual(list(self.legacy.iterdir()), [])
-        self.assertEqual((workspace.destination / '.gitignore').read_text(), '*\n')
+    def test_host_memory_never_reuses_legacy_in_repository_directory(self):
+        workspace = self.workspace()
+        self.assertEqual(workspace.destination.parent.parent, self.data / 'memory')
+        self.assertNotEqual(workspace.destination.parent, self.legacy.parent)
 
-    def test_real_container_file_script_reads_the_mount_view(self):
-        workspace = self.workspace(docker=True)
-        clean_workspace(workspace, self.copy(workspace))
-        container_view = self.root / 'container-view'
-        (container_view / '.astrion').mkdir(parents=True)
-        (container_view / '.astrion/memory').mkdir()
-        virtual_file = container_view / '.astrion/memory/topic.md'
-        os.link(workspace.destination / 'topic.md', virtual_file)
-        handle = ContainerHandle('test', 'docker', str(self.project), '/custom/ws', 'sandbox',
-                                 topic_memory_directory=str(workspace.destination))
-        file_manager = FileManager(str(self.project), container_session=handle, data_dir=str(self.data))
-        self.assertEqual(file_manager._quota_file_size(self.source), virtual_file.stat().st_size)
-        self.assertGreaterEqual(file_manager._get_project_size(), virtual_file.stat().st_size)
-        backend = LocalFileSystem(file_manager)
-        namespace = {'__name__': 'test'}
-        exec(CONTAINER_FILE_SCRIPT, namespace)
+    def test_legacy_container_identity_is_rejected_instead_of_served_host_path(self):
+        owner = self.owner(SimpleNamespace(mode='docker'))
+        with self.assertRaises(PermissionError):
+            tool_directory(owner)
+        with self.assertRaises(PermissionError):
+            scan_index(owner)
+        with self.assertRaises(RuntimeError):
+            owner_location(owner)
+        self.assertFalse((self.data / 'memory').exists())
 
-        def invoke(action, payload):
-            return namespace['HANDLERS'][action](container_view, payload)
 
-        with patch.object(file_manager, '_container_call', side_effect=invoke):
-            relative = '.astrion/memory/topic.md'
-            self.assertIn('old data', backend.read_file(relative)['content'])
-            self.assertIn('old data', backend.read_text_segment('/custom/ws/' + relative)['content'])
-            result = backend.container_project_memory_index('/custom/ws/.astrion/memory', NOTICE_NAME)
-            self.assertEqual(result['entries'][0]['description'], 'index text')
-            self.assertTrue(backend.write_file(relative, 'new value')['success'])
-        self.assertEqual(virtual_file.read_text(), 'new value')
-        self.assertFalse(self.source.exists())
-
-    def test_container_mount_uses_configured_workspace_path(self):
-        from threading import Lock
-
-        workspace = self.workspace(docker=True)
-        clean_workspace(workspace, self.copy(workspace))
-        manager = UserContainerManager.__new__(UserContainerManager)
-        manager.sandbox_mode = 'docker'
-        manager._lock = Lock()
-        manager._containers = {}
-        manager.mount_path = '/custom/ws'
-        manager.sandbox_bin = 'docker'
-        manager.max_containers = 0
-        manager.image = 'local-image'
-        manager.network = 'none'
-        manager.cpus = manager.memory = manager.pids_limit = None
-        manager.binds = []
-        manager.extra_env = {}
-        manager._project_label_key = manager._project_label_value = 'test'
-        manager._kind_label_key = manager._kind_label_value = 'test'
-        with patch.object(manager, '_assert_docker_runtime_ready'), \
-                patch.object(manager, '_build_container_name', return_value='sandbox'), \
-                patch.object(manager, '_kill_container'), \
-                patch('modules.user_container_manager.shutil.which', return_value='docker'), \
-                patch('modules.user_container_manager.subprocess.run', return_value=SimpleNamespace(
-                    returncode=0, stdout='sandbox-id', stderr='')) as docker:
-            handle = manager.ensure_container('test', str(self.project), data_dir=str(self.data))
-        self.assertEqual(handle.topic_memory_directory, str(workspace.destination))
-        self.assertIn(f'{workspace.destination}:/custom/ws/.astrion/memory', docker.call_args.args[0])
-        self.assertIn(f'{workspace.destination.parent}:/custom/ws/.astrion/astrion-memory', docker.call_args.args[0])
+if __name__ == '__main__':
+    unittest.main()

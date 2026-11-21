@@ -145,7 +145,7 @@ const backupModeItems = computed(() => [
     </div>
 
     <div class="stg-section-divider">
-      <span class="stg-section-divider__label">{{ $t('settings.workspaceTitleProject') }}</span>
+      <span class="stg-section-divider__label">{{ $t('settings.workspaceTitle') }}</span>
     </div>
     <div class="stg-card">
       <label class="stg-toggle-row"

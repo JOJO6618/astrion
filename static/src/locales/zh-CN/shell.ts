@@ -25,7 +25,6 @@ export default {
   loadingGitChanges: '正在加载 Git 变更...',
   noUncommittedChanges: '当前没有未提交变更',
   openFileWithApp: '用应用打开文件',
-  dockerModeUnavailable: 'Docker 模式不可用',
   noAppsDetected: '未检测到可用应用',
   restore: '恢复',
   hiddenLines: '{n} 行未编辑的内容',

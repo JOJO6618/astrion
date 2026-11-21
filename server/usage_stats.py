@@ -13,9 +13,7 @@ from typing import List, Optional, Tuple
 
 from flask import Blueprint, jsonify, request
 
-from config import TERMINAL_SANDBOX_MODE
 from modules.usage_stats import WorkspaceRef, build_report, gather_sources
-from server import state
 from server.auth_helpers import api_login_required, get_current_username
 
 logger = logging.getLogger(__name__)
@@ -43,19 +41,18 @@ def _resolve_timezone() -> Tuple[tzinfo, str]:
 
 
 def _workspace_refs(username: str, identity) -> Tuple[List[WorkspaceRef], bool]:
-    """列出当前账号的全部 Agent 工作区；返回 (引用列表, 账本目录是否共享)。"""
+    """列出 Host 的全部 Agent 工作区；返回 (引用列表, 账本目录是否共享)。
+
+    只接受已认证的 Host 身份。历史普通用户／API 用户记录不再解析工作区，
+    直接拒绝继续执行，不隐式映射为 Host。
+    """
     from server.context.data import get_workspace_data
 
-    host = identity.host_mode and (TERMINAL_SANDBOX_MODE or "host").lower() == "host"
-    if host:
-        from modules.host_workspace_manager import load_host_workspace_catalog
-        entries = [(item.get("workspace_id"), item.get("label")) for item in
-                   load_host_workspace_catalog().get("workspaces") or []]
-    elif identity.is_api_user:
-        entries = [(ws_id, ws_id) for ws_id in state.api_user_manager.list_workspaces(username)]
-    else:
-        listing = state.user_manager.list_user_workspaces(username, prepare=False)
-        entries = [(ws_id, item.get("label")) for ws_id, item in listing.items()]
+    if not identity.host_mode or username != "host":
+        raise PermissionError("Host identity required")
+    from modules.host_workspace_manager import load_host_workspace_catalog
+    entries = [(item.get("workspace_id"), item.get("label")) for item in
+               load_host_workspace_catalog().get("workspaces") or []]
 
     refs: List[WorkspaceRef] = []
     for ws_id, label in entries:
@@ -70,7 +67,7 @@ def _workspace_refs(username: str, identity) -> Tuple[List[WorkspaceRef], bool]:
         except Exception:
             # 单个工作区不可解析（目录缺失／配置损坏）不影响其余统计
             logger.warning("usage stats: skip workspace %s", ws_id, exc_info=True)
-    return refs, host
+    return refs, True
 
 
 def _chat_root() -> Optional[Path]:
@@ -78,6 +75,8 @@ def _chat_root() -> Optional[Path]:
         from server.chat_mode.context import principal
         from server.chat_mode_scope import scope_for_principal
         return Path(scope_for_principal(principal()).root)
+    except PermissionError:
+        raise
     except Exception:
         logger.warning("usage stats: chat scope unavailable", exc_info=True)
         return None
@@ -97,6 +96,12 @@ def get_usage_stats():
     try:
         refs, shared = _workspace_refs(username, request_identity())
         sources = gather_sources(refs, _chat_root(), shared_ledger=shared)
+    except PermissionError as exc:
+        return jsonify({
+            "success": False,
+            "code": "host_identity_required",
+            "error": str(exc),
+        }), 403
     except Exception as exc:
         logger.exception("usage stats: gather failed")
         return jsonify({"success": False, "error": str(exc)}), 500

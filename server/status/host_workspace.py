@@ -5,29 +5,11 @@ from server.status.base import (
     _close_terminal_for_key,
     _is_host_mode_request,
 )
-import time
-import re
-import os
-import json
-import shutil
-import subprocess
-import sys
-import tempfile
-import plistlib
 from pathlib import Path
-from flask import Blueprint, jsonify, request, send_file, session
+from flask import jsonify, request, session
 
-from server.auth_helpers import api_login_required, resolve_admin_policy
+from server.auth_helpers import api_login_required
 from server.gateway_auth import api_login_or_host_token_required
-from server.context import with_terminal
-from server.state import (
-    PROJECT_STORAGE_CACHE,
-    PROJECT_STORAGE_CACHE_TTL_SECONDS,
-    PROJECT_MAX_STORAGE_MB,
-    container_manager,
-    user_manager,
-)
-from config import AGENT_VERSION, TERMINAL_SANDBOX_MODE
 from modules.host_workspace_manager import (
     create_host_workspace,
     delete_host_workspace,
@@ -37,7 +19,6 @@ from modules.host_workspace_manager import (
     set_default_host_workspace,
 )
 from utils.host_workspace_debug import write_host_workspace_debug
-from server.utils_common import log_conn_diag
 import server.state as state
 from modules.i18n import tr
 
@@ -152,7 +133,6 @@ def delete_host_workspace_api():
         return jsonify({"success": False, "error": tr("status_host_workspace.workspace_has_running_tasks")}), 409
     try:
         _close_terminal_for_key(f"host::{workspace_id}")
-        container_manager.release_container(f"host::{workspace_id}", reason="delete_host_workspace")
         result = delete_host_workspace(workspace_id)
     except ValueError as exc:
         return jsonify({"success": False, "error": str(exc)}), 400

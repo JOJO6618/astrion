@@ -37,9 +37,6 @@ class ChatTools:
         runtime = self.runtime
         memory = runtime.memory_manager
         if name == "web_search":
-            allowed, quota = runtime.record_search_call()
-            if not allowed:
-                return {"success": False, "code": "quota_exceeded", "quota": quota}
             results = await SearchEngine(data_dir=runtime.preferences_dir).search(**args)
             registry = get_registry(runtime)
             for result in results.get("results", []):

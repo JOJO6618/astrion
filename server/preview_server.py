@@ -56,7 +56,7 @@ def register_token(token: str, username: str, workspace_id: str, conversation_id
 
 def _resolve_context(token: str):
     """token → (terminal, conversation_id)。工作区级 terminal 足以承载
-    文件读边界（file_manager）与容器会话（container_session 工作区级共享）。
+    工作区文件读取仍走运行实例绑定的 FileManager。
 
     身份必须显式传入（见文件头注释）：绝不走 request_identity()。
     """

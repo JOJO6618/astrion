@@ -13,10 +13,6 @@ try:
         READ_TOOL_MAX_CONTEXT_BEFORE, READ_TOOL_MAX_CONTEXT_AFTER,
         READ_TOOL_DEFAULT_MAX_MATCHES, READ_TOOL_MAX_MATCHES,
         READ_TOOL_MAX_FILE_SIZE,
-        TERMINAL_SANDBOX_MOUNT_PATH,
-        TERMINAL_SANDBOX_MODE,
-        TERMINAL_SANDBOX_CPUS,
-        TERMINAL_SANDBOX_MEMORY,
         PROJECT_MAX_STORAGE_MB,
         CUSTOM_TOOLS_ENABLED,
     )
@@ -33,10 +29,6 @@ except ImportError:
         READ_TOOL_MAX_CONTEXT_BEFORE, READ_TOOL_MAX_CONTEXT_AFTER,
         READ_TOOL_DEFAULT_MAX_MATCHES, READ_TOOL_MAX_MATCHES,
         READ_TOOL_MAX_FILE_SIZE,
-        TERMINAL_SANDBOX_MOUNT_PATH,
-        TERMINAL_SANDBOX_MODE,
-        TERMINAL_SANDBOX_CPUS,
-        TERMINAL_SANDBOX_MEMORY,
         PROJECT_MAX_STORAGE_MB,
         CUSTOM_TOOLS_ENABLED,
     )
@@ -69,7 +61,6 @@ try:
 except ImportError:
     REASONING_EFFORT_LEVELS = ("low", "medium", "high", "xhigh", "max")
 
-from modules.container_monitor import collect_stats, inspect_state
 from core.tool_config import TOOL_CATEGORIES
 from utils.api_client import APIClient
 from utils.context_manager import ContextManager
@@ -543,49 +534,7 @@ class MainTerminalCommandMixin:
       主记忆: {memory_stats['main_memory']['lines']} 行
       任务记忆: {memory_stats['task_memory']['lines']} 行
     """
-            container_report = self._container_status_report()
-            if container_report:
-                status_text += container_report
             print(status_text)
-
-    def _container_status_report(self) -> str:
-            session = getattr(self, "container_session", None)
-            if not session or session.mode != "docker":
-                return ""
-            stats = collect_stats(session.container_name, session.sandbox_bin)
-            state = inspect_state(session.container_name, session.sandbox_bin)
-            lines = [f"  容器: {session.container_name or '未知'}"]
-            if stats:
-                cpu = stats.get("cpu_percent")
-                mem = stats.get("memory", {})
-                net = stats.get("net_io", {})
-                block = stats.get("block_io", {})
-                lines.append(f"    CPU: {cpu:.2f}%" if cpu is not None else "    CPU: 未知")
-                if mem:
-                    used = mem.get("used_bytes")
-                    limit = mem.get("limit_bytes")
-                    percent = mem.get("percent")
-                    mem_line = "    内存: "
-                    if used is not None:
-                        mem_line += f"{used / (1024 * 1024):.2f}MB"
-                    if limit:
-                        mem_line += f" / {limit / (1024 * 1024):.2f}MB"
-                    if percent is not None:
-                        mem_line += f" ({percent:.2f}%)"
-                    lines.append(mem_line)
-                if net:
-                    rx = net.get("rx_bytes") or 0
-                    tx = net.get("tx_bytes") or 0
-                    lines.append(f"    网络: ↓{rx/1024:.1f}KB ↑{tx/1024:.1f}KB")
-                if block:
-                    read = block.get("read_bytes") or 0
-                    write = block.get("write_bytes") or 0
-                    lines.append(f"    磁盘: 读 {read/1024:.1f}KB / 写 {write/1024:.1f}KB")
-            else:
-                lines.append("    指标: 暂无")
-            if state:
-                lines.append(f"    状态: {state.get('status')}")
-            return "\n".join(lines) + "\n"
 
     async def save_state(self):
             """保存状态"""

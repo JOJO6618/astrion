@@ -188,9 +188,6 @@ def requires_csrf_protection(path: str) -> bool:
         from server.gateway_auth import _extract_bearer_token, _verify_host_bearer
         if _verify_host_bearer(_extract_bearer_token()):
             return False
-    # API v1 统一跳过 CSRF；若未携带 Authorization，将由鉴权层返回 401
-    if path.startswith("/api/v1/"):
-        return False
     if path in state.CSRF_EXEMPT_PATHS:
         return False
     if path in state.CSRF_PROTECTED_PATHS:
@@ -258,9 +255,8 @@ def attach_security_hooks(app):
         # 因此 admin_dashboard 静态资源必须在 before_request 层面拦截。
         path = request.path or ""
         if path.startswith("/static/admin_dashboard"):
-            from .auth_helpers import get_current_user_record  # 局部导入避免循环
-            user = get_current_user_record()
-            if not user or getattr(user, "role", None) != "admin":
+            from .auth_helpers import is_logged_in, is_admin_user
+            if not is_logged_in() or not is_admin_user():
                 from flask import abort
                 abort(404)
 

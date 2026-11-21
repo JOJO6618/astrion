@@ -131,8 +131,7 @@ class LocalFileSystem(MetadataFileSystemMixin):
     """``FileSystemBackend`` 的本地 FileManager 薄适配器。
 
     内容读写原样转调 FileManager（签名、返回结构、异常均保留）；元数据由
-    ``MetadataFileSystemMixin`` 提供，宿主模式授权先于 stat，容器模式走
-    容器代理，绝不使用宿主镜像冒充容器视图。
+    ``MetadataFileSystemMixin`` 提供，授权检查先于宿主文件的 stat。
     """
 
     def __init__(self, file_manager: "FileManager") -> None:
@@ -141,13 +140,6 @@ class LocalFileSystem(MetadataFileSystemMixin):
     # ------------------------------------------------------------------
     # 内容读写：显式转发，不改变现有 FileManager 行为
     # ------------------------------------------------------------------
-    def container_project_memory_index(self, path: str, ignore: str) -> Dict[str, Any] | None:
-        if not self._is_container_mode():
-            return None
-        return self._call_container("project_memory_index", {
-            "path": self._container_relative(path), "ignore": ignore,
-        })
-
     def read_file(self, path: str) -> Dict[str, Any]:
         return self._file_manager.read_file(path)
 

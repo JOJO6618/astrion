@@ -14,9 +14,6 @@ try:
         FORBIDDEN_ROOT_PATHS,
         OUTPUT_FORMATS,
         READ_TOOL_MAX_FILE_SIZE,
-        PROJECT_MAX_STORAGE_BYTES,
-        TERMINAL_SANDBOX_MODE,
-        LINUX_SAFETY,
     )
 except ImportError:  # 兼容全局环境中存在同名包的情况
     import sys
@@ -30,17 +27,10 @@ except ImportError:  # 兼容全局环境中存在同名包的情况
         FORBIDDEN_ROOT_PATHS,
         OUTPUT_FORMATS,
         READ_TOOL_MAX_FILE_SIZE,
-        PROJECT_MAX_STORAGE_BYTES,
-        TERMINAL_SANDBOX_MODE,
-        LINUX_SAFETY,
     )
-from modules.container_file_proxy import ContainerFileProxy
 from modules.host_sandbox_policy import get_macos_writable_paths, get_macos_readable_paths
 from utils.logger import setup_logger
 from modules.i18n import tr
-
-if TYPE_CHECKING:
-    from modules.user_container_manager import ContainerHandle
 
 # 临时禁用长度检查
 DISABLE_LENGTH_CHECK = True
@@ -65,15 +55,6 @@ class CrudMixin:
         relative_path = self._relative_path(full_path)
         
         try:
-            if self._use_container():
-                result = self._container_call("create_file", {
-                    "path": relative_path,
-                    "content": ""
-                })
-                if result.get("success"):
-                    print(f"{OUTPUT_FORMATS['file']} 创建文件: {relative_path}")
-                return result
-
             # 创建父目录
             self._native_mkdir(full_path.parent)
             
@@ -107,14 +88,6 @@ class CrudMixin:
         
         try:
             relative_path = self._relative_path(full_path)
-            if self._use_container():
-                result = self._container_call("delete_file", {
-                    "path": relative_path
-                })
-                if result.get("success"):
-                    print(f"{OUTPUT_FORMATS['file']} 删除文件: {relative_path}")
-                return result
-
             self._native_unlink(full_path)
             print(f"{OUTPUT_FORMATS['file']} 删除文件: {relative_path}")
             
@@ -155,15 +128,6 @@ class CrudMixin:
         try:
             old_relative = self._relative_path(full_old_path)
             new_relative = self._relative_path(full_new_path)
-            if self._use_container():
-                result = self._container_call("rename_file", {
-                    "old_path": old_relative,
-                    "new_path": new_relative
-                })
-                if result.get("success"):
-                    print(f"{OUTPUT_FORMATS['file']} 重命名: {old_relative} -> {new_relative}")
-                return result
-
             self._native_rename(full_old_path, full_new_path)
             
             print(f"{OUTPUT_FORMATS['file']} 重命名: {old_relative} -> {new_relative}")
@@ -191,12 +155,6 @@ class CrudMixin:
         
         try:
             relative_path = self._relative_path(full_path)
-            if self._use_container():
-                result = self._container_call("create_folder", {"path": relative_path})
-                if result.get("success"):
-                    print(f"{OUTPUT_FORMATS['file']} 创建文件夹: {relative_path}")
-                return result
-
             self._native_mkdir(full_path)
             print(f"{OUTPUT_FORMATS['file']} 创建文件夹: {relative_path}")
             
@@ -215,7 +173,7 @@ class CrudMixin:
 
 
         # 安全：禁止删除工作区根目录本身（空路径/点路径会解析为根；
-        # docker 模式下该目录是宿主 bind mount，rmtree 会真实删除宿主文件）
+        # 递归删除会真实清空工作区内容，不区分执行环境）
         try:
             if full_path.resolve() == Path(self.project_path).resolve():
                 return {"success": False, "error": tr("file_manager.cannot_delete_workspace_root")}
@@ -230,12 +188,6 @@ class CrudMixin:
         
         try:
             relative_path = self._relative_path(full_path)
-            if self._use_container():
-                result = self._container_call("delete_folder", {"path": relative_path})
-                if result.get("success"):
-                    print(f"{OUTPUT_FORMATS['file']} 删除文件夹: {relative_path}")
-                return result
-
             self._native_rmtree(full_path)
             print(f"{OUTPUT_FORMATS['file']} 删除文件夹: {relative_path}")
             
@@ -279,21 +231,6 @@ class CrudMixin:
         
         try:
             relative_path = self._relative_path(full_path)
-            if PROJECT_MAX_STORAGE_BYTES and self._is_docker_mode():
-                current_size = self._get_project_size()
-                existing_size = self._quota_file_size(full_path)
-                if mode == "a":
-                    projected_total = current_size + len(content)
-                else:
-                    projected_total = current_size - existing_size + len(content)
-                if projected_total > PROJECT_MAX_STORAGE_BYTES:
-                    return {
-                        "success": False,
-                        "error": tr("file_manager.storage_quota_exceeded"),
-                        "limit_bytes": PROJECT_MAX_STORAGE_BYTES,
-                        "project_size_bytes": current_size,
-                        "attempt_size_bytes": len(content)
-                    }
             # 记录写入前的原始内容（用于版本控制和前端 diff 显示）
             original_file: Optional[str] = None
             try:
@@ -301,18 +238,6 @@ class CrudMixin:
                     original_file = self._native_read_text(full_path)
             except Exception:
                 original_file = None
-
-            if self._use_container():
-                result = self._container_call("write_file", {
-                    "path": relative_path,
-                    "content": content,
-                    "mode": mode
-                })
-                if result.get("success"):
-                    action = "覆盖" if mode == "w" else "追加"
-                    print(f"{OUTPUT_FORMATS['file']} {action}文件: {relative_path}")
-                    result["original_file"] = original_file
-                return result
 
             # 创建父目录
             self._native_mkdir(full_path.parent)

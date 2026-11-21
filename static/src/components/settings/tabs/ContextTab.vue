@@ -1,12 +1,10 @@
 <script setup lang="ts">
 import { inject } from 'vue';
-import { useSettingsStore } from '@/stores/settings';
 import { useProjectMemoryMigrationStore } from '@/stores/projectMemoryMigration';
 import UiSwitch from '@/components/ui/UiSwitch.vue';
 
 defineOptions({ name: 'ContextTab' });
 
-const settings = useSettingsStore();
 const migration = useProjectMemoryMigrationStore();
 
 /**
@@ -87,7 +85,7 @@ const {
       </div>
     </div>
 
-    <div v-if="settings.sessionHostMode" class="stg-card">
+    <div class="stg-card">
       <div class="stg-action-row">
         <span class="stg-row-copy">
           <span class="stg-row-title">{{ $t('settings.memoryMigration.hostEntry') }}</span>

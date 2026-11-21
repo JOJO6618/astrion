@@ -56,7 +56,7 @@
 | 存储空间统计与清理 | `AD/storage_stats.md` |
 | 技能名称注入与 search_skills 检索 | `AD/skills_search.md` |
 | 主 Agent 系统提示词快照 | `system_prompt_snapshot.md` |
-| Android 发布联动 | `AD/android_release.md` |
+| Host 主仓与 Docker 拆分边界 | `docker_fork_split_plan.md` |
 | 自动审核策略 | `auto_approval_review.md` |
 | 提交共同作者尾注 | `coauthor_trailer.md` |
 
@@ -68,22 +68,22 @@
 
 ## 1) 当前项目结构（按代码现状）
 
-- **入口**：`main.py`（统一入口，默认 Web + thinking）；`server/app.py`（推荐 Web，转发 `app_legacy.py`）；`server/headless_app.py`（CLI 自启动，无站点路由面）；`web_server.py`（deprecated 兼容）
+- **入口**：`main.py`（统一入口，默认 Host Web + thinking）；`server/app.py`（推荐 Web，转发 `app_legacy.py`）；`server/headless_app.py`（CLI 自启动，无站点路由面）；`web_server.py`（deprecated 兼容）。full/headless 共用 `server/host_startup.py`，各自装配 Flask 路由。
 - **`server/`**：Flask 业务主线，子包 `chat/` `status/` `tasks/` `context/`；`server/runtime/` 是 RuntimeContext + RuntimeService（契约 `docs/runtime_contract.md`）。**REST 任务轮询是唯一实时通道**
 - **`core/`**：终端与工具编排（`main_terminal_parts/` 按 base + mixin 拆分）；**`modules/`**：可复用能力模块，其中 `execution_plane/` 是公共执行边界，**已绑定后端失败不得回退控制端**（契约 `docs/execution_contract.md`）
 - **`config/`**：配置拆分（api/limits/terminal/paths…），`config/__init__.py` 聚合 + 加载 `.env`；**`utils/`**：api_client、日志、上下文与对话工具
 - **前端**：`static/src/`（Vue 3 + TS）；`cli/src/`（opentui + React 19，旧 Ink 存档 `cli/legacy-ink-src/`）
-- **子项目**：`android-webview-app/`、`desktop-electron/`（macOS + Windows 共用 Electron）、`desktop/`（旧 Tauri 壳，仅供新壳复用 Windows staging/图标/原生模块）、`easyagent/`（已弃用）、`_experiments/`（不入 git，见 §7）
+- **子项目**：`desktop-electron/`（macOS + Windows 共用 Electron）、`desktop/`（旧 Tauri 壳，仅供新壳复用 Windows staging/图标/原生模块）、`easyagent/`（已弃用）、`_experiments/`（不入 git，见 §7）
 - 完整目录职责与监控动画核心文件见 `AD/project_structure.md`
 
 ### 1.5) 运行态数据目录与路径变量
 
-运行态数据（对话、工作区、日志）默认在 `~/.astrion/astrion/`，**不落源码树**（`config/paths.py`）。数据根可用 `ASTRION_DATA_ROOT` 搬迁，按 `TERMINAL_SANDBOX_MODE` 分流：host → `host/`，其它 → `web/`。**桌面端**数据根为 `~/.astrion/astrion-desktop`（Windows `%USERPROFILE%\.astrion\astrion-desktop`），后端数据在 `<根>/host/data/`、日志在 `<根>/host/logs/`；壳设置文件 `~/.astrion/rundata_settings.json`，调试可用 `ASTRION_DESKTOP_DATA_ROOT`。优先级：具体目录变量（`DATA_DIR`/`LOGS_DIR`/`USER_SPACE_DIR`/`API_USER_SPACE_DIR`）> `ASTRION_DATA_ROOT` > 兜底 `<mode>`。
+运行态数据根默认为 `~/.astrion/astrion/`，可用 `ASTRION_DATA_ROOT` 覆盖。数据和日志沿用 `host/data/` 与 `host/logs/`。具体 `DATA_DIR` 与 `LOGS_DIR` 覆盖优先。桌面壳默认 `~/.astrion/astrion-desktop`（Windows `%USERPROFILE%\.astrion\astrion-desktop`），调试覆盖用 `ASTRION_DESKTOP_DATA_ROOT`，壳设置仍在 `~/.astrion/rundata_settings.json`。
 
-- **`config/*.json` 分两类**：程序能力类（`docker_risk_markers`/`skill_hints`/`command_blocking_recommended`）锚定源码树；部署级配置（`custom_models`/`host_workspaces`/`auto_approval`/`goal_review`/`host_sandbox_policy`）外置到 `DEPLOY_CONFIG_DIR`（走 `config.resolve_deploy_config`）
-- host 模式同时加载 `host/` 与 `web/` 的用户/工作区，**写操作一律落 host**；API dump 默认关闭（`AGENT_API_DUMP_ENABLED`），轮转见 `utils/log_rotation.py`；迁移脚本 `scripts/migrate_runtime_data.py`（先 `--dry-run`）
-- **私有项目常驻记忆**：Host 存 `<DATA_DIR>/memory/<目录名>-<路径摘要>/MEMORY.md`，Docker 存工作区 `data/memory/MEMORY.md`（挂载到 `.astrion/astrion-memory/`）。**只在新建对话与压缩后全文加载**，正常发送与恢复沿用持久快照；只对已注入的那个文件免预读，readonly/plan 守门不变。契约 `docs/workspace_memory.md`
-- **索引式项目记忆**：专题存入工作区记忆目录的 `topics/`。Host 启动提示迁移并在核验后留说明，Docker 仅由管理员迁移，核验后挂到容器原 `.astrion/memory/`。老对话冻结提示词不回写。契约 `docs/workspace_memory.md`。
+- **`config/*.json` 分两类**：程序能力类（`docker_risk_markers`/`skill_hints`/`command_blocking_recommended`）锚定源码树；部署级配置（`custom_models`/`host_workspaces`/`auto_approval`/`goal_review`/`host_sandbox_policy`）外置到 `DEPLOY_CONFIG_DIR`（走 `config.resolve_deploy_config`）。
+- 主仓从 Host 目录解析注册工作区。旧 Docker/Web 数据沿用原部署。配置要求旧模式或 `LINUX_SAFETY` 时，主仓在初始化运行数据前退出。API dump 默认关闭（`AGENT_API_DUMP_ENABLED`），轮转见 `utils/log_rotation.py`。
+- **私有项目常驻记忆**：存 `<DATA_DIR>/memory/<目录名>-<路径摘要>/MEMORY.md`，只在新建对话与压缩后全文加载。继续及恢复沿用冻结快照，免预读只适用于已注入文件，readonly/plan 守门继续生效。
+- **索引式项目记忆**：专题存入同目录的 `topics/`。启动时提示迁移，验证源和目标后保留说明。老对话冻结提示词不回写。完整契约见 `docs/workspace_memory.md`。
 
 > 路径解析细节、个人指令拦截 `command_blocking` 语义见 `AD/runtime_data_paths.md`。
 
@@ -198,11 +198,9 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 - **`_experiments/`**：归档要保留但不属主线的零散文件（调试记录、旧变更日志、测试脚本等），**不纳入 git**，不要散落根目录。
 - **不要提交本地构建产物**（`static/dist/`、`node_modules/`）。**文档目录**：`docs/` 纳入版本控制（AGENTS.md 相关文档与开发文档，含 `agents_details/`）；`doc/` 不追踪，旧内容在 `_experiments/docs_archive/`（见 `docs/README.md`）。
 
-## 8) Android App 发布联动要求（重要）
+## 8) Host 主仓范围
 
-修改前端并需发布 Android WebView App 时**必须同步**：① `android-webview-app/app/build.gradle.kts` 递增 `versionCode`、更新 `versionName`；② `android-webview-app/APP_CHANGELOG.md` 顶部新增当前版本说明；③ 完成后提醒用户运行 `bash ./upload_android_apk.sh`（本地私有脚本，未随仓库发布；会同步 `build.gradle.kts` 与 `APP_CHANGELOG.md` 到服务器）。
-
-> **禁止只改前端而不更新版本号/更新说明**。服务端 `/api/app/version` 解析的是**服务器文件系统上的 `build.gradle.kts`**（`server/status/docker.py`），不是 APK——只传 APK 不同步元数据会导致 App 检测不到新版本。
+主仓维护 Host 浏览器界面、本机沙箱、CLI/headless、macOS 与 Windows 桌面端及 Quick Chat。普通账号、API 用户、容器执行和 Android 发布归独立 Docker 版的拆分范围。Host 继续通过 `/api/v1/models` 提供模型目录，网页登录和 CLI 认证分别走 `/host-login` 与本机 Gateway Bearer。历史部署与拆分边界见 `docs/docker_fork_split_plan.md`。
 
 ## 9) 给 Agent 的硬性要求
 
@@ -255,13 +253,12 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 
 ### 10.7) 后台命令只读沙箱
 
-后台 `run_command` 必须透传 `sandbox_write_access`：宿主机按它选只读/可写计划，docker 按它决定是否以非特权 uid 执行。**链路不变量，不得回退。**
+后台 `run_command` 必须透传 `sandbox_write_access`：由 Host 平台执行器选只读或可写计划。**链路不变量，不得回退。**
 
 ### 10.8) 平台级只读强制
 
 只读由平台原生机制兜底；`config/limits.py` 的命令文本白名单只是**审批启发式，不是安全边界**（可绕过，后果仅是多走一次审批）。
 
-- **docker/web**：非特权 uid（`-u 10001:10001`）+ Landlock 进程级只读域（`docker_readonly_exec.py`、`landlock_launcher.py`）；自检失败降级纯 DAC 并 warning；`DOCKER_READONLY_LANDLOCK=0` 可停用；**不能写「/ 授全量 + ro 授空」的交集规则**；仅 Linux 宿主生效。
 - **macOS host**：Seatbelt 白名单读模型（`host_sandbox_runner.py`），只读/可写共用同一白名单，区别只有写权限。要点：缺祖先目录 literal allow 会让 exec Abort trap；**deny 必须位于所有 allow 之后**（曾致工作区 `.env` 实际可读）；xcselect 垫片需放行 `MACOS_BASE_MACH_RULES` 与 `/Library/Preferences`；原生文件工具读 roots 与白名单同源；受限网络档允许本机监听与可写目录内 Unix socket，但挡不住监听 `0.0.0.0` 后的局域网入站。
 - **Linux host** 见 §20；**Windows** = WSL2 最小根文件系统白名单。
 
@@ -384,10 +381,10 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 - **检测唯一权威** `modules/preview_targets.py`，两类捕获源：① `write_file`/`edit_file` 的 `.html`/`.htm`；② 流式输出的 localhost 链接（120 字符滚动缓冲，防 URL 跨 chunk 断裂）。**run_command/terminal 输出检测已删除**（脏数据主来源）。URL 路径限 ASCII 白名单；裸主机与 favicon 不记录；尾部 `/` 归一后按**完整 URL** 去重（同 origin 不同 path 保留多条，刻意设计）；`0.0.0.0` 映射 `127.0.0.1`。存储 `metadata.preview_targets`，同 URL 重复命中不写不广播。
 - **安全模型 = 换源隔离**（同源端点 + `sandbox` 等于无沙箱）。localhost 走**独立预览服务器**（`server/preview_server.py`）：只绑 127.0.0.1 随机高位端口；路径带每对话 token（优先 `metadata.preview_token`，被整文件回写冲掉时用 `_derived_preview_token()`）；两道关卡 = Host 头白名单（防 DNS rebinding）+ token 注册表反查。`build_preview_runtime()` 在 targets/bootstrap/messages 三处带 `preview_base` + `preview_token`。
 - **预览服务器解析工作区必须传显式身份（硬约束）**：独立 Flask app 无主应用 session，`_resolve_context()` 必须传 `identity=RuntimeIdentity(host_mode=True, host_workspace_id=<注册工作区>, role=<注册角色>)`；否则造出假工作区 `users/<u>/projects/<ws>/project`，并用同一缓存键把错误 project_path 的 terminal 写进全局终端池（此后文件预览必报「文件不可用」，直到进程重启）。
-- **docker/web 整体禁用**（唯一判定 `is_preview_enabled()` = `IS_HOST_MODE`，四处门控：记录／端点／序列化／prompt）。**远端域名**（host 经反代）时前端回退旧同源端点 `/api/preview/file|proxy`（仅 host）。**SSRF 防护：只代理当前对话已登记的端口。** MVP 限制：不转发 WebSocket（HMR 失效）、动态 import/fetch 绝对路径不重写、docker 每请求一次 exec。
+- **Host 预览统一启用**（唯一判定 `is_preview_enabled()` = `IS_HOST_MODE`，记录／端点／序列化／prompt 四处门控一致）。**远端域名**（Host 经反代）时前端回退旧同源端点 `/api/preview/file|proxy`。**SSRF 防护：只代理当前对话已登记的端口。** MVP 限制：不转发 WebSocket（HMR 失效）、动态 import/fetch 绝对路径不重写、代理每请求一次 HTTP 拉取。
 - **前端**：`stores/preview.ts`、`PreviewWindow.vue`、`PreviewPanel.vue`。自动展开 `preview_auto_open`（默认 false）：最新目标优先、同目标更新不重弹、手动关闭后本次任务内不再展开、对话区 <300px 不展开。**窄布局自动折叠**：<300px 按「快捷面板组（快捷面板＋文件预览＋预览窗口）→ 右侧终端/Git」折叠，手动展开则强制保留至该组关闭，单向不自动展开。
 - **桌面端预览窗口已停用**：壳内不渲染两个预览组件，`preview_auto_open` 不生效，预览目标不计入快捷面板判定；**后端照常记录 `metadata.preview_targets`，只是不展示**。正文 http(s) 链接由 App.vue document 级 capture 拦截（仅 `__ASTRION_DESKTOP__`）转内置浏览器（先 `nativeBrowserStore.open = true`，拿到 lease 后 `navigate`；超时或缺作用域回退 `openExternal`）；**同源链接必须放行**。
-- **正文文件链接分流**：`a.md-download-link` / `a[data-download="1"]` 在 **host 模式**调 `/api/system/open-file` 用默认程序打开（失败 toast 后端文案），**docker/web/Android 保持下载**；判定走 `settings.isHostMode`；`<show_file>` 下载按钮不受影响。
+- **正文文件链接分流**：`a.md-download-link` / `a[data-download="1"]` 在 Host 模式调 `/api/system/open-file` 用默认程序打开（失败 toast 后端文案）；判定走 `settings.isHostMode`；`<show_file>` 下载按钮不受影响。
 - **Prompt**：`prompts/preview_panel.txt` 冻结注入——启动服务器后必须**写完整地址**、不要引导用户手动开浏览器、自我验证仍走 Playwright。
 
 ## 17) 代码索引（codegraph）
@@ -414,8 +411,7 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 - **`create_sub_agent` 必填 `access_level`**：`working_dir_write`/`workspace_write`/`sandbox_write`/`full_access`，创建时校验主权限上限；plan/readonly 可创建两个窄档。实例保存创建时规范化的 `workspace_root`、`working_dir` 与固定档位，恢复时核对原路径身份，**不重新 resolve 后扩大授权**；旧记录缺档位不迁移、不恢复。
 - **可信权限唯一入口 = `modules/execution_scope.py` 的 ContextVar**；子工具经 `modules/sub_agent/execution.py` 用独立 FileManager/TerminalOperator/TerminalManager，**不修改父对象再恢复**。父权限切换不改变已有子档位；子工具只开放自身白名单，**不开放后台命令或单次升级参数**。
 - `working_dir_write` 仅子工作目录可写，`workspace_write` 为原工作区可写；`workspace_root` 始终是原项目身份；未绑工作树时用 `working_dir`，已绑定时用独立 execution_root（见 §27）。macOS 临时目录在固定写根内，**不附带宿主 `/tmp` 写授权**；原生 IO 用 POSIX no-follow 描述符（或 Windows 句柄），拒绝替换链接、特殊文件与多硬链接写入；目录按路径组件检查并安全新建，**不用字符串 startswith**。
-- **Docker 不支持 `full_access`**；最低档经 `modules/docker_scoped_launcher.py` 强制 Landlock ABI≥3 + libseccomp + capability 清理；无法安装隔离则命令失败，**不使用 DAC 降级或宿主机回退**。
-- 主 `request_full_access=true` **必须提供非空原因**；plan/readonly 拒绝，Docker/远端替身不伪装支持；已在 direct 时无需申请。**Windows direct 用 cmd.exe，沙箱 bash 命令不得自动原样重试到宿主机。**
+- 主 `request_full_access=true` **必须提供非空原因**；plan/readonly 拒绝，只适用于真实本机 Host 后端；已在 direct 时无需申请。**Windows direct 用 cmd.exe，沙箱 bash 命令不得自动原样重试到宿主机。**
 - 单次申请复用 `ToolApprovalManager`（`approval_type=full_access`）。用户级 `allow_auto_approve_full_access` 默认 false：关闭时自动审核模式需自动与人工独立通过、无限制模式仅需人工；开启时两种模式均由审核智能体批准即可执行（`human_approval_required=false`）。**该标志是单闸语义**：面板不渲染允许/拒绝按钮（`humanDecisionRequired`），`decide()` 抛 `tool_approval.human_not_required`；**双闸场景人工先允许不能取消必需的自动审核**。条件在请求创建时快照。拒绝/故障/过期均不执行，任一拒绝仅结束申请并回填失败结果，**不触发 task_stopped**。授权记录绑定执行环境/完整参数/任务身份，`claim_execution` 原子领取一次，`FullAccessGrant.consume` 再核对，失效不破坏消息配对。
 - 前台、后台均绑定该次权限，不改变主对话全局状态；后台创建经 `asyncio.to_thread`，Popen 与取消在同一锁内握手。**正常后台完成不等于取消全部后台任务。**
 - **审批 UI** 在输入栏 `ComposerApprovalDock.vue`（人工模式：上方滚动内容 + 左下固定拒绝/允许；自动审核时加右侧进度区）；同对话串行审批、不加翻页。**收起后的「待审批操作」入口**内嵌在 git 状态栏「N 个终端」之后、`+/-` 之前（纯文字无边框图标），可见条件 = 已收起且存在**仍需人工决定**的请求（`needsHumanDecision`）；任务终态兜底清理残留条目。视觉由用户验收。
@@ -435,7 +431,7 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 - **存储边界**：`read_conversation`（兼容名 `load_conversation`）**不做迁移回写**；**锁顺序 = 显示锁 → 任务锁**，不得反向获取；维持单后端进程约束。
 - **工作区导航**：目标工作区与对话随快照一次提交，选择写入串行；同源 API 派发时捕获明确工作区；首次路由先取真实身份，**未知作用域不得猜为 default**；目录刷新不改写已提交的可见身份。
 - **输入草稿与运行引导**：无提前输入排队 UI、无自动续发；运行中发送直接作为引导，失败保留输入。引导附件复用 `media_paths`/`file_paths` 隐藏通知（`media_paths_only`），历史重建只传路径。草稿按「用户／工作区／对话」独立，localStorage + 服务器后台重试，以 revision CAS 防旧写覆盖；**不用无 CSRF 的 beacon**。回归 `test/2026-10-23_对话草稿与运行引导/`。
-- **查询／运行分层**：`context/workspace.py` 解析可信路径、`data.py` 轻量存储、`resources.py` 装配执行实例；bootstrap、列表、草稿、Token、模式及导航辅助查询**不得为读取而创建 WebTerminal／容器或复制技能**。
+- **查询／运行分层**：`context/workspace.py` 解析可信路径、`data.py` 轻量存储、`resources.py` 装配执行实例；bootstrap、列表、草稿、Token、模式及导航辅助查询**不得为读取而创建 WebTerminal／执行实例或复制技能**。
 - **启动期预热与端口复用**：壳层必须在 `waitBackendReady` 之后、**任何视图创建之前**完成一次免密 `host-login`（`session-priming.js`），否则首个 `/api/conversation-tabs` 401 →「同步失败」。后端端口复用上次值（`userData/backend-port.json`）——`SESSION_COOKIE_NAME` 与 localStorage 均按 origin 隔离。首帧主题经 `shell:theme-get` 注入 `window.__ASTRION_INITIAL_THEME__`，内联脚本优先读它。
 - 回归：`python -B test/2026-10-07_运行对话快照/run_regressions.py`、`test/2026-10-12_工作区切换重构/README.md`；**不将离线回归等同于实际速度达标**。
 
@@ -484,7 +480,7 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 
 > 协议 `docs/crosspet_integration.md`。
 
-- **可选 host 输出**：默认关闭，由设置→通用「CrossPet 联动」单开关控制（所有工作区共用，存 `DEPLOY_CONFIG_DIR/crosspet.json`）；不要求 CrossPet 侧启用，其 `astrion.json` 只提供目录。默认输出 macOS `/tmp/crosspet`、Windows `%LOCALAPPDATA%\CrossPet\state`，Docker/web 不输出；关闭即停止三个文件所有写入，保存与输出共用锁。
+- **可选 host 输出**：默认关闭，由设置→通用「CrossPet 联动」单开关控制（所有工作区共用，存 `DEPLOY_CONFIG_DIR/crosspet.json`）；不要求 CrossPet 侧启用，其 `astrion.json` 只提供目录。默认输出 macOS `/tmp/crosspet`、Windows `%LOCALAPPDATA%\CrossPet\state`；关闭即停止三个文件所有写入，保存与输出共用锁。
 - **观察入口** `server/crosspet.py` → `modules/crosspet/`：任务线程只派发白名单元数据，配置、模型解析、后台活动探测与文件 IO 都在观察器线程；关闭时不探测活动、不读前台模型、不创建执行实例。设置端点 `server/crosspet_settings.py` 同挂 Web/headless。
 - **状态与隐私**：独立 `astrion-state.json`，身份哈希，**不含消息、思考、工具参数、命令、结果或凭据**；心跳不增加动作修订号；`task_complete` 不是最终结束（真实终态与后台活动共同决定动作），业务失败不得庆祝；最多 256 会话。
 - **订阅额度** `modules/crosspet/quota.py`：以 Astrion 独立 OAuth 与既有代理后台查询，仅联动开启且订阅已连接时查，只在观察器线程做网络 IO；额度以白名单数值附加到 `quota.gpt`，不输出账号/凭据。CrossPet 侧「显示 Astrion 的 GPT 额度」与原「显示 GPT 额度」互斥；失败保留旧数据、不混账号、不自动切回 Codex。
@@ -522,7 +518,7 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 - **绑定点必须覆盖主任务全流程**：除工具分发外，`server/chat_flow.py::process_message_task` 线程入口、`service.enter`（branch_name 分支）与 `service.change`（exit 前残留检查）也必须包 `bind_extra_roots`；只绑工具层会漏掉建对话与系统提示词的 git 状态校验，表现为「发送失败：工作目录必须在项目文件夹内」。
 - **前端与草稿**：`/api/git-worktree/inspect` 的预检结果就是状态栏分支权威值（`/tmp` 与 `/private/tmp` 不能靠字符串比对）；`/new` 草稿目标不得被 `hydrate()` 无条件清空（仅 `cid !== null` 时清）；`refresh`/`select` 以输入栏弹窗的对话身份为准；**i18n 文案禁止裸 `@`**（vue-i18n 会按 linked message 解析并抛 `INVALID_LINKED_FORMAT`，整个下拉渲染中断）。
 - **工作树内没有 `node_modules`**：验证前端构建先 `ln -sfn <主目录>/node_modules node_modules`；合并回主目录后需重跑 build 界面才生效。工作树内 `py_compile` 会因写 `~/Library/Caches` 被沙箱拒，改用 `python3 -B -c "ast.parse(...)"`。
-- 回归 `test/2026-11-14_Git工作树/README.md`、`test/2026-11-15_工作树外部路径/`；Windows／WSL／Linux／Docker 原生执行与 UI 待实机验收，**不把路径模拟当跨平台验收**。
+- 回归 `test/2026-11-14_Git工作树/README.md`、`test/2026-11-15_工作树外部路径/`；Windows／WSL／Linux 原生执行与 UI 待实机验收，**不把路径模拟当跨平台验收**。
 
 ## 28) 存储空间统计与清理
 

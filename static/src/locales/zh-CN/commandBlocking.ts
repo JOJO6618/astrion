@@ -8,7 +8,6 @@ export default {
   // ── 设置行（GeneralTab） ──
   settingsTitle: '指令拦截',
   settingsDesc: '阻止智能体执行命中拦截规则的命令',
-  settingsDescProject: '阻止智能体执行命中拦截规则的命令',
   manageRules: '管理规则',
 
   // ── 规则管理窗口（CommandBlockingDialog） ──
@@ -17,7 +16,6 @@ export default {
   statusOff: '已关闭',
   loading: '加载中...',
   summary: '{status}。规则对你的所有工作区生效，指令包含任一规则（不区分大小写）即被拦截。',
-  summaryProject: '{status}。规则对你的所有项目生效，指令包含任一规则（不区分大小写）即被拦截。',
   rulesLabel: '拦截规则',
   rulesDesc: '哪些命令内容会被拦截',
   rulesPlaceholder: '每行一条规则，例如：rm -rf',

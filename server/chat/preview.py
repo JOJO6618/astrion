@@ -17,7 +17,6 @@ import hashlib
 import hmac
 import re
 import secrets
-import subprocess
 from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
@@ -30,7 +29,7 @@ from server.security import rate_limited
 from modules.i18n import tr
 from modules.preview_targets import remove_target, _normalize, _origin, is_preview_enabled
 from core.web_terminal import WebTerminal
-from modules.user_manager import UserWorkspace
+from modules.workspace import UserWorkspace
 
 # 代理响应体上限（防御性；正常页面远小于此）
 _PROXY_MAX_BYTES = 50 * 1024 * 1024
@@ -48,57 +47,6 @@ _HOP_BY_HOP_HEADERS = {
 }
 # 这些响应头会阻止 iframe 嵌入或破坏代理路径，统一剥离
 _STRIP_HEADERS = _HOP_BY_HOP_HEADERS | {"x-frame-options", "content-security-policy"}
-
-
-def _docker_exec_fetch(
-    container_name: str,
-    docker_bin: str,
-    method: str,
-    target_url: str,
-    headers: Dict[str, str],
-    body: Optional[bytes],
-) -> Tuple[int, Dict[str, str], bytes]:
-    """docker 模式的代理取数：目标服务器活在工具箱容器的网络命名空间里，
-    后端进程的 127.0.0.1 根本到不了（2026-09-27 实测 502 根因）——
-    经 docker exec curl 在容器内发请求。不跟随重定向：3xx 透传给浏览器，
-    Location 由调用方改写成代理路径。
-    """
-    args = [
-        docker_bin or "docker", "exec", "-i", container_name,
-        "curl", "-sS", "-i", "--max-time", str(int(_PROXY_TIMEOUT)), "-X", method,
-    ]
-    for key, value in headers.items():
-        args += ["-H", f"{key}: {value}"]
-    if body:
-        args += ["--data-binary", "@-"]
-    args.append(target_url)
-    proc = subprocess.run(
-        args, input=body or None, capture_output=True, timeout=_PROXY_TIMEOUT + 5,
-    )
-    if proc.returncode != 0:
-        detail = proc.stderr.decode("utf-8", errors="replace").strip()[:200]
-        raise RuntimeError(detail or f"curl exit {proc.returncode}")
-    raw = proc.stdout
-    # 跳过 100 Continue 等中间状态块
-    while True:
-        head, sep, rest = raw.partition(b"\r\n\r\n")
-        if not sep:
-            head, sep, rest = raw.partition(b"\n\n")
-        if not sep:
-            raise RuntimeError("bad upstream response")
-        status_line = head.split(b"\n", 1)[0].decode("latin-1", errors="replace")
-        match = re.search(r"\b(\d{3})\b", status_line)
-        status = int(match.group(1)) if match else 502
-        if status == 100 and rest:
-            raw = rest
-            continue
-        break
-    resp_headers: Dict[str, str] = {}
-    for line in head.split(b"\n")[1:]:
-        if b":" in line:
-            k, _, v = line.partition(b":")
-            resp_headers[k.decode("latin-1").strip()] = v.decode("latin-1").strip()
-    return status, resp_headers, rest
 
 
 def _rewrite_location(location: str, proxy_prefix: str, port: int) -> str:
@@ -430,33 +378,19 @@ def serve_proxy_response(terminal: WebTerminal, port: int, sub_path: str = "",
     if request.query_string:
         target_url += "?" + request.query_string.decode("utf-8", errors="replace")
 
-    # accept-encoding 一并剔除：httpx/curl 两条链路都保持原始字节流转，
-    # 避免上游 gzip 后头体不一致
+    # 代理由 HTTP 客户端管理响应解码。
     headers = {
         k: v for k, v in request.headers.items()
         if k.lower() not in _HOP_BY_HOP_HEADERS
         and k.lower() not in ("host", "cookie", "accept-encoding")
     }
-    # docker 模式：目标服务器在工具箱容器网络命名空间内，后端的 127.0.0.1
-    # 到不了它，必须经 docker exec 在容器内取数；host 模式直连保真
-    container = getattr(terminal, "container_session", None)
-    docker_container = ""
-    docker_bin = "docker"
-    if container is not None and getattr(container, "mode", "") == "docker":
-        docker_container = getattr(container, "container_name", None) or ""
-        docker_bin = getattr(container, "sandbox_bin", None) or "docker"
     try:
         body = request.get_data() if request.method != "GET" else None
-        if docker_container:
-            status, upstream_headers, content = _docker_exec_fetch(
-                docker_container, docker_bin, request.method, target_url, headers, body,
+        with httpx.Client(timeout=_PROXY_TIMEOUT, follow_redirects=True) as client:
+            upstream = client.request(request.method, target_url, content=body, headers=headers)
+            status, upstream_headers, content = (
+                upstream.status_code, dict(upstream.headers), upstream.content,
             )
-        else:
-            with httpx.Client(timeout=_PROXY_TIMEOUT, follow_redirects=True) as client:
-                upstream = client.request(request.method, target_url, content=body, headers=headers)
-                status, upstream_headers, content = (
-                    upstream.status_code, dict(upstream.headers), upstream.content,
-                )
         if len(content) > _PROXY_MAX_BYTES:
             return jsonify({"success": False, "error": tr("preview.response_too_large")}), 502
         content_type = ""
@@ -482,8 +416,6 @@ def serve_proxy_response(terminal: WebTerminal, port: int, sub_path: str = "",
             resp_headers[k] = v
         return Response(content, status=status, headers=resp_headers)
     except httpx.ConnectError:
-        return jsonify({"success": False, "error": tr("preview.server_unreachable", port=port)}), 502
-    except subprocess.TimeoutExpired:
         return jsonify({"success": False, "error": tr("preview.server_unreachable", port=port)}), 502
     except Exception as exc:
         return jsonify({"success": False, "error": tr("preview.proxy_failed", detail=str(exc)[:200])}), 502

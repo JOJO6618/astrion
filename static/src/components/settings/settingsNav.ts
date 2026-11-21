@@ -52,7 +52,6 @@ export const NAV_GROUPS: NavGroup[] = [
       { id: 'tools', labelKey: 'settings.navTools', icon: 'tools' },
       { id: 'context', labelKey: 'settings.navContext', icon: 'context' },
       { id: 'files', labelKey: 'settings.navFiles', icon: 'files' },
-      { id: 'voice', labelKey: 'settings.navVoice', icon: 'voice' },
       { id: 'browser', labelKey: 'settings.navBrowser', icon: 'browser' }
     ]
   },
@@ -92,7 +91,6 @@ export const SECTION_TITLE_KEYS: Record<SettingsSection, string> = {
   tools: 'settings.toolsTitle',
   context: 'settings.contextTitle',
   files: 'settings.filesTitle',
-  voice: 'settings.voiceTitle',
   browser: 'settings.browserTitle',
   'sub-agents': 'settings.subAgentsTitle',
   'review-agents': 'settings.reviewAgentsTitle',
@@ -143,8 +141,7 @@ const SEARCH_ENTRIES: SearchEntry[] = [
     `${P}thinkingSummaryIntervalTitle`,
     ['commandBlocking.settingsTitle', 'commandBlocking.settingsDesc'],
     'commandBlocking.rulesLabel',
-    ['settings.runDataTitle', 'settings.runDataDesc'],
-    `${P}appUpdateTitle`
+    ['settings.runDataTitle', 'settings.runDataDesc']
   ]),
   ...entries('chat', [
     'chatMode.defaultModel',
@@ -197,7 +194,6 @@ const SEARCH_ENTRIES: SearchEntry[] = [
     [`${P}adaptiveCompressTitle`, `${P}adaptiveCompressDesc`]
   ]),
   ...entries('files', [`${P}imageCompressionTitle`]),
-  ...entries('voice', [`${P}voiceModelTitle`]),
   ...entries('browser', [
     'browser.aiDefaultOn',
     'browser.aiAutoOpen',
@@ -233,13 +229,7 @@ const SEARCH_ENTRIES: SearchEntry[] = [
     `${P}minimalExpandHeightTitle`,
     `${P}compactMessageTitle`
   ]),
-  ...entries('admin', [
-    'settings.memoryMigration.dockerEntry',
-    `${P}mcpConfigTitle`,
-    `${P}adminMonitorTitle`,
-    `${P}apiAdminTitle`,
-    `${P}customToolsAdminTitle`
-  ])
+  ...entries('admin', [`${P}mcpConfigTitle`, `${P}customToolsAdminTitle`])
 ];
 
 export interface SearchResult {

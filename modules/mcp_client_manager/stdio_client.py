@@ -6,60 +6,35 @@ import hashlib
 import json
 import os
 import queue
-import shutil
 import subprocess
 import threading
 import time
 from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, TYPE_CHECKING
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
 import httpx
 
 from config import MCP_PROTOCOL_VERSION, MCP_DEFAULT_TIMEOUT_SECONDS
 from modules.mcp_client_manager.exceptions import MCPClientError
+from modules.mcp_client_manager.runtime_scope import reject_container_session
 from modules.mcp_server_registry import MCPServerRegistry
 
 from modules.i18n import tr
 
-if TYPE_CHECKING:
-    from modules.user_container_manager import ContainerHandle
-
 
 class _StdioMCPClient:
     """最小可用 stdio MCP 客户端（JSON-RPC over newline-delimited JSON）。"""
-
-    CONTAINER_PREFIXES = (
-        "/workspace",
-        "/usr/",
-        "/bin/",
-        "/sbin/",
-        "/lib/",
-        "/lib64/",
-        "/opt/",
-        "/etc/",
-        "/tmp/",
-        "/var/",
-        "/home/",
-        "/root/",
-    )
-    PATH_OPTION_KEYS = {
-        "--path",
-        "--dir",
-        "--directory",
-        "--root",
-        "--cwd",
-        "--workspace",
-    }
 
     def __init__(
         self,
         server: Dict[str, Any],
         timeout_seconds: int,
         protocol_version: str,
-        container_session: Optional["ContainerHandle"] = None,
+        container_session: Any = None,
     ):
+        reject_container_session(container_session)
         self.server = server
         self.timeout_seconds = max(3, int(timeout_seconds or MCP_DEFAULT_TIMEOUT_SECONDS))
         self.protocol_version = protocol_version
@@ -80,16 +55,7 @@ class _StdioMCPClient:
         return self._seq
 
     @staticmethod
-    def _is_windows_abs_path(value: str) -> bool:
-        return len(value) > 2 and value[1] == ":" and value[0].isalpha()
-
-    @staticmethod
-    def _normalize_mount_path(value: str) -> str:
-        mount = str(value or "/workspace").strip()
-        mount = mount.rstrip("/")
-        return mount or "/workspace"
-
-    def _normalize_workspace_path(self, value: Any) -> str:
+    def _normalize_workspace_path(value: Any) -> str:
         raw = str(value or "").strip()
         if not raw:
             return ""
@@ -97,89 +63,6 @@ class _StdioMCPClient:
             return str(Path(raw).expanduser().resolve())
         except Exception:
             return raw
-
-    def _map_workspace_path(self, raw: str, workspace_host: str, mount_path: str) -> str:
-        if not raw or not workspace_host:
-            return raw
-        if raw.startswith(mount_path):
-            return raw
-        if self._is_windows_abs_path(raw):
-            return raw
-        if not raw.startswith("/"):
-            return raw
-        try:
-            normalized = str(Path(raw).expanduser().resolve())
-        except Exception:
-            normalized = raw
-        if normalized == workspace_host:
-            return mount_path
-        prefix = workspace_host + os.sep
-        if normalized.startswith(prefix):
-            rel = normalized[len(prefix):].replace("\\", "/")
-            return f"{mount_path}/{rel}" if rel else mount_path
-        return raw
-
-    def _rewrite_path_like_value_for_container(
-        self,
-        value: str,
-        workspace_host: str,
-        mount_path: str,
-    ) -> str:
-        raw = str(value or "").strip()
-        if not raw:
-            return raw
-        mapped = self._map_workspace_path(raw, workspace_host, mount_path)
-        return mapped if mapped != raw else raw
-
-    @staticmethod
-    def _command_basename(value: str) -> str:
-        text = str(value or "").strip().replace("\\", "/").rstrip("/")
-        if not text:
-            return ""
-        if "/" in text:
-            return text.split("/")[-1]
-        return text
-
-    def _rewrite_command_for_container(self, command: str, workspace_host: str, mount_path: str) -> str:
-        raw = str(command or "").strip()
-        if not raw:
-            return raw
-        mapped = self._map_workspace_path(raw, workspace_host, mount_path)
-        if mapped != raw:
-            return mapped
-        # command 若是宿主机绝对路径（如 /opt/homebrew/bin/npx），
-        # 在容器内通常应退化为命令名（npx/python3），避免无意义路径校验阻断。
-        if raw.startswith("/") or self._is_windows_abs_path(raw) or "\\" in raw:
-            candidate = self._command_basename(raw)
-            return candidate or raw
-        return raw
-
-    def _rewrite_arg_for_container(
-        self,
-        arg: str,
-        *,
-        index: int,
-        workspace_host: str,
-        mount_path: str,
-    ) -> str:
-        raw = str(arg or "")
-        stripped = raw.strip()
-        if not stripped:
-            return raw
-        if "=" in stripped:
-            left, right = stripped.split("=", 1)
-            if left in self.PATH_OPTION_KEYS and right:
-                rewritten = self._rewrite_path_like_value_for_container(
-                    right,
-                    workspace_host=workspace_host,
-                    mount_path=mount_path,
-                )
-                return f"{left}={rewritten}"
-        return self._rewrite_path_like_value_for_container(
-            stripped,
-            workspace_host=workspace_host,
-            mount_path=mount_path,
-        )
 
     def _prepare_launch(self) -> Tuple[List[str], Optional[str], Dict[str, str]]:
         command_raw = str(self.server.get("command") or "").strip()
@@ -189,67 +72,17 @@ class _StdioMCPClient:
         if not command_raw:
             raise MCPClientError(tr("mcp_stdio.missing_command"))
 
+        # Host-only launch: explicit cwd wins; a child's validated working_dir
+        # may arrive through the runtime scope, otherwise the bound workspace.
         session = self.container_session
-        use_container = bool(session and getattr(session, "mode", None) == "docker")
-        if not use_container:
-            env = dict(os.environ)
-            env.update(env_raw)
-            resolved_cwd = cwd_raw
-            if not resolved_cwd and session is not None:
-                workspace_hint = self._normalize_workspace_path(getattr(session, "workspace_path", ""))
-                if workspace_hint:
-                    resolved_cwd = workspace_hint
-            return [command_raw, *args_raw], resolved_cwd, env
-
-        container_name = str(getattr(session, "container_name", "") or "").strip()
-        if not container_name:
-            raise MCPClientError(tr("mcp_stdio.docker_missing_container_name"))
-        docker_bin = str(getattr(session, "sandbox_bin", "") or "docker").strip() or "docker"
-        docker_path = shutil.which(docker_bin) or docker_bin
-        mount_path = self._normalize_mount_path(getattr(session, "mount_path", "/workspace"))
-        workspace_host = self._normalize_workspace_path(getattr(session, "workspace_path", ""))
-
-        command = self._rewrite_command_for_container(
-            command_raw,
-            workspace_host=workspace_host,
-            mount_path=mount_path,
-        )
-        args: List[str] = []
-        for idx, item in enumerate(args_raw):
-            args.append(
-                self._rewrite_arg_for_container(
-                    item,
-                    index=idx,
-                    workspace_host=workspace_host,
-                    mount_path=mount_path,
-                )
-            )
-        cwd = (
-            self._rewrite_path_like_value_for_container(
-                cwd_raw,
-                workspace_host=workspace_host,
-                mount_path=mount_path,
-            )
-            if cwd_raw
-            else None
-        )
-
-        cmd: List[str] = [docker_path, "exec", "-i"]
-        if cwd:
-            cmd += ["-w", cwd]
-
-        exec_env = {
-            "PYTHONIOENCODING": "utf-8",
-            "TERM": "xterm-256color",
-        }
-        for key, value in env_raw.items():
-            if value is not None:
-                exec_env[str(key)] = str(value)
-        for key, value in exec_env.items():
-            cmd += ["-e", f"{key}={value}"]
-        cmd += [container_name, command, *args]
-
-        return cmd, None, dict(os.environ)
+        env = dict(os.environ)
+        env.update(env_raw)
+        resolved_cwd = cwd_raw
+        if not resolved_cwd and session is not None:
+            workspace_hint = self._normalize_workspace_path(getattr(session, "workspace_path", ""))
+            if workspace_hint:
+                resolved_cwd = workspace_hint
+        return [command_raw, *args_raw], resolved_cwd, env
 
     def start(self) -> None:
         if self.process and self.process.poll() is None:

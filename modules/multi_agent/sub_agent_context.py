@@ -1,7 +1,7 @@
 """多智能体子智能体动态上下文构建。
 
 在子智能体创建时，为其系统提示词注入工作区相关信息：
-- 执行环境（宿主机/docker + 沙箱/直接）
+- 执行环境（宿主机沙箱／直接执行）
 - AGENTS.md 项目规范
 - 工作区信息（项目名称、运行环境、当前时间，不含 file_tree / recent_uploads）
 - .astrion/ 目录结构说明（skills / memory / review / user_upload）
@@ -22,9 +22,7 @@ try:
         PROMPTS_DIR,
         WORKSPACE_SKILLS_DIRNAME,
         WORKSPACE_REVIEW_DIRNAME,
-        TERMINAL_SANDBOX_MODE,
     )
-    from config.paths import IS_HOST_MODE
 except ImportError:
     import sys
 
@@ -35,9 +33,7 @@ except ImportError:
         PROMPTS_DIR,
         WORKSPACE_SKILLS_DIRNAME,
         WORKSPACE_REVIEW_DIRNAME,
-        TERMINAL_SANDBOX_MODE,
     )
-    from config.paths import IS_HOST_MODE
 
 
 def _context_read_text(path: Path) -> str:
@@ -45,10 +41,6 @@ def _context_read_text(path: Path) -> str:
     scope = current_execution_scope()
     if scope is None or not scope.is_sub_agent:
         return path.read_text(encoding="utf-8")
-    if not IS_HOST_MODE:
-        # Context injection reads the backend's bind-mounted workspace only;
-        # a container path must never select an unrelated host file.
-        path.resolve().relative_to(scope.workspace_root)
     from modules.file_manager import FileManager
     manager = FileManager(str(scope.workspace_root))
     manager.set_host_execution_mode(scope.execution_mode)
@@ -75,26 +67,10 @@ def _load_agents_md(workspace_path: str) -> Optional[str]:
 
 
 def _build_execution_env_section(workspace_path: str, *, sandbox_mode: str = "") -> str:
-    """构建执行环境信息段。
+    """Build a Host execution environment snapshot for the child."""
+    from modules.execution_env_text import build_sub_agent_env_section
 
-    宿主机模式：复用子智能体共享环境文本（平台细分：Windows 下 sandbox=WSL2 bash、
-    direct=cmd，mac/Linux 同为 POSIX shell），创建时快照，切换由运行期通知补充。
-    Docker 模式：保持容器语义描述。
-    """
-    mode = (sandbox_mode or TERMINAL_SANDBOX_MODE or "").lower()
-    if IS_HOST_MODE:
-        from modules.execution_env_text import build_sub_agent_env_section
-
-        return build_sub_agent_env_section(workspace_path, mode)
-    return (
-        "## 执行环境\n\n"
-        "- 运行环境：Docker 容器模式\n"
-        "- 执行方式：容器内执行\n\n"
-        "### 当前规则\n"
-        "- 所有命令在 Docker 容器内执行\n"
-        "- 工作区挂载在容器内 /workspace 路径下\n"
-        "- 网络可能受限，仅允许 localhost\n"
-    )
+    return build_sub_agent_env_section(workspace_path, sandbox_mode or "sandbox")
 
 
 def _build_workspace_section(workspace_path: str) -> str:
@@ -104,16 +80,11 @@ def _build_workspace_section(workspace_path: str) -> str:
     system_info = f"{platform.system()} {platform.release()}"
     current_time = datetime.now().strftime("%Y年%m月%d日 %H点（24小时制）")
 
-    if IS_HOST_MODE:
-        resource_limit = "宿主机模式无限制"
-    else:
-        resource_limit = "容器模式，受 Docker 资源限制"
-
     return (
         f"## 工作区信息\n\n"
         f"- 项目名称：{project_name}\n"
         f"- 运行环境：{system_info}\n"
-        f"- 资源限制：{resource_limit}\n"
+        "- 资源限制：宿主机模式无限制\n"
         f"- 当前时间：{current_time}\n"
     )
 
@@ -233,7 +204,7 @@ def build_sub_agent_dynamic_context(
     Args:
         workspace_path: 工作区路径
         data_dir: 数据目录路径（用于推断 private skills 目录）
-        sandbox_mode: 沙箱模式（sandbox/direct/host/docker）
+        sandbox_mode: Host 执行方式（sandbox 或 direct）
     """
     sections: List[str] = []
 

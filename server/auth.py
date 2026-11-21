@@ -1,53 +1,33 @@
 from __future__ import annotations
+
 import mimetypes
 import secrets
-from pathlib import Path
 from datetime import datetime
-from flask import Blueprint, request, jsonify, session, redirect, send_from_directory, abort, current_app, make_response
+from pathlib import Path
 
-from modules.personalization_manager import load_personalization_config
+from flask import Blueprint, abort, current_app, jsonify, make_response, redirect, request, send_from_directory, session
+
+from config import LOGS_DIR
 from modules.host_workspace_manager import resolve_host_workspace
-from config import (
-    TERMINAL_SANDBOX_MODE,
-    DATA_DIR,
-    LOGS_DIR,
-    UPLOAD_QUARANTINE_SUBDIR,
-    LINUX_SAFETY,
-    LOGS_DIR,
-)
-
-from .auth_helpers import login_required, api_login_required, get_current_user_record, get_current_username, is_logged_in
-from .entry_assets import serve_entry_html
-from .security import (
-    get_csrf_token,
-    check_rate_limit,
-    register_failure,
-    is_action_blocked,
-    clear_failures,
-    get_client_ip,
-)
-from . import state
-from .utils_common import debug_log
 from modules.i18n import tr
-from .host_password import authorize_host_login, ordinary_login_allowed, public_host_status
+from utils.log_rotation import append_line
+
+from . import state
+from .auth_helpers import is_logged_in, login_required, resolve_admin_policy
+from .context.identity import NoWorkspaceError, RuntimeIdentity
+from .context.workspace import resolve_workspace
+from .entry_assets import serve_entry_html
+from .host_password import authorize_host_login, public_host_status
+from .security import get_csrf_token
 
 auth_bp = Blueprint("auth", __name__)
 AUTH_DEBUG_FILE = Path(LOGS_DIR).expanduser().resolve() / "auth_debug.log"
 
 
 def auth_debug_log(message: str):
-    AUTH_DEBUG_FILE.parent.mkdir(parents=True, exist_ok=True)
-    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    line = f"[{ts}] {message}"
     try:
-        # 走统一轮转，防止未认证请求刷爆磁盘（此前为无上限 append）
-        from utils.log_rotation import append_line
-        append_line(AUTH_DEBUG_FILE, line)
-    except Exception:
-        pass
-    try:
-        debug_log(line)
-    except Exception:
+        append_line(AUTH_DEBUG_FILE, f"[{datetime.now():%Y-%m-%d %H:%M:%S}] {message}\n")
+    except OSError:
         pass
 
 
@@ -62,56 +42,41 @@ def _session_debug_snapshot():
     }
 
 
-def _issue_login_nonce(username: str) -> str:
+def _issue_login_nonce():
     nonce = secrets.token_urlsafe(16)
-    user = (username or "").strip().lower()
-    if user:
-        state.active_login_nonces[user].add(nonce)
-    session["login_nonce"] = nonce
-    return nonce
+    state.active_login_nonces['host'].add(nonce)
+    session['login_nonce'] = nonce
 
 
-def _revoke_login_nonce(username: str, nonce: str | None):
-    user = (username or "").strip().lower()
-    if not user or not nonce:
-        return
-    pool = state.active_login_nonces.get(user)
-    if not pool:
-        return
-    pool.discard(nonce)
-    if not pool:
-        state.active_login_nonces.pop(user, None)
-
-
-def _cookie_debug_snapshot():
-    raw = request.headers.get("Cookie", "") or ""
-    return raw[:300]
+def _clear_browser_session():
+    username = session.get('username')
+    nonce = session.get('login_nonce')
+    pool = state.active_login_nonces.get(username)
+    if pool is not None and nonce is not None:
+        pool.discard(nonce)
+    session.clear()
 
 
 def _expire_session_cookie(response):
-    """尽可能清理不同 domain/path 组合下的 session cookie（线上反向代理场景兜底）。"""
-    cookie_name = current_app.config.get("SESSION_COOKIE_NAME", "session")
-    configured_domain = current_app.config.get("SESSION_COOKIE_DOMAIN")
-    host = (request.host or "").split(":")[0]
+    cookie_name = current_app.config.get('SESSION_COOKIE_NAME', 'session')
+    configured_domain = current_app.config.get('SESSION_COOKIE_DOMAIN')
+    host = (request.host or '').split(':')[0]
     candidate_domains = {None, configured_domain, host}
-    if host.count(".") >= 2:
-        # 兼容 .example.com / example.com 两种历史写法
-        parent = ".".join(host.split(".")[1:])
-        candidate_domains.add(parent)
-        candidate_domains.add(f".{parent}")
+    if host.count('.') >= 2:
+        parent = '.'.join(host.split('.')[1:])
+        candidate_domains.update({parent, f'.{parent}'})
     for domain in candidate_domains:
         try:
-            response.delete_cookie(cookie_name, path="/", domain=domain)
-        except Exception:
+            response.delete_cookie(cookie_name, path='/', domain=domain)
+        except (TypeError, ValueError):
             continue
-    response.headers["Cache-Control"] = "no-store"
+    response.headers['Cache-Control'] = 'no-store'
     return response
 
 
 @auth_bp.route('/api/csrf-token', methods=['GET'])
 def issue_csrf_token():
-    token = get_csrf_token()
-    response = jsonify({"success": True, "token": token})
+    response = jsonify({'success': True, 'token': get_csrf_token()})
     response.headers['Cache-Control'] = 'no-store'
     return response
 
@@ -121,324 +86,60 @@ def host_mode_enabled():
     return jsonify(public_host_status())
 
 
-@auth_bp.route('/login', methods=['GET', 'POST'])
+@auth_bp.route('/login', methods=['GET'])
 def login():
-    if request.method == 'POST' and not ordinary_login_allowed():
-        return jsonify(success=False, error=tr("auth.host_password_required")), 403
-    if request.method == 'GET':
-        auth_debug_log(f"[auth_debug] GET /login session={_session_debug_snapshot()} cookie={_cookie_debug_snapshot()}")
-        if is_logged_in():
-            return redirect('/new')
-        # 避免“session 内残留 username 但已失效”导致 /login <-> /new 重定向循环
-        if session.get('username'):
-            stale_username = session.get('username')
-            stale_nonce = session.get('login_nonce')
-            _revoke_login_nonce(stale_username, stale_nonce)
-            session.clear()
-            resp = serve_entry_html('login.html')
-            return _expire_session_cookie(resp)
-        if not state.container_manager.has_capacity():
-            return serve_entry_html('resource_busy.html'), 503
-        return serve_entry_html('login.html')
-
-    data = request.get_json() or {}
-    email = (data.get('email') or '').strip()
-    password = data.get('password') or ''
-    # XFF 仅在可信代理后采信（见 security.get_client_ip），直连时以真实对端为准
-    client_ip = get_client_ip()
-    account_key = (email or '').strip().lower() or 'unknown'
-
-    limited, retry_after = check_rate_limit("login", 10, 60, client_ip)
-    if limited:
-        return jsonify({"success": False, "error": tr("auth.login_rate_limited"), "retry_after": retry_after}), 429
-
-    blocked, block_for = is_action_blocked("login", identifier=client_ip)
-    if blocked:
-        return jsonify({"success": False, "error": tr("auth.too_many_attempts", seconds=block_for), "retry_after": block_for}), 429
-
-    # 账号维度锁定：防止伪造/轮换来源 IP 对同一账号持续爆破
-    blocked, block_for = is_action_blocked("login_account", identifier=account_key)
-    if blocked:
-        return jsonify({"success": False, "error": tr("auth.too_many_attempts", seconds=block_for), "retry_after": block_for}), 429
-
-    record = state.user_manager.authenticate(email, password)
-    if not record:
-        register_failure("login_account", state.FAILED_LOGIN_LIMIT, state.FAILED_LOGIN_LOCK_SECONDS, identifier=account_key)
-        wait_seconds = register_failure("login", state.FAILED_LOGIN_LIMIT, state.FAILED_LOGIN_LOCK_SECONDS, identifier=client_ip)
-        error_payload = {"success": False, "error": tr("auth.invalid_credentials")}
-        status_code = 401
-        if wait_seconds:
-            error_payload.update({"error": tr("auth.too_many_attempts", seconds=wait_seconds), "retry_after": wait_seconds})
-            status_code = 429
-        return jsonify(error_payload), status_code
-
-    workspace = state.user_manager.ensure_user_workspace(record.username)
-    preferred_run_mode = None
-    try:
-        personal_config = load_personalization_config(workspace.data_dir)
-        candidate_mode = (personal_config or {}).get('default_run_mode')
-        if isinstance(candidate_mode, str):
-            normalized_mode = candidate_mode.lower()
-            if normalized_mode == "deep":  # 旧版标识符映射
-                normalized_mode = "thinking"
-            if normalized_mode in {"fast", "thinking"}:
-                preferred_run_mode = normalized_mode
-    except Exception as exc:
-        debug_log(f"加载个性化偏好失败: {exc}")
-
-    # 清理旧会话（尤其是从 host-login 切换到普通登录时遗留的 host_mode）
-    prev_username = session.get('username')
-    prev_nonce = session.get('login_nonce')
-    _revoke_login_nonce(prev_username, prev_nonce)
-    session.clear()
-
-    session['logged_in'] = True
-    session['username'] = record.username
-    session['role'] = record.role or 'user'
-    session['host_mode'] = False
-    session['workspace_id'] = 'default'
-    default_thinking = current_app.config.get('DEFAULT_THINKING_MODE', False)
-    session['thinking_mode'] = default_thinking
-    session['run_mode'] = current_app.config.get('DEFAULT_RUN_MODE', "deep" if default_thinking else "fast")
-    if preferred_run_mode:
-        session['run_mode'] = preferred_run_mode
-        session['thinking_mode'] = preferred_run_mode != 'fast'
-    session.permanent = True
-    _issue_login_nonce(record.username)
-    clear_failures("login", identifier=client_ip)
-    clear_failures("login_account", identifier=account_key)
-    try:
-        state.container_manager.ensure_container(
-            record.username,
-            str(workspace.project_path),
-            container_key=f"{record.username}::default",
-            preferred_mode="docker",
-        )
-    except RuntimeError as exc:
-        session.clear()
-        return jsonify({"success": False, "error": str(exc), "code": "resource_busy"}), 503
-    from .usage import record_user_activity
-    record_user_activity(record.username)
-    get_csrf_token(force_new=True)
-    return jsonify({"success": True})
+    if is_logged_in():
+        return redirect('/new')
+    if session.get('username'):
+        _clear_browser_session()
+        return _expire_session_cookie(serve_entry_html('login.html'))
+    return serve_entry_html('login.html')
 
 
 @auth_bp.route('/host-login', methods=['POST'])
 def host_login():
-    """Optional password login; without protection keep the existing loopback entry."""
-    if (TERMINAL_SANDBOX_MODE or "").lower() != "host" or LINUX_SAFETY:
-        return jsonify({"success": False, "error": tr("auth.host_mode_disabled")}), 403
+    """Authenticate the browser and prepare the registered Host workspace paths."""
     credential_state, error = authorize_host_login()
     if error is not None:
         return error
-    if not state.container_manager.has_capacity("host"):
-        return jsonify({"success": False, "error": tr("auth.resource_busy")}), 503
 
     _, host_workspace = resolve_host_workspace()
-    # 初始化 session，跳过账号体系；绑定校验过的密码版本以撤销旧会话。
-    _revoke_login_nonce(session.get('username'), session.get('login_nonce'))
-    session.clear()
+    workspace_id = host_workspace['workspace_id'] if host_workspace else None
+    if workspace_id:
+        resolve_workspace('host', workspace_id, identity=RuntimeIdentity(host_mode=True), prepare=True)
+
+    _clear_browser_session()
     session['host_auth_generation'] = credential_state.generation
     session['logged_in'] = True
     session['username'] = 'host'
     session['role'] = 'admin'
     session['host_mode'] = True
-
-    workspace_required = False
-    if host_workspace:
-        host_workspace_id = host_workspace.get("workspace_id") or "default"
-        host_path = Path(host_workspace.get("path") or "").expanduser().resolve()
-        host_path.mkdir(parents=True, exist_ok=True)
-        uploads_dir = host_path / ".astrion" / "user_upload"
-        uploads_dir.mkdir(parents=True, exist_ok=True)
-        quarantine_root = Path(UPLOAD_QUARANTINE_SUBDIR).expanduser()
-        if not quarantine_root.is_absolute():
-            quarantine_root = (host_path.parent / UPLOAD_QUARANTINE_SUBDIR).resolve()
-        quarantine_root.mkdir(parents=True, exist_ok=True)
-        session['host_workspace_id'] = host_workspace_id
-        session['workspace_id'] = host_workspace_id
-    else:
-        # 没有任何工作区：允许先登录，由用户在前端手动创建工作区
-        workspace_required = True
-
-    data_dir = Path(DATA_DIR).expanduser().resolve()
-    data_dir.mkdir(parents=True, exist_ok=True)
-    logs_dir = Path(LOGS_DIR).expanduser().resolve()
-    logs_dir.mkdir(parents=True, exist_ok=True)
+    if workspace_id:
+        session['host_workspace_id'] = workspace_id
+        session['workspace_id'] = workspace_id
     default_thinking = current_app.config.get('DEFAULT_THINKING_MODE', False)
     session['thinking_mode'] = default_thinking
-    session['run_mode'] = current_app.config.get('DEFAULT_RUN_MODE', "deep" if default_thinking else "fast")
+    session['run_mode'] = current_app.config.get('DEFAULT_RUN_MODE', 'deep' if default_thinking else 'fast')
     session.permanent = True
-    _issue_login_nonce('host')
-
-    # 预先创建宿主机模式的终端/容器句柄（host 模式不会启动 Docker）
-    # 无工作区时跳过，待用户创建工作区并选择后再初始化
-    if not workspace_required:
-        try:
-            state.container_manager.ensure_container(
-                "host",
-                str(host_path),
-                container_key=f"host::{host_workspace_id}",
-                preferred_mode="host",
-            )
-        except RuntimeError as exc:
-            session.clear()
-            return jsonify({"success": False, "error": str(exc)}), 503
-
+    _issue_login_nonce()
     get_csrf_token(force_new=True)
-    return jsonify({"success": True, "workspace_required": workspace_required})
-
-
-@auth_bp.route('/register', methods=['GET', 'POST'])
-def register():
-    if not ordinary_login_allowed():
-        if request.method == 'GET':
-            return redirect('/login')
-        return jsonify(success=False, error=tr("auth.host_password_required")), 403
-    if request.method == 'GET':
-        auth_debug_log(f"[auth_debug] GET /register session={_session_debug_snapshot()} cookie={_cookie_debug_snapshot()}")
-        if is_logged_in():
-            auth_debug_log("[auth_debug] GET /register redirected to /new because session.username exists")
-            return redirect('/new')
-        if session.get('username'):
-            stale_username = session.get('username')
-            stale_nonce = session.get('login_nonce')
-            _revoke_login_nonce(stale_username, stale_nonce)
-            session.clear()
-            resp = serve_entry_html('register.html')
-            return _expire_session_cookie(resp)
-        return serve_entry_html('register.html')
-
-    data = request.get_json() or {}
-    username = (data.get('username') or '').strip()
-    email = (data.get('email') or '').strip()
-    password = data.get('password') or ''
-    invite_code = (data.get('invite_code') or '').strip()
-
-    client_ip = get_client_ip()
-    limited, retry_after = check_rate_limit("register", 5, 300, client_ip)
-    if limited:
-        return jsonify({"success": False, "error": tr("auth.register_rate_limited"), "retry_after": retry_after}), 429
-
-    # 邀请码爆破锁定：连续失败达到阈值后按来源锁定一段时间
-    blocked, block_for = is_action_blocked("register_invite", identifier=client_ip)
-    if blocked:
-        return jsonify({"success": False, "error": tr("auth.too_many_attempts", seconds=block_for), "retry_after": block_for}), 429
-
-    try:
-        state.user_manager.register_user(username, email, password, invite_code)
-        auth_debug_log(f"[auth_debug] POST /register success username={username}")
-        return jsonify({"success": True})
-    except ValueError as exc:
-        register_failure("register_invite", state.FAILED_LOGIN_LIMIT, state.FAILED_LOGIN_LOCK_SECONDS, identifier=client_ip)
-        return jsonify({"success": False, "error": str(exc)}), 400
-    except Exception as exc:
-        return jsonify({"success": False, "error": str(exc)}), 500
+    return jsonify({'success': True, 'workspace_required': not workspace_id})
 
 
 @auth_bp.route('/logout', methods=['GET', 'POST'])
 def logout():
-    auth_debug_log(
-        f"[auth_debug] {request.method} /logout before_clear "
-        f"session={_session_debug_snapshot()} cookie={_cookie_debug_snapshot()}"
-    )
-    username = session.get('username')
-    login_nonce = session.get('login_nonce')
-    session.clear()
-    _revoke_login_nonce(username, login_nonce)
-    if username:
-        # 清理该用户相关的所有终端/容器（包含 API 多工作区）
-        term_keys = [k for k in list(state.user_terminals.keys()) if k == username or k.startswith(f"{username}::")]
-        for key in term_keys:
-            state.user_terminals.pop(key, None)
-            try:
-                state.container_manager.release_container(key, reason="logout")
-            except Exception:
-                pass
-    auth_debug_log(f"[auth_debug] {request.method} /logout after_clear session={_session_debug_snapshot()}")
+    _clear_browser_session()
+    auth_debug_log(f'[auth_debug] {request.method} /logout cleared browser session')
     if request.method == 'GET':
-        resp = make_response(redirect('/login?logged_out=1'))
-        resp = _expire_session_cookie(resp)
-        auth_debug_log(f"[auth_debug] GET /logout set-cookie={resp.headers.get('Set-Cookie', '')[:300]}")
-        return resp
-    resp = make_response(jsonify({"success": True}))
-    resp = _expire_session_cookie(resp)
-    auth_debug_log(f"[auth_debug] POST /logout set-cookie={resp.headers.get('Set-Cookie', '')[:300]}")
-    return resp
+        return _expire_session_cookie(make_response(redirect('/login?logged_out=1')))
+    return _expire_session_cookie(make_response(jsonify({'success': True})))
 
 
 @auth_bp.route('/api/session-status', methods=['GET'])
 def session_status():
-    """前端调试用：查看当前会话是否已清理。"""
     snapshot = _session_debug_snapshot()
     snapshot['logged_in'] = is_logged_in()
-    auth_debug_log(f"[auth_debug] GET /api/session-status session={snapshot} cookie={_cookie_debug_snapshot()}")
-    return jsonify({"success": True, "session": snapshot})
-
-
-@auth_bp.route('/api/tutorial-status', methods=['GET'])
-@api_login_required
-def get_tutorial_status():
-    username = (get_current_username() or "").strip().lower()
-    if not username:
-        return jsonify({"success": False, "error": tr("auth.not_logged_in")}), 401
-
-    if bool(session.get("host_mode")) or username == "host":
-        return jsonify({
-            "success": True,
-            "data": {
-                "username": username,
-                "applicable": False,
-                "tutorial_completed": True,
-                "should_prompt": False,
-            }
-        })
-
-    record = state.user_manager.get_user(username)
-    if not record:
-        return jsonify({
-            "success": True,
-            "data": {
-                "username": username,
-                "applicable": False,
-                "tutorial_completed": True,
-                "should_prompt": False,
-            }
-        })
-
-    completed = bool(getattr(record, "tutorial_completed", False))
-    return jsonify({
-        "success": True,
-        "data": {
-            "username": record.username,
-            "applicable": True,
-            "tutorial_completed": completed,
-            "should_prompt": not completed,
-        }
-    })
-
-
-@auth_bp.route('/api/tutorial-status', methods=['POST'])
-@api_login_required
-def set_tutorial_status():
-    username = (get_current_username() or "").strip().lower()
-    if not username:
-        return jsonify({"success": False, "error": tr("auth.not_logged_in")}), 401
-    if bool(session.get("host_mode")) or username == "host":
-        return jsonify({"success": False, "error": tr("auth.host_mode_tutorial_not_applicable")}), 400
-
-    payload = request.get_json(silent=True) or {}
-    completed = payload.get("tutorial_completed", True)
-    record = state.user_manager.set_tutorial_completed(username, bool(completed))
-    if not record:
-        return jsonify({"success": False, "error": tr("auth.user_not_found")}), 404
-    return jsonify({
-        "success": True,
-        "data": {
-            "username": record.username,
-            "tutorial_completed": bool(record.tutorial_completed),
-        }
-    })
+    return jsonify({'success': True, 'session': snapshot})
 
 
 @auth_bp.route('/')
@@ -463,19 +164,13 @@ def chat_mode_page(conversation_id=None):
 
 @auth_bp.route('/chrome')
 def chrome_page():
-    # 桌面壳双 webview 的顶部对话标签条页面（chrome webview 同源加载，
-    # fetch/CSRF/cookie 零改动复用；见 desktop/src-tauri/src/backend.rs）。
-    # 刻意不加 login_required：页面本身无数据（数据接口仍受保护），
-    # 未登录时标签条空白轮询，主页面自动登录完成后下轮轮询自愈；
-    # 若加登录重定向，chrome webview 会被导到登录页再跳进主应用
+    # The desktop view loads this shell before the browser session is ready.
     return serve_entry_html('chrome.html')
 
 
 @auth_bp.route('/browser-window')
 def browser_window_page():
-    # 桌面壳（macOS）对话浏览器独立窗口的界面页，复用共享 BrowserPanel。
-    # 与 /chrome 同理不加 login_required：页面本身无数据，身份由原生侧
-    # /api/session-status 校验；登录重定向会让窗口离开可信路由。
+    # The desktop browser window checks the session through its protected APIs.
     return serve_entry_html('browser-window.html')
 
 
@@ -483,8 +178,6 @@ def browser_window_page():
 @auth_bp.route('/settings/<path:section>')
 @login_required
 def settings_page(section=None):
-    # 设置页与 /new 同为 SPA 入口：前端 bootstrapRoute 识别 settings/settings/* 路径
-    # （参考 server/workflow_page.py 的 /workflows 同模式）
     return serve_entry_html('index.html')
 
 
@@ -497,92 +190,43 @@ def conversation_page(conversation_id):
 @auth_bp.route('/terminal')
 @login_required
 def terminal_page():
-    from .auth_helpers import resolve_admin_policy
-    policy = resolve_admin_policy(get_current_user_record())
-    if policy.get("ui_blocks", {}).get("block_realtime_terminal"):
-        return tr("auth.terminal_blocked_by_admin"), 403
+    if resolve_admin_policy().get('ui_blocks', {}).get('block_realtime_terminal'):
+        return tr('auth.terminal_blocked_by_admin'), 403
     return serve_entry_html('terminal.html')
 
 
-def _resolve_serving_workspace_roots(user):
-    """返回 (uploads_dir, project_root)，供 /user_upload/ 与 /workspace/ 文件服务路由使用。
+def _serving_workspace():
+    # Media requests use the URL to specify the visible workspace in each window.
+    workspace_id = (request.args.get('workspace_id') or '').strip() or None
+    try:
+        return resolve_workspace('host', workspace_id)
+    except (NoWorkspaceError, ValueError):
+        abort(404)
 
-    宿主机免登录模式（host_mode session）必须与 get_user_resources 走同一套
-    host_workspaces.json 解析：上传文件实际存放在宿主机工作区目录的
-    .astrion/user_upload 下。若误用 user_manager 的 users/<user>/projects/<id>
-    结构，会解析到一个空工作区，导致已上传文件 404（show_image 引用上传目录
-    图片时加载失败）。
-    """
-    host_mode_session = bool(session.get("host_mode"))
-    sandbox_is_host = (TERMINAL_SANDBOX_MODE or "").lower() == "host"
-    if host_mode_session and sandbox_is_host:
-        # `<img>`/`<iframe>` 等原生资源请求无法携带 X-Astrion-Workspace-Id 头，
-        # 只靠 session 选中工作区时，多窗口/并发响应会让 session 与当前可见工作区
-        # 不一致，导致上传目录图片 404。调用方因此会在资源 URL 上显式带
-        # workspace_id；该值仍受 host_workspaces.json 目录校验，不是任意路径。
-        requested_workspace_id = (request.args.get("workspace_id") or "").strip()
-        selected_workspace_id = (
-            requested_workspace_id
-            or session.get("host_workspace_id")
-            or session.get("workspace_id")
-        )
-        active_workspace_path = None
-        if not selected_workspace_id:
-            with state.HOST_ACTIVE_WORKSPACE_LOCK:
-                selected_workspace_id = state.HOST_ACTIVE_WORKSPACE_ID
-                active_workspace_path = state.HOST_ACTIVE_WORKSPACE_PATH
-        _, host_workspace = resolve_host_workspace(selected_workspace_id)
-        if not host_workspace:
-            return None, None
-        if active_workspace_path:
-            host_workspace = dict(host_workspace)
-            host_workspace["path"] = active_workspace_path
-        project_root = Path(host_workspace.get("path") or "").expanduser().resolve()
-        return (project_root / ".astrion" / "user_upload").resolve(), project_root
-    workspace = state.user_manager.ensure_user_workspace(
-        user.username,
-        session.get("workspace_id") or "default",
-    )
-    return workspace.uploads_dir.resolve(), workspace.project_path.resolve()
+
+def _workspace_file(root: Path, filename: str) -> Path:
+    root = root.resolve()
+    target = (root / filename).resolve()
+    if not target.is_relative_to(root):
+        abort(403)
+    if not target.is_file():
+        abort(404)
+    return target
 
 
 @auth_bp.route('/user_upload/<path:filename>')
 @login_required
 def serve_user_upload(filename: str):
-    user = get_current_user_record()
-    if not user:
-        return redirect('/login')
-    uploads_dir, _project_root = _resolve_serving_workspace_roots(user)
-    if not uploads_dir:
-        abort(404)
-    target = (uploads_dir / filename).resolve()
-    try:
-        target.relative_to(uploads_dir)
-    except ValueError:
-        abort(403)
-    if not target.exists() or not target.is_file():
-        abort(404)
-    return send_from_directory(str(uploads_dir), str(target.relative_to(uploads_dir)))
+    target = _workspace_file(_serving_workspace().uploads_dir, filename)
+    return send_from_directory(str(target.parent), target.name)
 
 
 @auth_bp.route('/workspace/<path:filename>')
 @login_required
 def serve_workspace_file(filename: str):
-    user = get_current_user_record()
-    if not user:
-        return redirect('/login')
-    _uploads_dir, project_root = _resolve_serving_workspace_roots(user)
-    if not project_root:
-        abort(404)
-    target = (project_root / filename).resolve()
-    try:
-        target.relative_to(project_root)
-    except ValueError:
-        abort(403)
-    if not target.exists() or not target.is_file():
-        abort(404)
+    target = _workspace_file(_serving_workspace().project_path, filename)
     mime_type, _ = mimetypes.guess_type(str(target))
-    if not mime_type or not mime_type.startswith("image/"):
+    if not mime_type or not mime_type.startswith('image/'):
         abort(415)
     return send_from_directory(str(target.parent), target.name)
 
@@ -593,4 +237,5 @@ def static_files(filename):
         abort(404)
     return send_from_directory('static', filename)
 
-__all__ = ["auth_bp"]
+
+__all__ = ['auth_bp']

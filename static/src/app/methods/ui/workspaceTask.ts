@@ -71,9 +71,7 @@ export const workspaceTaskMethods = {
         (task: any) =>
           task?.status === 'running' &&
           task?.conversation_id &&
-          (!(this.versioningHostMode || this.dockerProjectMode) ||
-            !this.currentHostWorkspaceId ||
-            task?.workspace_id === this.currentHostWorkspaceId)
+          (!this.currentHostWorkspaceId || task?.workspace_id === this.currentHostWorkspaceId)
       );
       return runningTask?.conversation_id || null;
     } catch (error) {

@@ -12,18 +12,13 @@
 
 ### 1.5.1 默认位置与模式分流
 
-运行态数据根目录（`data_root`）默认为 `~/.astrion/astrion`，可通过 `ASTRION_DATA_ROOT` 整体搬迁。在该根目录下，按运行模式自动分流（由 `TERMINAL_SANDBOX_MODE` 决定）：
-
-- 宿主机模式（`TERMINAL_SANDBOX_MODE=host`）→ `~/.astrion/astrion/host`
-- 其它模式（默认 docker / web）→ `~/.astrion/astrion/web`
-
-数据根目录下还包含：`settings.json`（唯一配置文件）、`config/`（部署级配置，host/web 共享）。每个模式目录下包含：`data/`（对话、用户库、记忆、sub_agents.json、sub_agent_tasks 等）、`users/`（web 多用户工作区）、`api/users/`（API 用户工作区）、`logs/`（日志）。
+`ASTRION_DATA_ROOT` 可整体搬迁数据根。Host 数据和日志分别沿用 `<data_root>/host/data/` 与 `<data_root>/host/logs/`。`settings.json` 和部署级 `config/` 继续位于数据根内。`web/` 下的旧租户数据留给旧版部署。主仓在路径初始化前拒绝 `TERMINAL_SANDBOX_MODE=web`、`docker` 或旧 `LINUX_SAFETY`。
 
 ### 1.5.2 路径解析优先级（从高到低）
 
-1. **具体目录环境变量**：`DATA_DIR` / `LOGS_DIR` / `USER_SPACE_DIR` / `API_USER_SPACE_DIR`（单独覆盖某个目录，最高优先级）
+1. **具体目录环境变量**：`DATA_DIR` / `LOGS_DIR`（单独覆盖某个目录，最高优先级）
 2. **数据根目录环境变量**：`ASTRION_DATA_ROOT`（整体搬迁运行态数据根目录，默认 `~/.astrion/astrion`）
-3. **兜底默认**：`~/.astrion/astrion/<mode>`
+3. **兜底默认**：`~/.astrion/astrion/host`
 
 具体目录变量支持相对路径（相对仓库根目录展开）、绝对路径与 `~`。
 
@@ -33,23 +28,9 @@
 >
 > **个人指令拦截（2026-10）**：唯一权威为 `modules/command_blocking.py`。个人文件 `command_blocking.json` 与解析共享链接后的 `personalization.json` 同目录，格式 `{enabled: true, rules: []}`；用户间隔离、同用户跨工作区共享，host 免登录沿用其 `DATA_DIR`。普通用户可调用 `/api/command-blocking` GET/POST（full/headless 共用），设置→通用的开关与路径授权旁的规则窗口共享状态。保存立即影响后续前台/后台命令和终端输入；部分更新不能覆盖未提交字段。沿用不区分大小写的全文包含匹配，空列表不回退，关闭保留规则。旧部署级 `forbidden_commands.json` 和硬编码词表均不再使用，也不自动迁入个人配置。
 
-### 1.5.3 Host / Web 双路径机制（2026-06 新增）
+### 1.5.3 旧租户数据归属
 
-`paths.py` 新增三个固定变量，支持 host 模式同时读取 web/ 数据：
-
-- **`IS_HOST_MODE`**：当前是否为 host 模式（布尔值）
-- **`WEB_DATA_DIR`**：固定指向 `<data_root>/web/data`（不受当前模式影响）
-- **`WEB_USER_SPACE_DIR`**：固定指向 `<data_root>/web/users`（不受当前模式影响）
-
-**host 模式**（`modules/user_manager.py`）：
-- 用户列表：同时加载 `host/data/users.json` + `web/data/users.json`（web 用户不覆盖已有）
-- 工作区列表：合并 host/ 和 web/ 两处
-- 工作区定位：已有 web 工作区直接复用；新工作区写入 host/
-- 写操作（创建/删除/重命名）：始终走 host 路径
-
-**web 模式**：只读取 web/ 数据，无变化。
-
-> 设计意图：host 模式 = host + web 数据都可用；web 模式 = 仅 web 数据可用。
+Host 登录和 CLI 使用可信 Host 工作区目录。旧 Web 普通账号、API 用户及其数据保留在原版本的数据根。跨版本导入与部署切换见 [拆分方案](../docker_fork_split_plan.md)。
 
 ### 1.5.4 日志策略（2026-06）
 
@@ -71,4 +52,4 @@
 
 ### 私有项目常驻记忆（2026-11-07）
 
-新增 `modules/workspace_memory.py` 统一解析源码树外的 MEMORY.md。Host 使用当前数据目录的 `memory/<目录名>-<规范化项目路径摘要>/MEMORY.md`；Docker 使用每用户每工作区独立 `data_dir/memory/MEMORY.md`，将该目录挂载到容器项目根的 `.astrion/astrion-memory/`。主子只在新建和压缩时全文加载，不在恢复／普通请求中刷新；具体冻结元数据、授权与迁移边界见 `docs/workspace_memory.md`。
+新增 `modules/workspace_memory.py` 统一解析源码树外的 MEMORY.md。Host 使用当前数据目录的 `memory/<目录名>-<规范化项目路径摘要>/MEMORY.md`。主子只在新建和压缩时全文加载，不在恢复／普通请求中刷新；具体冻结元数据、授权与迁移边界见 `docs/workspace_memory.md`。

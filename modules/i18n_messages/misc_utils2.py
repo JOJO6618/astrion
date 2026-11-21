@@ -54,10 +54,6 @@ MESSAGES = {
         "zh-CN": "stdio 服务缺少 command",
         "en-US": "stdio server is missing a command",
     },
-    "mcp_stdio.docker_missing_container_name": {
-        "zh-CN": "docker 模式下 stdio MCP 缺少 container_name",
-        "en-US": "Docker-mode stdio MCP is missing container_name",
-    },
     "mcp_stdio.launch_failed": {
         "zh-CN": "启动 stdio MCP 服务失败: {error}",
         "en-US": "Failed to launch stdio MCP server: {error}",

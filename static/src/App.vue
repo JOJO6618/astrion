@@ -71,8 +71,8 @@
           :current-workspace-id="currentHostWorkspaceId"
           :default-workspace-id="defaultHostWorkspaceId"
           :workspaces="hostWorkspaces"
-          :workspace-kind="versioningHostMode ? 'workspace' : 'project'"
-          :host-workspace-enabled="versioningHostMode || dockerProjectMode"
+          :workspace-kind="'workspace'"
+          :host-workspace-enabled="true"
           :workspace-busy="hostWorkspaceSwitching || hostWorkspaceManageSubmitting"
           :workspace-create-submitting="hostWorkspaceCreateSubmitting"
           :workspace-error="hostWorkspaceCreateError"
@@ -106,7 +106,6 @@
           class="chat-container"
           :class="{
             'chat-container--mobile': isMobileViewport,
-            'chat-container--app-shell': isAppShell,
             'chat-container--monitor': chatDisplayMode === 'monitor',
             'has-title-ribbon': titleRibbonVisible
           }"
@@ -119,16 +118,7 @@
             @toggle="handleTokenPanelToggleClick"
             :current-conversation-tokens="currentConversationTokens"
             :current-context-tokens="currentContextTokens"
-            :container-status="containerStatus"
-            :container-net-rate="containerNetRate"
-            :project-storage="projectStorage"
-            :usage-quota="usageQuota"
             :format-token-count="formatTokenCount"
-            :format-percentage="formatPercentage"
-            :format-bytes="formatBytes"
-            :format-quota-value="formatQuotaValue"
-            :format-reset-time="formatResetTime"
-            :format-rate="formatRate"
           />
 
           <div v-if="titleRibbonVisible" class="conversation-ribbon" ref="titleRibbon">
@@ -241,7 +231,6 @@
               :block-tool-toggle="policyUiBlocks.block_tool_toggle"
               :block-realtime-terminal="policyUiBlocks.block_realtime_terminal"
               :terminal-count="terminalSessions ? Object.keys(terminalSessions).length : 0"
-              :host-mode="versioningHostMode"
               :block-focus-panel="policyUiBlocks.block_focus_panel"
               :block-token-panel="policyUiBlocks.block_token_panel"
               :block-compress-conversation="policyUiBlocks.block_compress_conversation"
@@ -276,9 +265,7 @@
               :host-workspaces="hostWorkspaces"
               :current-host-workspace-id="currentHostWorkspaceId"
               :host-workspace-switching="hostWorkspaceSwitching"
-              :workspace-kind="
-                versioningHostMode ? 'workspace' : dockerProjectMode ? 'project' : null
-              "
+              :workspace-kind="'workspace'"
               :main-chat-idle="mainChatIdle"
               :sub-agent-count="subAgentCount"
               :avatar-status="showStatusAvatar && messages.length > 0 ? avatarStatus : null"
@@ -636,15 +623,14 @@
               :current-workspace-id="currentHostWorkspaceId"
               :default-workspace-id="defaultHostWorkspaceId"
               :workspaces="hostWorkspaces"
-              :workspace-kind="versioningHostMode ? 'workspace' : 'project'"
-              :host-workspace-enabled="versioningHostMode || dockerProjectMode"
+              :workspace-kind="'workspace'"
+              :host-workspace-enabled="true"
               :workspace-busy="hostWorkspaceSwitching || hostWorkspaceManageSubmitting"
               :workspace-create-submitting="hostWorkspaceCreateSubmitting"
               :workspace-error="hostWorkspaceCreateError"
               :group-by-workspace="personalizationStore?.form?.group_sidebar_by_workspace"
               :versioning-host-mode="versioningHostMode"
               :show-collapse-button="true"
-              :show-refresh-button="isAppShell"
               collapse-button-variant="close"
               @toggle="closeMobileOverlay"
               @refresh="refreshCurrentPage"
@@ -722,7 +708,7 @@
 </template>
 
 <script setup lang="ts">
-import { defineAsyncComponent, onBeforeUnmount, onMounted, ref } from 'vue';
+import { defineAsyncComponent, onBeforeUnmount, onMounted } from 'vue';
 import appOptions from './app';
 import ConversationModelHeader from './components/chat/ConversationModelHeader.vue';
 import ModelEffortPanel from './components/chat/ModelEffortPanel.vue';
@@ -762,15 +748,6 @@ const tutorialStore = useTutorialStore();
 const personalizationStore = usePersonalizationStore();
 
 const mobilePanelIconStyle = iconSrcStyle('alignLeft');
-const detectAppShell = () => {
-  if (typeof window === 'undefined') return false;
-  const params = new URLSearchParams(window.location.search);
-  const ua = window.navigator?.userAgent || '';
-  return (
-    params.has('app_shell') || Boolean((window as any)?.AndroidThemeBridge) || /;\s*wv\)/i.test(ua)
-  );
-};
-const isAppShell = ref(detectAppShell());
 
 // 桌面端：正文里的网页链接统一交给 Astrion 内置浏览器打开（预览面板已在桌面端停用）。
 // 同源（后端自身端口）链接是应用内部导航，必须放行；内置浏览器不可用时退回系统浏览器。
@@ -824,10 +801,6 @@ const onDesktopExternalLinkClick = (event: MouseEvent) => {
 };
 
 onMounted(() => {
-  isAppShell.value = detectAppShell();
-  window.setTimeout(() => {
-    isAppShell.value = detectAppShell();
-  }, 300);
   if ((window as any).__ASTRION_DESKTOP__) {
     document.addEventListener('click', onDesktopExternalLinkClick, true);
     // 旧壳与 legacy 页面仍由本视图显示软件更新入口。

@@ -13,9 +13,7 @@ headless 只挂 CLI / 桌面 / API 客户端依赖的 API 蓝图：
 被砍的「web 站点职责」（静态页面、web 登录、旧版通道等）在本形态下访问返回 404；
 GET / 返回形态告知页（避免浏览器打开时误判为服务故障）。
 
-注意：本入口通过 import server.app_legacy 复用 initialize_system / start_background_jobs，
-因此 import 链与 full 形态一致（app_legacy 模块级创建的 app 对象不会被 serve）。
-headless 精简的是**路由面**（攻击面收敛 + CLI 依赖契约显式化），不是 import 链。
+本入口与 full 形态共用 Host 初始化和后台服务，各自装配 Flask app。
 
 启动：python -m server.headless_app [--path PATH] [--port 8091] [--thinking-mode] [--debug]
 """
@@ -39,8 +37,8 @@ from config import (
 
 DEFAULT_PORT = WEB_SERVER_PORT
 
-# 复用 full 形态的初始化与后台任务（模块级 app 对象仅被创建，不会被 serve）
-from server.app_legacy import initialize_system, start_background_jobs  # noqa: F401
+from server.host_startup import initialize_host, start_background_jobs
+from server.model_catalog import model_catalog_bp
 from server.gateway_api import gateway_bp
 from server.tasks.web import get_tasks_blueprint
 from server.status import status_bp
@@ -54,6 +52,7 @@ from server.security import attach_security_hooks
 HEADLESS_BLUEPRINTS = (
     ("gateway", gateway_bp),
     ("tasks", get_tasks_blueprint()),
+    ("model_catalog", model_catalog_bp),
     ("status", status_bp),
     ("approval", approval_bp),
     ("usage", usage_bp),
@@ -123,8 +122,7 @@ _HEADLESS_LANDING_HTML = """<!DOCTYPE html>
     </div>
     <h1>这是 Astrion 的 API 后端实例，运行正常。</h1>
     <p>
-      本实例以 <strong>headless 形态</strong>启动：只提供 Gateway / Runtime API
-      （供 CLI、桌面端、Android 等客户端使用），不包含 Web 界面。
+      本实例以 <strong>headless 形态</strong>启动，供 CLI 使用 Gateway / Runtime API。
     </p>
     <p>如需 Web 界面，请改用 full 形态启动：</p>
     <span class="cmd">python -m server.app</span>
@@ -137,7 +135,7 @@ _HEADLESS_LANDING_HTML = """<!DOCTYPE html>
 
 def create_headless_app() -> Flask:
     """创建 headless 形态的 Flask app（最小 API 路由面）。"""
-    app = Flask(__name__)
+    app = Flask(__name__, static_folder=None)
     app.config['MAX_CONTENT_LENGTH'] = MAX_UPLOAD_SIZE
     # Flask session 仍被 Bearer 通道的身份注入使用（请求内 session 对象），
     # 必须配置 SECRET_KEY；解析规则与 full 形态一致。
@@ -171,9 +169,7 @@ def create_headless_app() -> Flask:
     from server.conversation import list_background_commands, list_sub_agents, list_conversation_versioning_checkpoints
     from server.workflow_page import api_list_workflows
     from server.chat.command_blocking import get_command_blocking, update_command_blocking
-    from server.api_v1 import list_models_api
 
-    app.add_url_rule('/api/v1/models', view_func=list_models_api, methods=['GET'])
     app.add_url_rule('/api/personalization', view_func=get_personalization_settings, methods=['GET'])
     app.add_url_rule('/api/personalization', view_func=update_personalization_settings, methods=['POST'])
     app.add_url_rule('/api/path-authorization', view_func=get_path_authorization, methods=['GET'])
@@ -214,14 +210,16 @@ def run_headless(path: str, thinking_mode: bool = False, port: int = DEFAULT_POR
     app.config['SESSION_COOKIE_NAME'] = os.environ.get(
         "WEB_SESSION_COOKIE_NAME", f"agents_session_{port}"
     )
-    initialize_system(path, thinking_mode)
-    start_background_jobs()
+    initialize_host(app, path, thinking_mode)
+    if not debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
+        start_background_jobs()
     app.run(
         host=WEB_SERVER_HOST,
         port=port,
         debug=debug,
         use_reloader=debug,
         threaded=True,
+        load_dotenv=False,
     )
 
 

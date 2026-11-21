@@ -42,13 +42,13 @@ from modules.host_sandbox_policy import (
     get_macos_deny_read_regexes,
     get_windows_deny_read_paths,
 )
-from modules.user_manager import UserWorkspace
+from modules.workspace import UserWorkspace
 from core.web_terminal import WebTerminal
 from config.model_profiles import get_model_context_window
 
-from server.auth_helpers import api_login_required, resolve_admin_policy, get_current_user_record, get_current_username
+from server.auth_helpers import api_login_required, resolve_admin_policy, get_current_username
 from server.gateway_auth import api_login_or_host_token_required
-from server.context import with_terminal, get_gui_manager, get_upload_guard, build_upload_error_response, ensure_conversation_loaded, get_or_create_usage_tracker, get_user_resources
+from server.context import with_terminal, get_gui_manager, get_upload_guard, build_upload_error_response, ensure_conversation_loaded, get_user_resources
 from server.context.data_decorators import with_workspace_data
 from server.context.modes import mode_view
 from server.security import rate_limited

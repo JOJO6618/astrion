@@ -27,22 +27,18 @@ class WebAuthTests(unittest.TestCase):
         self.data = Path(directory)
         self.policy = policy
         self.stack.enter_context(patch.object(policy, "DATA_DIR", directory))
-        self.stack.enter_context(patch.object(policy, "TERMINAL_SANDBOX_MODE", "host"))
-        self.stack.enter_context(patch.object(policy, "LINUX_SAFETY", False))
         self.stack.enter_context(patch.dict(os.environ, {"ASTRION_DESKTOP_VERSION": ""}))
-        self.stack.enter_context(patch.object(routes, "DATA_DIR", directory))
-        self.stack.enter_context(patch.object(routes, "LOGS_DIR", directory))
-        self.stack.enter_context(patch.object(routes, "TERMINAL_SANDBOX_MODE", "host"))
-        self.stack.enter_context(patch.object(routes, "LINUX_SAFETY", False))
         self.stack.enter_context(patch.object(routes, "resolve_host_workspace", return_value=(None, None)))
         self.stack.enter_context(patch.object(routes, "auth_debug_log"))
-        self.stack.enter_context(patch.object(state, "container_manager"))
         self.stack.enter_context(patch.dict(state.active_login_nonces, clear=True))
         self.stack.enter_context(patch.dict(state.RATE_LIMIT_BUCKETS, clear=True))
         self.stack.enter_context(patch.dict(state.FAILURE_TRACKERS, clear=True))
         app = Flask(__name__)
         app.secret_key = "synthetic-test-only"
-        app.url_map.converters["conv"] = BaseConverter
+        class ConversationIdConverter(BaseConverter):
+            regex = r'(?:conv_)?\d{8}_\d{6}_\d{3}'
+
+        app.url_map.converters["conv"] = ConversationIdConverter
         app.register_blueprint(routes.auth_bp)
         app.register_blueprint(policy.host_password_bp)
         app.send_static_file = lambda name: name
@@ -128,17 +124,14 @@ class WebAuthTests(unittest.TestCase):
             self.assertEqual(response.status_code, 401)
             self.assertTrue(load_host_auth(self.data).enabled)
             self.assertIs(state.user_terminals['synthetic-running-task'], marker)
-            state.container_manager.release_container.assert_not_called()
 
-    def test_previous_ordinary_account_cookie_cannot_bypass_host_password(self):
-        from server.auth import _issue_login_nonce
+    def test_previous_ordinary_account_cookie_never_grants_host_access(self):
+        from server import state
+        nonce = 'synthetic-legacy-nonce'
+        state.active_login_nonces['synthetic-account'].add(nonce)
         with self.client.session_transaction() as browser_session:
-            browser_session.update(username='synthetic-account', host_mode=False)
-        with self.app.test_request_context():
-            nonce = _issue_login_nonce('synthetic-account')
-        with self.client.session_transaction() as browser_session:
-            browser_session['login_nonce'] = nonce
-        self.assertEqual(self.client.get('/api/protected-test').status_code, 200)
+            browser_session.update(username='synthetic-account', host_mode=False, login_nonce=nonce)
+        self.assertEqual(self.client.get('/api/protected-test').status_code, 401)
         set_host_password(self.data, PASSWORD)
         self.assertEqual(self.client.get('/api/protected-test').status_code, 401)
 
@@ -157,11 +150,10 @@ class WebAuthTests(unittest.TestCase):
                          headers={'Authorization': 'Bearer synthetic-invalid'}).status_code, 403)
         self.assertTrue(load_host_auth(self.data).enabled)
 
-    def test_password_host_hides_and_rejects_account_login_and_registration(self):
-        set_host_password(self.data, PASSWORD)
-        self.assertEqual(self.post('/login', {'email': 'synthetic@example.invalid', 'password': PASSWORD}).status_code, 403)
-        self.assertEqual(self.client.get('/register').status_code, 302)
-        self.assertEqual(self.post('/register').status_code, 403)
+    def test_account_login_and_registration_are_unavailable(self):
+        self.assertEqual(self.post('/login', {'email': 'synthetic@example.invalid', 'password': PASSWORD}).status_code, 405)
+        self.assertEqual(self.client.get('/register').status_code, 404)
+        self.assertEqual(self.post('/register').status_code, 404)
 
     def test_desktop_backend_is_exempt_even_with_damaged_password_file(self):
         host_auth_path(self.data).write_text('broken')
@@ -188,18 +180,10 @@ class WebAuthTests(unittest.TestCase):
         self.assertFalse(status['config_valid'])
         self.assertEqual(self.login().status_code, 503)
         self.assertEqual(self.client.get('/api/protected-test').status_code, 401)
-        self.assertEqual(self.post('/login').status_code, 403)
+        self.assertEqual(self.post('/login').status_code, 405)
 
     def test_failed_password_attempts_are_rate_limited(self):
         set_host_password(self.data, PASSWORD)
         for _ in range(5):
             self.assertEqual(self.login(password='incorrect 123').status_code, 401)
         self.assertEqual(self.login().status_code, 429)
-
-    def test_web_mode_ignores_host_password_file_and_keeps_account_entry(self):
-        host_auth_path(self.data).write_text('broken')
-        with patch.object(self.policy, 'TERMINAL_SANDBOX_MODE', 'docker'):
-            status = self.client.get('/api/host-mode-enabled').json
-            self.assertFalse(status['enabled'])
-            self.assertFalse(status['password_required'])
-            self.assertEqual(self.client.get('/register').status_code, 200)

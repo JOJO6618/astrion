@@ -376,17 +376,20 @@ class IdentityTest(RuntimeCase):
             with self.assertRaises(PermissionError):
                 self.adapter.validate(self.definition(), self.host_principal())
 
-    def test_unknown_user_is_rejected(self):
+    def test_legacy_regular_principal_is_rejected(self):
         principal = {"username": "ghost", "host_mode": False, "host_workspace_id": self.workspace_id}
-        with mock.patch("config.IS_HOST_MODE", False):
-            with self.assertRaises(PermissionError):
-                self.adapter.validate(self.definition(), principal)
+        with self.assertRaises(PermissionError):
+            self.adapter.validate(self.definition(), principal)
 
-    def test_api_user_cannot_access_unowned_workspace(self):
+    def test_legacy_api_principal_is_rejected(self):
         principal = {"username": "api_user", "host_mode": False, "is_api_user": True}
-        with mock.patch("config.IS_HOST_MODE", False):
-            with self.assertRaises(PermissionError):
-                self.adapter.validate(self.definition(), principal)
+        with self.assertRaises(PermissionError):
+            self.adapter.validate(self.definition(), principal)
+
+    def test_non_host_username_with_host_flag_is_rejected(self):
+        principal = {"username": "alice", "host_mode": True, "host_workspace_id": self.workspace_id}
+        with self.assertRaises(PermissionError):
+            self.adapter.validate(self.definition(), principal)
 
     def test_unknown_workspace_is_rejected(self):
         principal = self.host_principal()
@@ -395,36 +398,6 @@ class IdentityTest(RuntimeCase):
             self.adapter.validate(definition, principal)
         self.assertIn("工作区不存在", str(ctx.exception))
 
-    def register_user(self, username="alice"):
-        from modules.user_manager import UserRecord
-        from server.state import user_manager
-
-        user_manager._users[username] = UserRecord(
-            username=username, email=f"{username}@example.test", password_hash="x", created_at="", role="user"
-        )
-        user_manager._save_users()
-        return user_manager.ensure_user_workspace(username)
-
-    def test_regular_user_missing_workspace_is_rejected(self):
-        self.register_user()
-        principal = {"username": "alice", "host_mode": False}
-        definition = self.definition(workspace_id="missing_ws")
-        with mock.patch("config.IS_HOST_MODE", False):
-            with self.assertRaises(ValueError):
-                self.adapter.validate(definition, principal)
-
-    def test_regular_user_direct_execution_is_rejected_not_silently_downgraded(self):
-        """非 host 显式 direct 必须被拒绝，不能静默改成 sandbox（runtime 3909c490 曾静默降级，已回归锁定）。"""
-        self.register_user()
-        principal = {"username": "alice", "host_mode": False}
-        definition = self.definition(
-            workspace_id="default",
-            configuration={"mode": "custom", "work_mode": "execute", "execution_mode": "direct"},
-        )
-        with mock.patch("config.IS_HOST_MODE", False):
-            with self.assertRaises((PermissionError, ValueError)):
-                self.adapter.validate(definition, principal)
-
     def test_host_admin_explicit_direct_with_readonly_permission_is_not_silently_downgraded(self):
         """显式 direct 与继承的 readonly 冲突时应报错，而不是悄悄改成 sandbox。"""
         definition = self.definition(
@@ -432,17 +405,6 @@ class IdentityTest(RuntimeCase):
         )
         with self.assertRaises((PermissionError, ValueError)):
             self.adapter.validate(definition, self.host_principal())
-
-    def test_regular_user_cannot_enable_full_network(self):
-        self.register_user()
-        principal = {"username": "alice", "host_mode": False}
-        definition = self.definition(
-            workspace_id="default",
-            configuration={"mode": "custom", "work_mode": "execute", "network_enabled": True},
-        )
-        with mock.patch("config.IS_HOST_MODE", False):
-            with self.assertRaises(PermissionError):
-                self.adapter.validate(definition, principal)
 
     def test_existing_conversation_from_other_workspace_is_rejected(self):
         other_project = self.case_root / "other-workspace"
@@ -460,27 +422,6 @@ class IdentityTest(RuntimeCase):
                 self.definition(mode="existing", conversation_id=conversation_id), self.host_principal()
             )
         self.assertIn("不属于所选工作区", str(ctx.exception))
-
-    def test_conversation_of_another_user_is_not_visible(self):
-        self.register_user("alice")
-        bob_workspace = self.register_user("bob")
-        manager = ConversationManager(
-            base_dir=str(bob_workspace.data_dir), project_path=str(bob_workspace.project_path)
-        )
-        conversation_id = manager.create_conversation(
-            str(bob_workspace.project_path),
-            metadata_overrides=dict(REALISTIC_CONVERSATION_METADATA),
-        )
-        principal = {"username": "alice", "host_mode": False}
-        with mock.patch("config.IS_HOST_MODE", False):
-            with self.assertRaises(ValueError) as ctx:
-                self.adapter.validate(
-                    self.definition(
-                        workspace_id="default", mode="existing", conversation_id=conversation_id
-                    ),
-                    principal,
-                )
-        self.assertIn("不存在", str(ctx.exception))
 
     def test_chat_conversation_is_rejected(self):
         conversation_id, _ = self.create_conversation(metadata={"conversation_kind": "chat"})

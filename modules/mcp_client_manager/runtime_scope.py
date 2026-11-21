@@ -7,11 +7,10 @@ import json
 import os
 import re
 from dataclasses import dataclass
-from pathlib import Path, PurePosixPath
-from typing import Any, Dict, Optional, TYPE_CHECKING
+from pathlib import Path
+from typing import Any, Dict, Optional
 
-if TYPE_CHECKING:
-    from modules.user_container_manager import ContainerHandle
+from modules.mcp_client_manager.exceptions import MCPClientError
 
 
 @dataclass(frozen=True)
@@ -26,6 +25,17 @@ class MCPRuntimeScope:
 
 
 _PACKAGE = re.compile(r"^@playwright/mcp(?:@[^/\\]+)?$")
+
+
+def reject_container_session(container_session: Any) -> None:
+    """Fail closed instead of converting a legacy container session to Host MCP.
+
+    The Host-only product keeps the ``container_session=None`` call sites for
+    compatibility, but a Docker handle must never be silently served by a local
+    stdio launch with Host paths.
+    """
+    if container_session is not None and str(getattr(container_session, "mode", "") or "").lower() == "docker":
+        raise MCPClientError("当前版本仅支持宿主机 MCP，不能把容器会话转换为宿主机启动。")
 
 
 def _is_playwright(server: Dict[str, Any]) -> bool:
@@ -49,13 +59,14 @@ def _has_option(args: list[str], *names: str) -> bool:
 def prepare_stdio_server(
     server: Dict[str, Any],
     scope: Optional[MCPRuntimeScope],
-    container_session: Optional["ContainerHandle"],
+    container_session: Any = None,
 ) -> Dict[str, Any]:
     """Isolate default local Playwright profiles, without changing saved config.
 
     Explicit browser attachment, isolated mode, profile/config overrides retain
     their configured semantics. HTTP services manage their own browser state.
     """
+    reject_container_session(container_session)
     if server.get("transport") == "stdio" and scope and scope.actor_id and scope.working_dir:
         server = dict(server)
         if not server.get("cwd"):
@@ -72,10 +83,8 @@ def prepare_stdio_server(
     ):
         return server
 
-    # Host MCP inherits the backend environment; docker exec only forwards the
-    # server's explicit env. Do not accidentally override either source.
-    docker = bool(container_session and container_session.mode == "docker")
-    launch_env = {} if docker else dict(os.environ)
+    # Host stdio inherits the backend environment; explicit server env wins.
+    launch_env = dict(os.environ)
     launch_env.update({key: value for key, value in env.items() if value is not None})
     if any(str(launch_env.get(key) or "").strip() for key in (
         "PLAYWRIGHT_MCP_USER_DATA_DIR", "PLAYWRIGHT_MCP_CONFIG",
@@ -97,13 +106,7 @@ def prepare_stdio_server(
     if scope.actor_id:
         identity.append(scope.actor_id)
     digest = hashlib.sha256(json.dumps(identity, ensure_ascii=False).encode("utf-8")).hexdigest()
-    if docker:
-        # The workspace bind mount survives container recreation. Do not pass an
-        # unmounted host data path to docker or add any new host mounts.
-        mount = str(container_session.mount_path or "/workspace")
-        root = PurePosixPath(mount) / ".astrion" / "mcp_profiles"
-    else:
-        root = Path(scope.data_dir).expanduser().resolve() / "mcp_profiles"
+    root = Path(scope.data_dir).expanduser().resolve() / "mcp_profiles"
 
     prepared = dict(server)
     prepared["args"] = [*args, "--user-data-dir", str(root / digest)]

@@ -14,9 +14,6 @@ try:
         FORBIDDEN_ROOT_PATHS,
         OUTPUT_FORMATS,
         READ_TOOL_MAX_FILE_SIZE,
-        PROJECT_MAX_STORAGE_BYTES,
-        TERMINAL_SANDBOX_MODE,
-        LINUX_SAFETY,
     )
 except ImportError:  # 兼容全局环境中存在同名包的情况
     import sys
@@ -30,17 +27,10 @@ except ImportError:  # 兼容全局环境中存在同名包的情况
         FORBIDDEN_ROOT_PATHS,
         OUTPUT_FORMATS,
         READ_TOOL_MAX_FILE_SIZE,
-        PROJECT_MAX_STORAGE_BYTES,
-        TERMINAL_SANDBOX_MODE,
-        LINUX_SAFETY,
     )
-from modules.container_file_proxy import ContainerFileProxy
 from modules.host_sandbox_policy import get_macos_writable_paths, get_macos_readable_paths
 from utils.logger import setup_logger
 from modules.i18n import tr
-
-if TYPE_CHECKING:
-    from modules.user_container_manager import ContainerHandle
 
 # 临时禁用长度检查
 DISABLE_LENGTH_CHECK = True
@@ -101,12 +91,6 @@ class ReadMixin:
         if not ok:
             return {"success": False, "error": msg}
         
-        if self._is_docker_mode():
-            return self._container_call("read_file", {
-                "path": self._relative_path(full_path),
-                "size_limit": MAX_FILE_SIZE
-            })
-
         if not full_path.exists():
             return {"success": False, "error": tr("file_manager.file_not_found")}
         
@@ -141,14 +125,6 @@ class ReadMixin:
         if not ok:
             return {"success": False, "error": msg}
         
-        if self._is_docker_mode():
-            return self._container_call("read_text_segment", {
-                "path": self._relative_path(full_path),
-                "start_line": start_line,
-                "end_line": end_line,
-                "size_limit": size_limit or READ_TOOL_MAX_FILE_SIZE,
-            })
-
         if not full_path.exists():
             return {"success": False, "error": tr("file_manager.file_not_found")}
         
@@ -217,17 +193,6 @@ class ReadMixin:
         if not ok:
             return {"success": False, "error": msg}
         
-        if self._is_docker_mode():
-            return self._container_call("search_text", {
-                "path": self._relative_path(full_path),
-                "query": query,
-                "max_matches": max_matches,
-                "context_before": context_before,
-                "context_after": context_after,
-                "case_sensitive": case_sensitive,
-                "size_limit": size_limit or READ_TOOL_MAX_FILE_SIZE,
-            })
-
         if not full_path.exists():
             return {"success": False, "error": tr("file_manager.file_not_found")}
         
@@ -298,13 +263,6 @@ class ReadMixin:
         if not ok:
             return {"success": False, "error": msg}
         
-        if self._is_docker_mode():
-            return self._container_call("extract_segments", {
-                "path": self._relative_path(full_path),
-                "segments": segments,
-                "size_limit": size_limit or READ_TOOL_MAX_FILE_SIZE,
-            })
-
         if not full_path.exists():
             return {"success": False, "error": tr("file_manager.file_not_found")}
         

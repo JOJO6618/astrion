@@ -1,46 +1,19 @@
 # modules/persistent_terminal.py - 持久化终端实例（修复版）
 
-import asyncio
-import subprocess
-import os
 import sys
 import time
-import signal
-from pathlib import Path
-from typing import Optional, Callable, Dict, List, Tuple
-from datetime import datetime
-import threading
 import queue
-from collections import deque
-import shutil
-import uuid
-import codecs
-from modules.host_sandbox_runner import (
-    HostSandboxError,
-    build_host_sandbox_shell_plan,
-    host_sandbox_enabled,
-)
+from pathlib import Path
+from typing import Optional, Dict, Tuple
+from datetime import datetime
+
 try:
     from config import (
         OUTPUT_FORMATS,
         TERMINAL_OUTPUT_WAIT,
         TERMINAL_INPUT_MAX_CHARS,
-        TERMINAL_SANDBOX_MODE,
-        TERMINAL_SANDBOX_IMAGE,
-        TERMINAL_SANDBOX_MOUNT_PATH,
-        TERMINAL_SANDBOX_SHELL,
-        TERMINAL_SANDBOX_NETWORK,
-        TERMINAL_SANDBOX_CPUS,
-        TERMINAL_SANDBOX_MEMORY,
-        TERMINAL_SANDBOX_BINDS,
-        TERMINAL_SANDBOX_BIN,
-        TERMINAL_SANDBOX_NAME_PREFIX,
-        TERMINAL_SANDBOX_ENV,
-        TERMINAL_SANDBOX_REQUIRE,
     )
 except ImportError:
-    import sys
-    from pathlib import Path
     project_root = Path(__file__).resolve().parents[1]
     if str(project_root) not in sys.path:
         sys.path.insert(0, str(project_root))
@@ -48,18 +21,6 @@ except ImportError:
         OUTPUT_FORMATS,
         TERMINAL_OUTPUT_WAIT,
         TERMINAL_INPUT_MAX_CHARS,
-        TERMINAL_SANDBOX_MODE,
-        TERMINAL_SANDBOX_IMAGE,
-        TERMINAL_SANDBOX_MOUNT_PATH,
-        TERMINAL_SANDBOX_SHELL,
-        TERMINAL_SANDBOX_NETWORK,
-        TERMINAL_SANDBOX_CPUS,
-        TERMINAL_SANDBOX_MEMORY,
-        TERMINAL_SANDBOX_BINDS,
-        TERMINAL_SANDBOX_BIN,
-        TERMINAL_SANDBOX_NAME_PREFIX,
-        TERMINAL_SANDBOX_ENV,
-        TERMINAL_SANDBOX_REQUIRE,
     )
 from modules.i18n import tr
 

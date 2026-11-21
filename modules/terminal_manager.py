@@ -1,10 +1,8 @@
-# modules/terminal_manager.py - 终端会话管理器
+# modules/terminal_manager.py - 终端会话管理器（Host-only）
 
-import json
-import time
 import shlex
 import shutil
-from typing import Dict, List, Optional, Callable, Tuple, TYPE_CHECKING
+from typing import Dict, List, Optional, Callable, Tuple
 from pathlib import Path
 from datetime import datetime
 try:
@@ -16,18 +14,6 @@ try:
         TERMINAL_SNAPSHOT_DEFAULT_LINES,
         TERMINAL_SNAPSHOT_MAX_LINES,
         TERMINAL_SNAPSHOT_MAX_CHARS,
-        TERMINAL_SANDBOX_MODE,
-        TERMINAL_SANDBOX_IMAGE,
-        TERMINAL_SANDBOX_MOUNT_PATH,
-        TERMINAL_SANDBOX_SHELL,
-        TERMINAL_SANDBOX_NETWORK,
-        TERMINAL_SANDBOX_CPUS,
-        TERMINAL_SANDBOX_MEMORY,
-        TERMINAL_SANDBOX_BINDS,
-        TERMINAL_SANDBOX_BIN,
-        TERMINAL_SANDBOX_NAME_PREFIX,
-        TERMINAL_SANDBOX_ENV,
-        TERMINAL_SANDBOX_REQUIRE,
     )
 except ImportError:
     import sys
@@ -42,30 +28,14 @@ except ImportError:
         TERMINAL_SNAPSHOT_DEFAULT_LINES,
         TERMINAL_SNAPSHOT_MAX_LINES,
         TERMINAL_SNAPSHOT_MAX_CHARS,
-        TERMINAL_SANDBOX_MODE,
-        TERMINAL_SANDBOX_IMAGE,
-        TERMINAL_SANDBOX_MOUNT_PATH,
-        TERMINAL_SANDBOX_SHELL,
-        TERMINAL_SANDBOX_NETWORK,
-        TERMINAL_SANDBOX_CPUS,
-        TERMINAL_SANDBOX_MEMORY,
-        TERMINAL_SANDBOX_BINDS,
-        TERMINAL_SANDBOX_BIN,
-        TERMINAL_SANDBOX_NAME_PREFIX,
-        TERMINAL_SANDBOX_ENV,
-        TERMINAL_SANDBOX_REQUIRE,
     )
 
 from modules.persistent_terminal import PersistentTerminal
 from utils.terminal_factory import TerminalFactory
 from modules.i18n import tr
 from modules.execution_scope import current_execution_scope
-from modules.scoped_execution_policy import (
-    scoped_work_path, same_scope_authority, require_scoped_docker_support,
-)
-
-if TYPE_CHECKING:
-    from modules.user_container_manager import ContainerHandle
+from modules.scoped_execution_policy import scoped_work_path, same_scope_authority
+from modules.terminal_ops.base import reject_docker_session
 
 class TerminalManager:
     """管理多个终端会话"""
@@ -79,7 +49,7 @@ class TerminalManager:
         broadcast_callback: Callable = None,
         sandbox_mode: Optional[str] = None,
         sandbox_options: Optional[Dict] = None,
-        container_session: Optional["ContainerHandle"] = None,
+        container_session=None,
         network_permission_getter: Optional[Callable] = None,
         terminal_readonly_getter: Optional[Callable] = None,
         command_validator: Optional[Callable[[str], Tuple[bool, str]]] = None,
@@ -106,43 +76,30 @@ class TerminalManager:
         self.max_snapshot_lines = TERMINAL_SNAPSHOT_MAX_LINES
         self.max_snapshot_chars = TERMINAL_SNAPSHOT_MAX_CHARS
         self.broadcast = broadcast_callback
-        self.default_sandbox_mode = (sandbox_mode or TERMINAL_SANDBOX_MODE or "host").lower()
-        self.sandbox_mode = self.default_sandbox_mode
-        default_sandbox_options = {
-            "image": TERMINAL_SANDBOX_IMAGE,
-            "mount_path": TERMINAL_SANDBOX_MOUNT_PATH,
-            "shell": TERMINAL_SANDBOX_SHELL,
-            "network": TERMINAL_SANDBOX_NETWORK,
-            "cpus": TERMINAL_SANDBOX_CPUS,
-            "memory": TERMINAL_SANDBOX_MEMORY,
-            "binds": list(TERMINAL_SANDBOX_BINDS),
-            "bin": TERMINAL_SANDBOX_BIN,
-            "name_prefix": TERMINAL_SANDBOX_NAME_PREFIX,
-            "env": dict(TERMINAL_SANDBOX_ENV),
-            "require": TERMINAL_SANDBOX_REQUIRE,
+        requested_mode = str(sandbox_mode or "host").strip().lower()
+        if requested_mode != "host":
+            raise ValueError(f"TerminalManager 仅接受 Host 终端模式，收到 {requested_mode!r}。")
+        reject_docker_session(container_session, component="TerminalManager")
+        options = sandbox_options or {}
+        if options.get("container_name") or options.get("docker_readonly_exec"):
+            raise ValueError("TerminalManager 不接受 Docker 容器终端或只读身份参数。")
+        self.default_sandbox_mode = "host"
+        self.sandbox_mode = "host"
+        # 旧调用点可能仍传入容器 image/mount/bin 等默认值；Host 路径不使用它们，
+        # 只保留与 Host 终端身份/网络相关的少量键。
+        self.sandbox_options = {
+            key: value for key, value in (sandbox_options or {}).items()
+            if key in {"host_terminal_readonly", "allow_direct_host_execution"}
         }
-        if sandbox_options:
-            # 深拷贝，确保不会影响默认值
-            for key, value in sandbox_options.items():
-                if key == "binds" and isinstance(value, list):
-                    default_sandbox_options[key] = list(value)
-                elif key == "env" and isinstance(value, dict):
-                    default_sandbox_options[key] = dict(value)
-                else:
-                    default_sandbox_options[key] = value
-        self.sandbox_options = default_sandbox_options
-        self.container_session: Optional["ContainerHandle"] = None
-        if sandbox_options and sandbox_options.get("container_name"):
-            self.sandbox_mode = "docker"
-        self._apply_container_session(container_session)
+        # Host-only：不保存容器句柄；属性保留为空，兼容读取 owner.container_session 的旧代码。
+        self.container_session = None
         # 网络权限 getter（由所属 WebTerminal 注入）：新建持久终端时透传，
         # 使 shell 沙箱实时跟随该终端实例的权限设置而非进程级 env。
         self.network_permission_getter = network_permission_getter
         # 终端只读身份 getter（由所属 WebTerminal 注入）：返回 True 时新建的
-        # 终端会话以只读身份运行——docker 容器内为非特权 uid（与 run_command
-        # 只读执行同一身份，见 modules/docker_readonly_exec.py），宿主机沙箱为
-        # 只读 profile（host_sandbox_runner shell plan 的 readonly 参数）；
-        # 已存在的会话不受影响（权限跨界切换时由 set_permission_mode 销毁重建）。
+        # 终端会话以宿主机只读 profile 运行（host_sandbox_runner shell plan 的
+        # readonly 参数）；已存在的会话不受影响（权限跨界切换时由
+        # set_permission_mode 销毁重建）。
         self.terminal_readonly_getter = terminal_readonly_getter
         # 终端命令超时工具（兼容 macOS 无 coreutils 的情况）
         self._timeout_bin = shutil.which("timeout") or shutil.which("gtimeout")
@@ -160,16 +117,6 @@ class TerminalManager:
         self.factory = TerminalFactory()
         self.host_execution_mode: str = "sandbox"
 
-    def _apply_container_session(self, session: Optional["ContainerHandle"]):
-        """根据容器句柄调整执行模式。"""
-        self.container_session = session
-        if session and session.mode == "docker":
-            self.sandbox_mode = "docker"
-        elif session:
-            self.sandbox_mode = "host"
-        else:
-            self.sandbox_mode = self.default_sandbox_mode
-
     def _resolve_execution_scope(self):
         current = current_execution_scope()
         captured = self.execution_scope
@@ -181,23 +128,17 @@ class TerminalManager:
         return scope
 
     def _build_sandbox_options(self, execution_scope=None) -> Dict:
-        """构造当前终端应使用的沙箱参数。"""
-        options = dict(self.sandbox_options)
+        """构造当前 Host 终端应使用的沙箱参数。"""
         scope = execution_scope if execution_scope is not None else self._resolve_execution_scope()
         mode = scope.execution_mode if scope else self.host_execution_mode
-        options["execution_scope"] = scope
-        options["allow_direct_host_execution"] = self.sandbox_mode == "host" and mode == "direct"
         readonly_getter = getattr(self, "terminal_readonly_getter", None)
         readonly_terminal = False if scope and scope.is_sub_agent else bool(readonly_getter and readonly_getter())
-        options["docker_readonly_exec"] = readonly_terminal
-        # 宿主机沙箱持久终端同身份：受限档（非 unrestricted）以只读 profile 创建
-        options["host_terminal_readonly"] = readonly_terminal
-        if self.container_session and self.container_session.mode == "docker":
-            options["container_name"] = self.container_session.container_name
-            options["mount_path"] = self.container_session.mount_path
-        else:
-            options.pop("container_name", None)
-        return options
+        return {
+            "execution_scope": scope,
+            "allow_direct_host_execution": mode == "direct",
+            # 宿主机沙箱持久终端同身份：受限档（非 unrestricted）以只读 profile 创建
+            "host_terminal_readonly": readonly_terminal,
+        }
 
     def set_host_execution_mode(self, mode: str) -> None:
         normalized = str(mode or "").strip().lower()
@@ -205,35 +146,18 @@ class TerminalManager:
         if self.host_execution_mode == target:
             return
         self.host_execution_mode = target
-        if self.execution_scope is None and self.sandbox_mode == "host" and self.terminals:
+        if self.execution_scope is None and self.terminals:
             print(f"{OUTPUT_FORMATS['warning']} 执行环境已切换为 {target}，正在关闭现有终端会话。")
             self.close_all()
 
-    @staticmethod
-    def _same_container(a: Optional["ContainerHandle"], b: Optional["ContainerHandle"]) -> bool:
-        if a is b:
-            return True
-        if not a or not b:
-            return False
-        if a.mode != b.mode:
-            return False
-        if a.mode == "docker":
-            return a.container_id == b.container_id and a.container_name == b.container_name
-        return True
-
-    def update_container_session(self, session: Optional["ContainerHandle"]):
-        """外部更新容器信息，必要时重置终端。"""
-        if self._same_container(self.container_session, session):
-            self._apply_container_session(session)
-            return
-        self._apply_container_session(session)
-        if self.terminals:
-            print(f"{OUTPUT_FORMATS['warning']} 容器已切换，正在关闭现有终端会话。")
-            self.close_all()
+    def update_container_session(self, session=None):
+        """兼容旧调用点：Host-only 只接受 None / host 句柄，Docker 会话明确拒绝。"""
+        reject_docker_session(session, component="TerminalManager")
+        self.container_session = None
     
     def _main_terminal_is_direct(self) -> bool:
         """主智能体终端是否跑在宿主机直接执行（完全访问）下。"""
-        return self.sandbox_mode == "host" and self.host_execution_mode == "direct"
+        return self.host_execution_mode == "direct"
 
     def _allowed_work_roots(self) -> List[Path]:
         """终端 cwd 必须落在这些根之一。
@@ -345,8 +269,6 @@ class TerminalManager:
             if getattr(self, 'execution_binding_error', None):
                 raise ValueError(self.execution_binding_error)
             scope = self._resolve_execution_scope()
-            if self.sandbox_mode == "docker":
-                require_scoped_docker_support(scope)
             if scope:
                 base = Path(getattr(self, 'execution_root', self.project_path))
                 requested = working_dir if scope.is_sub_agent else str(base / (working_dir or ''))
@@ -405,24 +327,12 @@ class TerminalManager:
                 'active': self.active_terminal
             })
         
-        # 对外返回容器视角/相对路径，避免暴露宿主绝对路径
+        # 对外返回相对路径，避免暴露宿主绝对路径
         display_root = Path(scope.workspace_root) if scope else self.project_path
         try:
-            if terminal.using_container:
-                mount_path = (self.sandbox_options.get("mount_path") or "/workspace").rstrip("/")
-                mount_path = mount_path or "/workspace"
-                try:
-                    rel = work_path.relative_to(display_root)
-                    if str(rel) == ".":
-                        display_work_dir = mount_path
-                    else:
-                        display_work_dir = f"{mount_path}/{rel.as_posix()}"
-                except Exception:
-                    display_work_dir = mount_path
-            else:
-                display_work_dir = "."
-                if work_path != display_root:
-                    display_work_dir = work_path.relative_to(display_root).as_posix()
+            display_work_dir = "."
+            if work_path != display_root:
+                display_work_dir = work_path.relative_to(display_root).as_posix()
         except Exception:
             display_work_dir = str(work_path)
 

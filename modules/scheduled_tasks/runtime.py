@@ -18,27 +18,16 @@ ASK_USER_NOTICE = (
 class AgentRuntimeAdapter:
     @staticmethod
     def _scope(principal: dict, workspace_id: str):
+        """Resolve the Host execution scope; historical tenant principals are rejected."""
         from config import IS_HOST_MODE
-        from server import state
         from server.context import RuntimeIdentity
         from server.context.data import get_workspace_data
         username = principal["username"]
-        host = bool(principal.get("host_mode"))
-        if host:
-            if not IS_HOST_MODE or username != "host":
-                raise PermissionError("无效宿主机身份")
-            role = "admin"
-        elif principal.get("is_api_user"):
-            if workspace_id not in state.api_user_manager.list_workspaces(username):
-                raise PermissionError("工作区不可访问")
-            role = "api"
-        else:
-            user = state.user_manager.get_user(username)
-            if user is None:
-                raise PermissionError("计划所属账户不存在")
-            role = user.role or "user"
-        identity = RuntimeIdentity(host_mode=host, host_workspace_id=workspace_id if host else None,
-                                   is_api_user=bool(principal.get("is_api_user")), role=role)
+        if not (IS_HOST_MODE and principal.get("host_mode") and username == "host"):
+            # 旧普通用户／API 用户计划只保留可识别的主体元数据，绝不隐式映射为 Host。
+            raise PermissionError("计划所属身份不受支持，仅允许宿主机身份")
+        identity = RuntimeIdentity(host_mode=True, host_workspace_id=workspace_id,
+                                   is_api_user=False, role="admin")
         data = get_workspace_data(username, workspace_id, identity=identity)
         return data, identity
 
@@ -131,10 +120,11 @@ class AgentRuntimeAdapter:
 
     @staticmethod
     def _validated_principal(principal, data, identity, settings, *, freeze=False):
-        from server import state
         from modules.admin_policy_manager import get_effective_policy
-        record = None if identity.host_mode or identity.is_api_user else state.user_manager.get_user(principal["username"])
-        policy = get_effective_policy(principal["username"], identity.role, getattr(record, "invite_code", None))
+        if not identity.host_mode:
+            raise PermissionError("计划所属身份不受支持，仅允许宿主机身份")
+        # Host 没有普通用户记录或邀请码，策略按其显式 Host 角色解析。
+        policy = get_effective_policy(principal["username"], identity.role, None)
         disabled = set(policy.get("disabled_models") or [])
         if settings["model_key"] in disabled:
             raise PermissionError("此模型已被管理员禁用")

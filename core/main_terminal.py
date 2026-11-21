@@ -3,17 +3,13 @@
 import os
 from pathlib import Path
 import time
-from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, Set
 
 try:
     from config import (
         OUTPUT_FORMATS,
         DATA_DIR,
         MAX_TERMINALS, TERMINAL_BUFFER_SIZE, TERMINAL_DISPLAY_SIZE,
-        TERMINAL_SANDBOX_MOUNT_PATH,
-        TERMINAL_SANDBOX_MODE,
-        TERMINAL_SANDBOX_CPUS,
-        TERMINAL_SANDBOX_MEMORY,
         PROJECT_MAX_STORAGE_MB,
         CUSTOM_TOOLS_ENABLED,
         MCP_TOOLS_ENABLED,
@@ -29,10 +25,6 @@ except ImportError:
         OUTPUT_FORMATS,
         DATA_DIR,
         MAX_TERMINALS, TERMINAL_BUFFER_SIZE, TERMINAL_DISPLAY_SIZE,
-        TERMINAL_SANDBOX_MOUNT_PATH,
-        TERMINAL_SANDBOX_MODE,
-        TERMINAL_SANDBOX_CPUS,
-        TERMINAL_SANDBOX_MEMORY,
         PROJECT_MAX_STORAGE_MB,
         CUSTOM_TOOLS_ENABLED,
         MCP_TOOLS_ENABLED,
@@ -72,9 +64,6 @@ from core.main_terminal_parts import (
 
 from modules.i18n import tr
 
-if TYPE_CHECKING:
-    from modules.user_container_manager import ContainerHandle
-
 
 class MainTerminal(MainTerminalCommandMixin, MainTerminalContextMixin, MainTerminalToolsMixin):
     def __init__(
@@ -83,8 +72,6 @@ class MainTerminal(MainTerminalCommandMixin, MainTerminalContextMixin, MainTermi
             thinking_mode: bool = False,
             run_mode: Optional[str] = None,
             data_dir: Optional[str] = None,
-            container_session: Optional["ContainerHandle"] = None,
-            usage_tracker: Optional[object] = None,
         ):
             self.project_path = project_path
             allowed_modes = {"fast", "thinking"}
@@ -98,7 +85,6 @@ class MainTerminal(MainTerminalCommandMixin, MainTerminalContextMixin, MainTermi
             # 会话级推理强度（None=默认，不传参）
             self.reasoning_effort: Optional[str] = None
             self.data_dir = Path(data_dir).expanduser().resolve() if data_dir else Path(DATA_DIR).resolve()
-            self.usage_tracker = usage_tracker
 
             # 初始化组件
             self.api_client = APIClient(thinking_mode=self.thinking_mode)
@@ -120,20 +106,15 @@ class MainTerminal(MainTerminalCommandMixin, MainTerminalContextMixin, MainTermi
             self.apply_model_profile(self.model_profile)
             self.context_manager = ContextManager(project_path, data_dir=str(self.data_dir))
             self.context_manager.main_terminal = self
-            self.container_mount_path = TERMINAL_SANDBOX_MOUNT_PATH or "/workspace"
-            self.container_cpu_limit = TERMINAL_SANDBOX_CPUS or "未限制"
-            self.container_memory_limit = TERMINAL_SANDBOX_MEMORY or "未限制"
             self.project_storage_limit = f"{PROJECT_MAX_STORAGE_MB}MB" if PROJECT_MAX_STORAGE_MB else "未限制"
             self.project_storage_limit_bytes = (
                 PROJECT_MAX_STORAGE_MB * 1024 * 1024 if PROJECT_MAX_STORAGE_MB else None
             )
-            self.container_session: Optional["ContainerHandle"] = None
+            self.container_session = None
             self.memory_manager = MemoryManager(data_dir=str(self.data_dir))
-            self.file_manager = FileManager(project_path, container_session=container_session, data_dir=str(self.data_dir))
+            self.file_manager = FileManager(project_path, data_dir=str(self.data_dir))
             self.search_engine = SearchEngine(data_dir=str(self.data_dir))
-            self.terminal_ops = TerminalOperator(
-                project_path, container_session=container_session, data_dir=str(self.data_dir)
-            )
+            self.terminal_ops = TerminalOperator(project_path, data_dir=str(self.data_dir))
             from modules.execution_plane import get_execution_backend
             self.ocr_client = OCRClient(
                 project_path, self.file_manager,
@@ -149,17 +130,14 @@ class MainTerminal(MainTerminalCommandMixin, MainTerminalContextMixin, MainTermi
                 terminal_buffer_size=TERMINAL_BUFFER_SIZE,
                 terminal_display_size=TERMINAL_DISPLAY_SIZE,
                 broadcast_callback=None,  # CLI模式不需要广播
-                container_session=container_session,
                 network_permission_getter=self.get_network_permission,
                 terminal_readonly_getter=self.terminal_readonly_enabled,
                 command_validator=self.terminal_ops._validate_command,
             )
-            # 让 run_command 复用终端容器，保持环境一致
             self.terminal_ops.attach_terminal_manager(self.terminal_manager)
-            self._apply_container_session(container_session)
 
-            # All environment-bound operations share the same backend. The local
-            # adapter resolves resources dynamically, including later mode/session changes.
+            # The local backend resolves the current Host resources and execution mode.
+
             from modules.execution_plane import LocalExecutionBackend
             self.execution_backend = LocalExecutionBackend(self)
 
@@ -167,7 +145,6 @@ class MainTerminal(MainTerminalCommandMixin, MainTerminalContextMixin, MainTermi
             self.sub_agent_manager = SubAgentManager(
                 project_path=self.project_path,
                 data_dir=str(self.data_dir),
-                container_session=container_session,
                 # 对话级隔离（仅 WebTerminal 设置该属性；CLI MainTerminal 无此属性，getattr 回退 None）
                 owner_conversation_id=getattr(self, "_bound_conversation_id", None),
             )
@@ -200,7 +177,6 @@ class MainTerminal(MainTerminalCommandMixin, MainTerminalContextMixin, MainTermi
             self.mcp_server_registry = MCPServerRegistry()
             self.mcp_client_manager = MCPClientManager(
                 self.mcp_server_registry,
-                container_session=container_session,
                 runtime_scope_resolver=lambda: MCPRuntimeScope(
                     workspace_path=self.project_path,
                     data_dir=str(self.data_dir),
@@ -289,13 +265,6 @@ class MainTerminal(MainTerminalCommandMixin, MainTerminalContextMixin, MainTermi
                 base_url, getattr(self, "context_manager", None),
                 base_dir=getattr(self, "data_dir", None),
             )
-
-    def _apply_container_session(self, session: Optional["ContainerHandle"]):
-            self.container_session = session
-            if session and session.mode == "docker":
-                self.container_mount_path = session.mount_path or (TERMINAL_SANDBOX_MOUNT_PATH or "/workspace")
-            else:
-                self.container_mount_path = TERMINAL_SANDBOX_MOUNT_PATH or "/workspace"
 
     def _init_host_execution_mode(self):
             default_mode = str(HOST_EXECUTION_MODE_DEFAULT or "sandbox").strip().lower()
@@ -517,63 +486,7 @@ class MainTerminal(MainTerminalCommandMixin, MainTerminalContextMixin, MainTermi
             return self.get_execution_mode_state()
 
     def _is_host_mode(self) -> bool:
-            """判定当前是否运行在宿主机模式，用于豁免配额等限制。"""
-            if self.container_session and getattr(self.container_session, "mode", None) != "docker":
-                return True
-            return (TERMINAL_SANDBOX_MODE or "").lower() == "host"
-
-    def record_model_call(self, is_thinking: bool):
-            if self._is_host_mode():
-                return True, {}
-            tracker = getattr(self, "usage_tracker", None)
-            if not tracker:
-                return True, {}
-            mode = "thinking" if is_thinking else "fast"
-            try:
-                allowed, info = tracker.check_and_increment(mode)
-                if allowed:
-                    self._notify_quota_update(mode)
-                return allowed, info
-            except Exception:
-                return True, {}
-
-    def record_search_call(self):
-            if self._is_host_mode():
-                return True, {}
-            tracker = getattr(self, "usage_tracker", None)
-            if not tracker:
-                return True, {}
-            try:
-                allowed, info = tracker.check_and_increment("search")
-                if allowed:
-                    self._notify_quota_update("search")
-                return allowed, info
-            except Exception:
-                return True, {}
-
-    def _notify_quota_update(self, metric: str):
-            callback = getattr(self, "quota_update_callback", None)
-            if callable(callback):
-                try:
-                    callback(metric)
-                except Exception:
-                    pass
-
-    def update_container_session(self, session: Optional["ContainerHandle"]):
-            self._apply_container_session(session)
-            if getattr(self, "terminal_manager", None):
-                self.terminal_manager.update_container_session(session)
-            if getattr(self, "terminal_ops", None):
-                self.terminal_ops.set_container_session(session)
-            if getattr(self, "file_manager", None):
-                self.file_manager.set_container_session(session)
-            if getattr(self, "mcp_client_manager", None):
-                self.mcp_client_manager.set_container_session(session)
-            if getattr(self, "sub_agent_manager", None):
-                try:
-                    self.sub_agent_manager.set_container_session(session)
-                except Exception:
-                    pass
+            return True
 
     def update_project_path(self, project_path: str):
             """更新当前终端绑定的工作目录（宿主机工作区切换场景）。"""

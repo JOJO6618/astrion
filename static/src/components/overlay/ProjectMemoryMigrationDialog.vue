@@ -49,16 +49,11 @@
     <template v-else-if="migration.overview?.total">
       <p class="ui-dialog-text">
         {{
-          $t(
-            migration.overview.mode === 'host'
-              ? 'settings.memoryMigration.hostIntro'
-              : 'settings.memoryMigration.dockerIntro',
-            {
-              users: migration.overview.users,
-              workspaces: migration.overview.workspaces.length,
-              memories: migration.overview.total
-            }
-          )
+          $t('settings.memoryMigration.hostIntro', {
+            users: migration.overview.users,
+            workspaces: migration.overview.workspaces.length,
+            memories: migration.overview.total
+          })
         }}
       </p>
       <div v-if="migration.overview.data_root" class="ui-dialog-field">
@@ -69,10 +64,7 @@
             : migration.overview.data_root
         }}</code>
       </div>
-      <div
-        v-if="migration.overview.workspaces.length > 1 || migration.overview.mode === 'docker'"
-        class="memory-migration-targets"
-      >
+      <div v-if="migration.overview.workspaces.length > 1" class="memory-migration-targets">
         <button
           type="button"
           class="ui-dialog-link memory-migration-toggle"
@@ -98,7 +90,7 @@
           </ul>
         </div>
       </div>
-      <p v-if="migration.overview.mode === 'host'" class="ui-dialog-note">
+      <p class="ui-dialog-note">
         {{ $t('settings.memoryMigration.deferHint') }}
       </p>
     </template>
@@ -161,7 +153,7 @@ let mounted = false;
 async function checkStartup() {
   if (document.visibilityState !== 'visible' || migration.startupChecked) return;
   await settings.fetchSessionStatus();
-  if (mounted && settings.sessionHostMode && document.visibilityState === 'visible') {
+  if (mounted && document.visibilityState === 'visible') {
     void migration.checkStartup();
   }
 }

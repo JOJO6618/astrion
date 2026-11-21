@@ -4,13 +4,6 @@ export default {
   title: 'Admin Policy Configuration',
   subtitle:
     'Control tool categories, model availability, and disabled frontend features. Last saved: {time}',
-  scopeGlobal: 'Global',
-  scopeRole: 'By role',
-  scopeUser: 'Specific user',
-  scopeInvite: 'Invite code',
-  placeholderRole: 'e.g. admin / user',
-  placeholderInvite: 'Invite code',
-  placeholderUsername: 'Username (lowercase)',
   load: 'Load',
   categorySection: 'Tool Categories',
   addCategory: 'Add category',

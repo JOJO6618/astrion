@@ -11,40 +11,42 @@
 ## ⚠️ 重要声明
 
 - **本项目处于开发中，不要用于正式生产环境。**
-- 宿主机沙箱已在 **macOS（sandbox-exec）** 与 **Windows（WSL2）** 完成测试；**Linux 首批适配 Ubuntu 24.04**（bwrap + seccomp + AppArmor + systemd/cgroup IP 过滤），已完成隔离环境实测，须由管理员安装受限助手，Astrion 本体以普通用户运行。其它 Linux 发行版和全局安装流程尚需实机验收，详见 [Linux 安装说明](docs/linux_host_sandbox_setup.md)。Linux 多用户服务仍使用 Docker 模式。
+- 宿主机沙箱已在 **macOS（sandbox-exec）** 与 **Windows（WSL2）** 完成测试；**Linux 首批适配 Ubuntu 24.04**（bwrap + seccomp + AppArmor + systemd/cgroup IP 过滤），已完成隔离环境实测，须由管理员安装受限助手，Astrion 本体以普通用户运行。其它 Linux 发行版和全局安装流程尚需实机验收，详见 [Linux Host 沙箱](docs/agents_details/linux_host_sandbox.md)。
+- 主仓交付 **Host Web、本机 CLI、macOS / Windows 桌面端（含 Quick Chat）与本机沙箱**。多用户 Web 服务、Docker 镜像、普通账号、API 用户与 Android 工程归入独立 Docker 版的拆分范围。现有 Docker 部署继续使用对应旧版本，详见 [拆分方案](docs/docker_fork_split_plan.md)。
 - 本项目的大量设计借鉴了 **Codex、Claude Code、OpenCode、OpenClaw** 等智能体产品的优秀实践，特此致谢。
 
 ## 核心特性
 
 - **完整的 Agent 循环**：流式输出 + 工具调用编排，内置文件操作、持久终端、网络检索、图片/视频理解、待办与记忆等工具
-- **双运行模式**：`web` 模式（线上多人 AI 服务，Docker 容器隔离）与 `host` 模式（本地个人智能体，宿主机 OS 沙箱）
+- **Host 优先**：Host Web、CLI 与桌面端共用同一个本机后端；终端执行走宿主机 OS 沙箱，不依赖 Docker
 - **双层安全模型**：权限模式（`readonly` / `approval` / `auto_approval` / `unrestricted`）× 执行环境（沙箱 / 直接执行）
 - **子智能体与多智能体**：主进程内并行子智能体（独立上下文、可后台运行）；实验性多智能体团队模式
-- **技能系统（Skills）**：可插拔技能包，模型按需加载（内置技能包未随公开仓库分发，可在 `<数据根目录>/<模式>/agentskills/` 下自行创建）
+- **技能系统（Skills）**：可插拔技能包，模型按需加载（内置技能包未随公开仓库分发，可在 `<数据根目录>/host/agentskills/` 下自行创建）
 - **MCP 扩展**：接入任意 MCP 服务，工具自动映射进 Agent 工具箱
 - **提供商与模型体系**：内置 21 家服务商目录，填入 API key 自动拉取全部可用模型；Chat Completions / Responses 双协议支持；也兼容手写 OpenAI 兼容条目与 Codex 订阅 OAuth；模型可见性按用户开关，思考模式切换、推理强度档位、多模态声明齐全
 - **工程化细节**：对话持久化与跨工作区搜索、文件版本快照回滚、Token 统计、日志轮转、运行态数据外置（源码树零污染）
 
 ## 运行模式
 
+主仓只交付 `host` 模式：本地个人智能体，终端命令在宿主机 OS 沙箱内执行。
+
+| | Host 模式 |
+|---|---|
+| **定位** | 本地个人智能体 |
+| **终端执行** | 宿主机 OS 级沙箱（macOS `sandbox-exec` / Windows WSL2 / Linux 受限助手；Linux 首批 Ubuntu 24.04 隔离实测） |
+| **可登录账号** | 默认本机免登录；开启 Host 网页密码后只使用密码登录 |
+| **数据目录** | `<数据根>/host/` |
+| **默认监听** | `setup` 向导默认 `127.0.0.1`；未显式配置时程序默认 `0.0.0.0`，Host 请显式设 `WEB_SERVER_HOST=127.0.0.1` |
+| **用户注册** | 单人使用，无需注册 |
+| **前置要求** | Windows 安装 WSL2 沙箱；Linux 管理员安装受限助手（见安装说明） |
+
 启动模式由 `TERMINAL_SANDBOX_MODE` 决定（在 settings.json 的 `terminal.sandbox_mode` 或环境变量中设置），**在进程启动时锁定，运行中不可切换**。
 
-| | `host` 模式（默认） | `web` 模式（值 `web` 或 `docker`） |
-|---|---|---|
-| **定位** | 本地个人智能体 | 线上多人 AI 服务 |
-| **终端执行** | 宿主机 OS 级沙箱（macOS `sandbox-exec` / Windows WSL2 / Linux 受限助手；Linux 首批 Ubuntu 24.04 隔离实测） | 每个用户独立的 Docker 容器 |
-| **可登录账号** | 未开启 Host 密码时可登录 host/web 账号；开启后只使用 Host 密码登录 | **仅 web 数据源账号**（host 账号无法登录，即被封堵） |
-| **数据目录** | `<数据根>/host/`（同时可读 web 数据） | `<数据根>/web/` |
-| **默认监听** | 当前配置默认 `0.0.0.0`；host 请显式设 `WEB_SERVER_HOST=127.0.0.1` | `0.0.0.0`（对外服务） |
-| **用户注册** | 单人使用，无需注册 | 邀请码注册制 |
-| **前置要求** | Windows 安装 WSL2 沙箱；Linux 管理员安装受限助手（见安装说明） | **必须先构建 Docker 沙箱镜像**（见下） |
-
-> 两种模式下 Web 界面都可启动；host 模式只是把服务开在本机给自己用。
-> 依据：用户加载逻辑 `modules/user_manager.py:_load_users`（host 模式合并加载 `host/data/users.json` + `web/data/users.json`，web 模式仅加载后者）。
+> 旧配置中的 `web` / `docker` 模式与 `LINUX_SAFETY` 不属于本仓 Host 交付。旧 Docker/Web 部署继续使用对应旧版本，详见 [拆分方案](docs/docker_fork_split_plan.md)；本机使用请完成显式 Host 配置迁移。
 
 ## 快速开始
 
-**环境要求**：Python 3.10+、Node.js 18+；web 模式另需 Docker。
+**环境要求**：Python 3.10+、Node.js 18+。
 
 ```bash
 # 1. 克隆
@@ -52,21 +54,21 @@ git clone https://github.com/JOJO6618/astrion.git
 cd astrion
 
 # 2. 初始化：创建 venv、安装依赖、运行交互式配置向导
-#    向导会依次询问：运行模式 → 监听地址/端口 → 管理员账户 → 模型 API → 生成密钥
+#    向导会依次询问：监听地址/端口 → 数据目录 → 模型 API（并自动生成会话密钥）
 ./setup.sh
 
 # 3. 构建前端
 npm install && npm run build
 
-# 4.（仅 web 模式）构建 Docker 沙箱镜像，见下一节
-
-# 5. 启动
+# 4. 启动
 ./start.sh
 # 或：python -m server.app --port 8091 --thinking-mode
 ```
 
-访问 `http://localhost:8091`，使用向导中设置的管理员账户登录。
+访问 `http://localhost:8091`。Host 模式默认本机免登录；启用 Host 网页密码后只显示密码登录（见下文）。桌面端免密码。
 
+> Linux 首次使用还需由管理员安装 Host 沙箱助手：`sudo bash scripts/setup-linux-sandbox.sh`。Windows 首次使用按设置页向导安装 WSL2 沙箱。
+>
 > 说明：`setup.sh` 向导当前将配置写入仓库根目录 `.env`（开发备用方式）。
 > 生产部署建议按「配置」一节迁移为 `<数据根目录>/settings.json` 或系统环境变量。
 
@@ -78,7 +80,7 @@ npm install && npm run build
 bun cli/src/main.tsx   # 或 npm --prefix cli run dev；当前目录即工作区
 ```
 
-CLI 通过 host Bearer 通道连接本地服务（探测到无服务时自动启动后端）；命令入口为 `cli/bin/astrion`，加入 PATH 后可直接使用 `astrion` 命令。
+CLI 通过本机 Gateway Bearer 连接服务，探测到无服务时自动启动 `server.headless_app`。命令入口为 `cli/bin/astrion`，加入 PATH 后可直接使用 `astrion` 命令。
 
 ### Host 网页密码（可选）
 
@@ -92,42 +94,24 @@ python3 scripts/host_password.py --password 'YOUR_PASSWORD'
 
 启用后，Host 登录页只显示密码登录。设置 → 通用可验证当前密码后关闭保护；再次开启或重设密码仍运行上述脚本。配置保存为 `<DATA_DIR>/host_auth.json`（scrypt 哈希、0600、原子写），不保存明文。桌面端免密码，本机 CLI/headless Bearer 通道独立保留。
 
-## Docker 沙箱镜像（web 模式必需）
-
-程序**不会自动构建镜像**，必须手动构建一次：
-
-```bash
-# 在仓库根目录执行（构建上下文必须是仓库根）
-docker build -f docker/terminal.Dockerfile -t my-agent-shell:latest .
-```
-
-- 镜像内容（`docker/terminal.Dockerfile`）：`python:3.11-slim` + LibreOffice / Pandoc / FFmpeg / Tesseract OCR（含中文）/ Chromium / Node 20 / 全局 `docx`+`pptxgenjs` / 独立工具 venv（`docker/toolbox-requirements.txt`）
-- **镜像名**由 `TERMINAL_SANDBOX_IMAGE` 设置（默认 `python:3.11-slim`，建议构建后改为 `my-agent-shell:latest`）
-- **容器名前缀**由 `TERMINAL_SANDBOX_NAME_PREFIX` 设置（默认 `agent-term`）
-- Docker 不可用时的行为由 `TERMINAL_SANDBOX_REQUIRE` 控制：`1`=直接报错（web 模式建议）；`0`=打印警告并尝试降级（默认）
-
 ## 数据存储
 
-运行态数据（对话、用户、日志、部署级配置）默认存放在 **`~/.astrion/astrion/`**，**不落在源码树内**：
+Host 运行态数据默认位于 **`~/.astrion/astrion/`**。桌面端默认使用 `~/.astrion/astrion-desktop/`（Windows 下位于 `%USERPROFILE%`），目录结构相同。
 
 ```
 ~/.astrion/astrion/           ← 数据根目录（ASTRION_DATA_ROOT 可整体搬迁）
-├── settings.json             ← 唯一配置文件（手动维护）
-├── config/                   ← 部署级配置（custom_models.json 等，host/web 共享）
-├── host/                     ← host 模式运行态
-│   ├── data/                 ← 对话、用户库、记忆、子智能体任务
-│   └── logs/
-└── web/                      ← web 模式运行态
-    ├── data/
-    ├── users/                ← 每用户独立工作区
+├── settings.json             ← 本机配置（手动维护）
+├── config/                   ← 部署级配置（custom_models.json 等）
+└── host/                     ← Host 运行态
+    ├── data/                 ← 对话、记忆、子智能体任务等
     └── logs/
 ```
 
 路径解析优先级（高→低）：
 
-1. **具体目录变量**：`DATA_DIR` / `LOGS_DIR` / `USER_SPACE_DIR` / `API_USER_SPACE_DIR`（单独覆盖某个目录）
+1. **具体目录变量**：`DATA_DIR` / `LOGS_DIR`（单独覆盖某个目录）
 2. **`ASTRION_DATA_ROOT`**：整体搬迁数据根目录
-3. 兜底默认：`~/.astrion/astrion/<模式>/`
+3. 兜底默认：`~/.astrion/astrion/host/`
 
 以上均写在仓库根目录 `.env` 或系统环境变量中。
 
@@ -149,18 +133,14 @@ docker build -f docker/terminal.Dockerfile -t my-agent-shell:latest .
     "sandbox_mode": "host",
     "execution_mode_default": "sandbox",
     "macos_writable_paths": "",
-    "max_active_containers": 8,
     "project_max_storage_mb": 2048
   },
   "server": { "port": 8091, "host": "127.0.0.1" },
   "admin": {
-    "username": "admin",
-    "password_hash": "<werkzeug 哈希>",
     "secondary_password_hash": ""
   },
   "secrets": {
-    "web_secret_key": "<随机 hex>",
-    "api_token_secret": "<随机 hex>"
+    "web_secret_key": "<随机 hex>"
   },
   "models": { "default_response_max_tokens": 32768 },
   "search": { "tavily_api_key": "", "tavily_api_key_2": "" },
@@ -173,17 +153,13 @@ docker build -f docker/terminal.Dockerfile -t my-agent-shell:latest .
 
 | 字段 | 映射环境变量 | 说明 |
 |---|---|---|
-| `terminal.sandbox_mode` | `TERMINAL_SANDBOX_MODE` | **启动模式**：`host` / `web`（或 `docker`） |
+| `terminal.sandbox_mode` | `TERMINAL_SANDBOX_MODE` | **启动模式**：`host`（主仓仅交付 Host；旧 `web` / `docker` 部署继续使用对应旧版本，见拆分方案） |
 | `terminal.execution_mode_default` | `HOST_EXECUTION_MODE_DEFAULT` | 宿主机执行环境默认：`sandbox` / `direct` |
 | `terminal.macos_writable_paths` | `HOST_SANDBOX_MACOS_WRITABLE_PATHS` | macOS 沙箱额外可写白名单（逗号分隔） |
-| `terminal.max_active_containers` | `MAX_ACTIVE_USER_CONTAINERS` | 最大并发用户容器数 |
 | `terminal.project_max_storage_mb` | `PROJECT_MAX_STORAGE_MB` | 单项目存储上限 |
 | `server.port` / `server.host` | `WEB_SERVER_PORT` / `WEB_SERVER_HOST` | Web 监听 |
-| `admin.username` | `AGENT_ADMIN_USERNAME` | 管理员用户名 |
-| `admin.password_hash` | `AGENT_ADMIN_PASSWORD_HASH` | 管理员密码哈希（见「管理员账户」） |
-| `admin.secondary_password_hash` | `ADMIN_SECONDARY_PASSWORD_HASH` | 敏感操作二级密码（**web 模式实际必需**：未配置时管理接口校验恒失败，管理面板功能不可用） |
-| `secrets.web_secret_key` | `WEB_SECRET_KEY` | Session 签名密钥（随机 hex；**web 模式强烈建议配置**：未配置时使用临时密钥，重启后所有登录会话失效） |
-| `secrets.api_token_secret` | `API_TOKEN_SECRET` | API Token 加密密钥（随机 hex） |
+| `admin.secondary_password_hash` | `ADMIN_SECONDARY_PASSWORD_HASH` | 敏感操作二级密码（未配置时相关管理接口校验失败） |
+| `secrets.web_secret_key` | `WEB_SECRET_KEY` | Session 签名密钥（随机 hex；未配置时使用临时密钥，重启后所有登录会话失效） |
 | `models.default_response_max_tokens` | `AGENT_DEFAULT_RESPONSE_MAX_TOKENS` | 单轮响应 token 全局上限 |
 | `search.tavily_api_key(_2)` | `AGENT_TAVILY_API_KEY(_2)` | Tavily 搜索 Key（可选） |
 | `env_vars.*` | 原样注入 | 任意环境变量（API Key、沙箱参数等） |
@@ -198,11 +174,11 @@ docker build -f docker/terminal.Dockerfile -t my-agent-shell:latest .
 
 系统不内置任何供应商模型。**推荐通过设置页连接提供商**；旧版的手写 `custom_models.json` 方式完整保留兼容。模型库由三条路径合并而成：
 
-1. **设置页连接提供商（推荐）**：Web 界面「设置 → 提供商」内置 21 家服务商目录（DeepSeek、Moonshot、智谱、阿里云百炼、火山方舟、SiliconFlow、MiniMax、OpenAI、OpenRouter、Google Gemini、xAI、Groq、Together、Mistral、OpenCode Zen/Go，以及本地 Ollama / LM Studio），填入 API key 即自动拉取该服务商全部可用模型注册进模型库；也可以添加自定义 OpenAI 兼容提供商。凭证保存在 `<数据根目录>/<模式>/data/providers.json`（0600 权限，不纳入 git）。
+1. **设置页连接提供商（推荐）**：Web 界面「设置 → 提供商」内置 21 家服务商目录（DeepSeek、Moonshot、智谱、阿里云百炼、火山方舟、SiliconFlow、MiniMax、OpenAI、OpenRouter、Google Gemini、xAI、Groq、Together、Mistral、OpenCode Zen/Go，以及本地 Ollama / LM Studio），填入 API key 即自动拉取该服务商全部可用模型注册进模型库；也可以添加自定义 OpenAI 兼容提供商。凭证保存在 `<数据根目录>/host/data/providers.json`（0600 权限，不纳入 git）。
 2. **手写 custom_models.json（旧版兼容）**：旧版的手动注册方式，完整保留且已 UI 化——手写条目自动出现在设置页「模型」分区的「自定义」分组，可在界面直接增删改（字段见下表）。
-3. **Codex 订阅 OAuth**：OpenAI 在目录中拆为两条——`OpenAI`（API key）与 `OpenAI Codex`（ChatGPT Pro/Plus 订阅授权，在设置页连接，授权后自动获取订阅包含的模型；docker 多用户部署下管理员连接的 Codex 模型对全员可见）。
+3. **Codex 订阅 OAuth**：OpenAI 在目录中拆为两条——`OpenAI`（API key）与 `OpenAI Codex`（ChatGPT Pro/Plus 订阅授权，在设置页连接，授权后自动获取订阅包含的模型）。
 
-**协议支持**：Chat Completions 与 OpenAI **Responses** 双协议（Responses 按加密 reasoning 处理，多轮回传保持推理连续性）；Anthropic Messages / Google 原生协议的模型会正常注册显示，但当前版本调用时会明确报错（不做协议适配）。
+**协议支持**：Chat Completions 与 OpenAI **Responses** 双协议（Responses 按加密 reasoning 处理，多轮回传保持推理连续性）。Anthropic Messages / Google 原生协议的模型会正常注册显示，但当前版本调用时会明确报错（不做协议适配）。
 
 **模型可见性与偏好**：设置页「模型」分区的可见性开关为**每用户独立**；「模型偏好」分区设置每用户的默认模型 / 默认思考模式 / 默认推理强度。
 
@@ -236,25 +212,21 @@ docker build -f docker/terminal.Dockerfile -t my-agent-shell:latest .
 - **留空走自动规则**：注册表第一个可见模型（纯 Codex 环境下优先选 `-luna` 轻量款）；
 - **创建锁**：子智能体创建时记录所用模型 key，重跑/恢复强制复用同一模型。
 
-### 管理员账户
+### Host 登录与管理员二级验证
 
-方式一（推荐）：运行 `./setup.sh`，向导第 2 步交互式设置用户名与密码（自动哈希）。
-
-方式二（手动）：生成哈希后写入 settings.json 的 `admin.password_hash` 或环境变量 `AGENT_ADMIN_PASSWORD_HASH`：
+Host 模式默认本机免登录。需要网页密码时按上文「Host 网页密码」运行：
 
 ```bash
-python3 -c "from werkzeug.security import generate_password_hash; print(generate_password_hash('你的密码'))"
+python3 scripts/host_password.py --password 'YOUR_PASSWORD'
 ```
 
-管理员登录邮箱自动生成，规则为 `<用户名>@local`（例如用户名为 `admin`，则登录邮箱为 `admin@local`）。
+`setup` 向导不再创建旧管理员账号。
 
-### 普通用户（web 模式）
+敏感操作的管理员二级密码仍保留：生成哈希后写入 settings.json 的 `admin.secondary_password_hash` 或环境变量 `ADMIN_SECONDARY_PASSWORD_HASH`：
 
-**邀请码注册制**：`/register` 注册必须提供有效邀请码；邀请码由管理员在管理面板（`/admin/monitor`）的「邀请码」标签页生成（支持次数限制）。
-
-> ⚠️ **安全提示**
-> - 注册邮箱仅用于登录与查重，**系统不发送验证邮件**——邀请码是注册的唯一实质门槛，请妥善保管。
-> - 新用户的默认权限模式为「批准」（`approval`：命令在沙箱内只读预检，写入/联网等动作需逐项批准后执行）。个人独占部署可在个人空间主动升级为 `auto_approval` / `unrestricted`；多用户或包含不可信用户的场景，建议引导用户在个人空间收紧为 `readonly`。
+```bash
+python3 -c "from werkzeug.security import generate_password_hash; print(generate_password_hash('你的二级密码'))"
+```
 
 ## 项目结构
 
@@ -265,17 +237,19 @@ python3 -c "from werkzeug.security import generate_password_hash; print(generate
 ├── config/                  # 配置聚合、路径解析、模型注册
 ├── utils/                   # API 客户端、上下文与对话管理
 ├── prompts/                 # 系统提示词
-├── multi_agent_roles/       # 多智能体预设角色
 ├── static/src/              # Vue 3 + TypeScript Web 前端
 ├── cli/                     # opentui + React 19 终端 CLI（bun，命令名 astrion）
-├── docs/                    # 设计文档
-└── docker/                  # 沙箱镜像定义
+├── desktop/                 # 桌面壳与原生模块
+├── desktop-electron/        # macOS / Windows Electron 桌面端
+├── scripts/                 # 安装、构建与维护脚本
+└── docs/                    # 设计文档
 ```
 
 ## 文档与测试
 
-- 宿主机沙箱与权限模型：[docs/host_sandbox_and_permission_model.md](docs/host_sandbox_and_permission_model.md)
-- 多智能体模式设计：[docs/multi_agent_mode/](docs/multi_agent_mode/01_overview.md)
+- 宿主机沙箱与权限模型：[docs/agents_details/permission_and_sandbox.md](docs/agents_details/permission_and_sandbox.md)
+- Linux Host 沙箱安装与限制：[docs/agents_details/linux_host_sandbox.md](docs/agents_details/linux_host_sandbox.md)
+- 运行态数据路径：[docs/agents_details/runtime_data_paths.md](docs/agents_details/runtime_data_paths.md)
 - 提供商与设置页 API 契约：[docs/providers_api.md](docs/providers_api.md)
 
 ```bash

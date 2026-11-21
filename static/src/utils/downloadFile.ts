@@ -1,12 +1,11 @@
 // static/src/utils/downloadFile.ts - 工作区文件下载统一入口
 //
-// 三条宿主通道（不要在各业务组件里各自实现）：
+// 两条宿主通道（不要在各业务组件里各自实现）：
 // 1. 桌面壳（Windows Tauri / macOS Electron）：Windows 的 WebView2 没有下载 UI，
 //    浏览器式的 fetch→blob→a.download 点了没有任何反应；macOS Electron 靠默认行为
 //    会弹保存框，两边体验不一致。故桌面壳统一走后端 /api/system/save-file，
 //    由宿主后端弹原生「另存为」对话框（与 mac 行为对齐，两端一致）。
-// 2. Android：走 AndroidDownloadBridge 原生桥（WebView 对 a.download / blob 支持不佳）。
-// 3. 浏览器：保持原有 fetch → blob → a.download 行为不变。
+// 2. 浏览器：保持原有 fetch → blob → a.download 行为不变。
 
 import { isDesktopShell } from '@/utils/desktopPlatform';
 
@@ -115,18 +114,6 @@ export async function downloadWorkspaceFile(
   const kind = options.kind || 'file';
   const filename = options.filename || baseName(path);
 
-  // Android App：原生下载桥接优先（保持既有行为）
-  const androidBridge = (window as any).AndroidDownloadBridge;
-  if (androidBridge && typeof androidBridge.downloadFile === 'function') {
-    try {
-      const absoluteUrl = new URL(downloadUrl(path, kind), window.location.href).href;
-      androidBridge.downloadFile(absoluteUrl, filename);
-      return { status: 'started' };
-    } catch (error) {
-      console.warn('[download] Android 桥接下载失败，回退:', error);
-    }
-  }
-
   // 桌面壳：宿主原生保存对话框（Windows WebView2 无下载 UI，必须走这条）
   if (isDesktopShell()) {
     if (kind === 'folder') {
@@ -141,7 +128,7 @@ export async function downloadWorkspaceFile(
   return await browserDownload(path, filename, kind);
 }
 
-/** Authenticated application exports use the same desktop / Android / web channels. */
+/** Authenticated application exports use the same desktop / web channels. */
 export async function downloadApplicationFile(
   url: string,
   filename: string
@@ -149,11 +136,6 @@ export async function downloadApplicationFile(
   const target = new URL(url, window.location.href);
   if (target.origin !== window.location.origin)
     return { status: 'failed', error: 'invalid export URL' };
-  const bridge = (window as any).AndroidDownloadBridge;
-  if (bridge && typeof bridge.downloadFile === 'function') {
-    bridge.downloadFile(target.href, filename);
-    return { status: 'started' };
-  }
   if (isDesktopShell()) {
     try {
       await (window as any).ensureCsrfToken?.();

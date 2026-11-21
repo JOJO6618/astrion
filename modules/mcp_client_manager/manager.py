@@ -12,7 +12,7 @@ import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, TYPE_CHECKING
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
 import httpx
 
@@ -20,14 +20,13 @@ from config import MCP_PROTOCOL_VERSION, MCP_DEFAULT_TIMEOUT_SECONDS
 from modules.mcp_client_manager.exceptions import MCPClientError
 from modules.mcp_client_manager.http_client import _StreamableHTTPMCPClient
 from modules.mcp_client_manager.models import MCPClientPoolEntry, MCPToolBinding
-from modules.mcp_client_manager.runtime_scope import MCPRuntimeScope, prepare_stdio_server
+from modules.mcp_client_manager.runtime_scope import (
+    MCPRuntimeScope, prepare_stdio_server, reject_container_session,
+)
 from modules.mcp_client_manager.stdio_client import _StdioMCPClient
 from modules.mcp_server_registry import MCPServerRegistry
 
 from modules.i18n import tr
-
-if TYPE_CHECKING:
-    from modules.user_container_manager import ContainerHandle
 
 
 class MCPClientManager:
@@ -37,15 +36,18 @@ class MCPClientManager:
         self,
         registry: MCPServerRegistry,
         protocol_version: str = MCP_PROTOCOL_VERSION,
-        container_session: Optional["ContainerHandle"] = None,
+        container_session: Any = None,
         *,
         runtime_scope_resolver: Optional[Callable[[], MCPRuntimeScope]] = None,
     ):
         self.registry = registry
         self.protocol_version = str(protocol_version or MCP_PROTOCOL_VERSION)
         self.runtime_scope_resolver = runtime_scope_resolver
+        # Host-only: None stays supported; a Docker handle is rejected rather
+        # than being silently served by a Host launch.
+        reject_container_session(container_session)
         self.container_session = container_session
-        self._container_session_signature = self._compute_session_signature(container_session)
+        self._container_session_signature = self._session_signature(container_session)
         self._latest_alias_map: Dict[str, MCPToolBinding] = {}
         self._client_pool: Dict[str, MCPClientPoolEntry] = {}
         self._pool_lock = threading.RLock()
@@ -57,19 +59,15 @@ class MCPClientManager:
             pass
 
     @staticmethod
-    def _compute_session_signature(session: Optional["ContainerHandle"]) -> Optional[Tuple[str, str, str, str, str]]:
+    def _session_signature(session: Any) -> Optional[Tuple[str, str]]:
         if not session:
             return None
-        return (
-            str(getattr(session, "mode", "") or ""),
-            str(getattr(session, "workspace_path", "") or ""),
-            str(getattr(session, "mount_path", "") or ""),
-            str(getattr(session, "container_name", "") or ""),
-            str(getattr(session, "sandbox_bin", "") or ""),
-        )
+        return (str(getattr(session, "mode", "") or ""),
+                str(getattr(session, "workspace_path", "") or ""))
 
-    def set_container_session(self, session: Optional["ContainerHandle"]) -> None:
-        next_signature = self._compute_session_signature(session)
+    def set_container_session(self, session: Any) -> None:
+        reject_container_session(session)
+        next_signature = self._session_signature(session)
         if next_signature == self._container_session_signature:
             # 引用对象可能相同（甚至被原地修改），这里仍刷新引用，便于后续读取最新字段。
             self.container_session = session

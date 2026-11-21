@@ -13,10 +13,6 @@ try:
         READ_TOOL_MAX_CONTEXT_BEFORE, READ_TOOL_MAX_CONTEXT_AFTER,
         READ_TOOL_DEFAULT_MAX_MATCHES, READ_TOOL_MAX_MATCHES,
         READ_TOOL_MAX_FILE_SIZE,
-        TERMINAL_SANDBOX_MOUNT_PATH,
-        TERMINAL_SANDBOX_MODE,
-        TERMINAL_SANDBOX_CPUS,
-        TERMINAL_SANDBOX_MEMORY,
         PROJECT_MAX_STORAGE_MB,
         CUSTOM_TOOLS_ENABLED,
     )
@@ -33,10 +29,6 @@ except ImportError:
         READ_TOOL_MAX_CONTEXT_BEFORE, READ_TOOL_MAX_CONTEXT_AFTER,
         READ_TOOL_DEFAULT_MAX_MATCHES, READ_TOOL_MAX_MATCHES,
         READ_TOOL_MAX_FILE_SIZE,
-        TERMINAL_SANDBOX_MOUNT_PATH,
-        TERMINAL_SANDBOX_MODE,
-        TERMINAL_SANDBOX_CPUS,
-        TERMINAL_SANDBOX_MEMORY,
         PROJECT_MAX_STORAGE_MB,
         CUSTOM_TOOLS_ENABLED,
     )
@@ -66,7 +58,6 @@ from modules.custom_tool_executor import CustomToolExecutor
 from modules.mcp_server_registry import MCPServerRegistry, build_default_mcp_category
 
 
-from modules.container_monitor import collect_stats, inspect_state
 from core.tool_config import TOOL_CATEGORIES
 from utils.api_client import APIClient
 from utils.context_manager import ContextManager
@@ -86,14 +77,6 @@ DISABLE_LENGTH_CHECK = True
 
 
 class ToolsDefinitionBaseMixin:
-    @staticmethod
-    def _mcp_disabled_message() -> str:
-                return "当前为docker模式，MCP仅支持宿主机模式"
-
-    def _is_mcp_disabled_in_docker_mode(self) -> bool:
-                session = getattr(self, "container_session", None)
-                return bool(session and getattr(session, "mode", None) == "docker")
-
     def _inject_intent(self, properties: Dict[str, Any]) -> Dict[str, Any]:
                 """在工具参数中注入 intent（简短意图说明），仅当开关启用时。
 

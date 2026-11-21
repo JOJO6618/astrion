@@ -152,9 +152,7 @@ class ReviewPreviewTests(unittest.TestCase):
         app = Flask(__name__)
         with app.test_request_context('/?limit=5&content_mode=dialogue'):
             original_policy = conversation_module.resolve_admin_policy
-            original_record = conversation_module.get_current_user_record
-            conversation_module.resolve_admin_policy = lambda record: {}
-            conversation_module.get_current_user_record = lambda: None
+            conversation_module.resolve_admin_policy = lambda: {}
             try:
                 view = conversation_module.review_conversation_preview
                 while hasattr(view, "__wrapped__"):
@@ -164,7 +162,6 @@ class ReviewPreviewTests(unittest.TestCase):
                 )
             finally:
                 conversation_module.resolve_admin_policy = original_policy
-                conversation_module.get_current_user_record = original_record
         self.assertEqual(response.status_code, 200)
         payload = response.get_json()
         self.assertTrue(payload["success"])

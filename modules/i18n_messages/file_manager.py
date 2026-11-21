@@ -9,12 +9,6 @@ English (sentence case).
 """
 
 MESSAGES = {
-    # ── base.py（容器未就绪） ──
-    "file_manager.container_not_ready": {
-        "zh-CN": "容器未就绪，无法执行文件操作",
-        "en-US": "Container is not ready; cannot perform file operations",
-    },
-
     # ── path_mixin.py（_validate_path / _ensure_host_access，传播到多处显示） ──
     "file_manager.path_outside_workspace_detailed": {
         "zh-CN": "路径必须在项目文件夹内。请检查是否使用的是不带/workspace的相对路径。",
@@ -165,10 +159,6 @@ MESSAGES = {
     "file_manager.content_too_long": {
         "zh-CN": "内容过长({length}字符)，超过100KB限制",
         "en-US": "Content too long ({length} chars); exceeds the 100KB limit",
-    },
-    "file_manager.storage_quota_exceeded": {
-        "zh-CN": "写入失败：超出项目磁盘配额",
-        "en-US": "Write failed: project disk quota exceeded",
     },
 
     # ── patch_mixin.py (apply_diff_patch / apply_modify_blocks) ──

@@ -14,9 +14,6 @@ try:
         FORBIDDEN_ROOT_PATHS,
         OUTPUT_FORMATS,
         READ_TOOL_MAX_FILE_SIZE,
-        PROJECT_MAX_STORAGE_BYTES,
-        TERMINAL_SANDBOX_MODE,
-        LINUX_SAFETY,
     )
 except ImportError:  # 兼容全局环境中存在同名包的情况
     import sys
@@ -30,17 +27,10 @@ except ImportError:  # 兼容全局环境中存在同名包的情况
         FORBIDDEN_ROOT_PATHS,
         OUTPUT_FORMATS,
         READ_TOOL_MAX_FILE_SIZE,
-        PROJECT_MAX_STORAGE_BYTES,
-        TERMINAL_SANDBOX_MODE,
-        LINUX_SAFETY,
     )
-from modules.container_file_proxy import ContainerFileProxy
 from modules.host_sandbox_policy import get_macos_writable_paths, get_macos_readable_paths
 from utils.logger import setup_logger
 from modules.i18n import tr
-
-if TYPE_CHECKING:
-    from modules.user_container_manager import ContainerHandle
 
 # 临时禁用长度检查
 DISABLE_LENGTH_CHECK = True
@@ -286,17 +276,7 @@ class PatchMixin:
 
         if append_only_blocks:
             try:
-                if self._use_container():
-                    append_payload = "".join(block.get("new", "") for block in append_only_blocks)
-                    append_response = self.write_file(path, append_payload, mode="a")
-                    if not append_response.get("success"):
-                        raise PermissionError(append_response.get("error") or "Append refused")
-                    # Container write has already happened; StringIO only shares
-                    # metadata accounting with the native append path below.
-                    from io import StringIO
-                    append_stream = StringIO()
-                else:
-                    append_stream = self._native_open(full_path, 'a', encoding='utf-8')
+                append_stream = self._native_open(full_path, 'a', encoding='utf-8')
                 with append_stream as f:
                     for block in append_only_blocks:
                         chunk = block.get("new", "")
@@ -405,12 +385,6 @@ class PatchMixin:
         
         try:
             relative_path = self._relative_path(full_path)
-            if self._use_container():
-                return self._container_call("apply_modify_blocks", {
-                    "path": relative_path,
-                    "blocks": blocks
-                })
-
             with self._native_open(full_path, 'r', encoding='utf-8') as f:
                 original_content = f.read()
         except Exception as e:

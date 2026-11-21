@@ -29,12 +29,12 @@ from modules.skills_manager import (
 )
 from modules.upload_security import UploadSecurityError
 from modules.host_sandbox_policy import load_policy, save_policy
-from modules.user_manager import UserWorkspace
+from modules.workspace import UserWorkspace
 from core.web_terminal import WebTerminal
 from config.model_profiles import get_model_context_window
 
-from server.auth_helpers import api_login_required, resolve_admin_policy, get_current_user_record, get_current_username
-from server.context import with_terminal, get_gui_manager, get_upload_guard, build_upload_error_response, ensure_conversation_loaded, get_or_create_usage_tracker
+from server.auth_helpers import api_login_required, resolve_admin_policy, get_current_username
+from server.context import with_terminal, get_gui_manager, get_upload_guard, build_upload_error_response, ensure_conversation_loaded
 from server.security import rate_limited
 from server.context.data_decorators import with_workspace_data
 from server.context.resources import find_runtime
@@ -52,7 +52,7 @@ UPLOAD_FOLDER_NAME = ".astrion/user_upload"
 def get_terminals(data_context, workspace: UserWorkspace, username: str):
     """获取已有终端会话；列表查询不启动执行环境。"""
     terminal = find_runtime(username, workspace, request.args.get("conversation_id") or None)
-    policy = resolve_admin_policy(get_current_user_record())
+    policy = resolve_admin_policy()
     if policy.get("ui_blocks", {}).get("block_realtime_terminal"):
         return jsonify({"success": False, "error": tr("chat_terminal.realtime_terminal_admin_disabled")}), 403
     if terminal is not None and terminal.terminal_manager:
@@ -66,7 +66,7 @@ def get_terminals(data_context, workspace: UserWorkspace, username: str):
 @with_terminal
 def get_terminal_output_rest(terminal: WebTerminal, workspace: UserWorkspace, username: str, session_name: str):
     """获取终端输出历史（TerminalPanel 轮询端点，替代原 WebSocket get_terminal_output）。"""
-    policy = resolve_admin_policy(get_current_user_record())
+    policy = resolve_admin_policy()
     if policy.get("ui_blocks", {}).get("block_realtime_terminal"):
         return jsonify({"success": False, "error": tr("chat_terminal.realtime_terminal_admin_disabled")}), 403
     if not terminal.terminal_manager:

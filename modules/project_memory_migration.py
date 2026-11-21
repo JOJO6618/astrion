@@ -11,7 +11,7 @@ import stat
 from config import WORKSPACE_MEMORY_DIRNAME
 from modules.file_manager.scoped_io import checked_parent, open_checked, unlink_checked
 from modules.project_memory import (
-    NOTICE_NAME, activate_docker_topics, legacy_files, prepare_topic_directory,
+    NOTICE_NAME, legacy_files, prepare_topic_directory,
     publish_memory_file, topic_directory,
 )
 
@@ -23,12 +23,11 @@ class WorkspaceMemories:
     label: str
     project: Path
     data: Path
-    docker: bool
     files: tuple[Path, ...]
 
     @property
     def destination(self) -> Path:
-        return topic_directory(str(self.project), str(self.data), docker=self.docker)
+        return topic_directory(str(self.project), str(self.data))
 
 
 @dataclass(frozen=True)
@@ -64,7 +63,7 @@ def _stream_source(source: Path, expected: os.stat_result, output) -> None:
 
 
 def copy_workspace(workspace: WorkspaceMemories, on_copied) -> list[VerifiedCopy]:
-    target = prepare_topic_directory(str(workspace.project), str(workspace.data), docker=workspace.docker)
+    target = prepare_topic_directory(str(workspace.project), str(workspace.data))
     copies = []
     for source in workspace.files:
         digest, info = _fingerprint(source)
@@ -76,7 +75,7 @@ def copy_workspace(workspace: WorkspaceMemories, on_copied) -> list[VerifiedCopy
             except FileNotFoundError:
                 try:
                     publish_memory_file(destination, lambda output: _stream_source(source, info, output),
-                                        mode=0o644 if workspace.docker else 0o600, mtime_ns=info.st_mtime_ns)
+                                        mode=0o600, mtime_ns=info.st_mtime_ns)
                 except FileExistsError:
                     # A writer claimed this filename while the copy was streaming.
                     continue
@@ -128,12 +127,8 @@ def verify_workspace(workspace: WorkspaceMemories, copies: list[VerifiedCopy], o
 
 
 def clean_workspace(workspace: WorkspaceMemories, copies: list[VerifiedCopy]) -> None:
-    # The Docker caller has retired the legacy container at this point.
     verify_workspace(workspace, copies, lambda: None)
-    if workspace.docker:
-        activate_docker_topics(workspace.destination)
-    else:
-        _write_notice(workspace)
+    _write_notice(workspace)
     for copy in copies:
         # Recheck immediately before removing each source. A file edited during
         # verification remains on disk and can be imported on a later retry.

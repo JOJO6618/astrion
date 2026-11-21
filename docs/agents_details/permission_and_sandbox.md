@@ -21,7 +21,7 @@
   - `run_command` 可调用，但在只读沙箱执行；写入由系统拒绝
   - 读取同样受限（各平台只读强制的可读边界见 §10.8）；读不到属预期边界，不是故障
   - `write_file` / `edit_file` 等写入类工具直接拒绝
-  - 持久终端可自由创建与输入，但以只读身份运行（docker 非特权 uid / 宿主机只读 profile），写入 EPERM 由系统强制；权限跨界切换（受限档⇄unrestricted）时现有终端直接销毁，重开生效
+  - 持久终端可自由创建与输入，但以只读身份运行（宿主机只读 profile），写入 EPERM 由系统强制；权限跨界切换（受限档⇄unrestricted）时现有终端直接销毁，重开生效
 - `approval`
   - `run_command` 先走只读沙箱（可读边界见 §10.8，读越界也会触发权限拒绝）
   - 若出现权限拒绝（例如 `Operation not permitted` / `Permission denied`），触发前端审批
@@ -83,22 +83,13 @@
 
 ### 10.7) 后台命令只读沙箱修复（2026-08-13）
 
-后台 `run_command`（`run_in_background=true`）此前在**所有环境**绕过只读权限（`background_command_manager` 固定用可写沙箱计划）。已修复：`create_background_command` 透传 `sandbox_write_access`，宿主机路径按它选只读/可写计划；docker 路径按它决定是否以非特权 uid 执行（见 §10.8）。
+后台 `run_command`（`run_in_background=true`）此前在**所有环境**绕过只读权限（`background_command_manager` 固定用可写沙箱计划）。已修复：`create_background_command` 透传 `sandbox_write_access`，Host 平台执行器按它选择只读或可写计划（见 §10.8）。
 
 ### 10.8) 平台级只读强制（2026-08-30）
 
 只读权限的强制由各平台原生机制兜底；`config/limits.py` 的命令文本白名单（`_is_readonly_run_command_allowed`）只是**审批决策的启发式**，不再是安全边界（已知可绕过，如 `find . -delete`；绕过后果只是多走一次审批）。
 
-- **docker/web 模式 = 非特权 uid 执行角色 + Landlock 进程级只读域**（`modules/docker_readonly_exec.py`）：
-  - 容器主进程保持 root（可写执行不变）；`sandbox_write_access=False` 的执行通道（`terminal_ops/run.py`、`background_command_manager.py`、只读语境创建的持久终端）以 `-u 10001:10001` 运行，`DOCKER_READONLY_EXEC_UID/GID` 可覆盖
-  - 第一层强制力 = 内核 DAC：工作区属主为宿主机 root，非属主无写权；600 权限文件（如 .env）不可读；逃逸需提权（setuid/内核漏洞），无 umount 类捷径
-  - **第二层 = Landlock 只读域**（2026-09 新增，云端实测 kernel 6.8 / ABI V4 / Docker 28 默认 seccomp 放行）：纯 DAC 的残留漏洞是工作区内历史遗留的 world-writable（777/o+w）路径对只读 uid 仍可写；只读执行时命令再经 `modules/landlock_launcher.py`（首次执行时 docker cp 进容器并自检）进入「工作区写类操作全拒」的内核域，最终权限 = DAC ∩ Landlock，该洞封死。要点：
-    - launcher 规则：handled 只含写类操作；ro 路径（工作区挂载点）不加规则（无覆盖即拒绝）；/tmp、/var/tmp、/dev/shm 显式授写权以对齐纯 DAC 现状行为（只读身份 HOME=/tmp）；读/执行不进 handled，仍由 DAC 管。注意不能写「/ 授全量 + ro 授空」的交集规则——空授权规则被内核拒绝（ENOMSG/errno 42）
-    - 自检失败（内核 <5.13 / seccomp 拦截 / 容器无 python3）自动降级纯 DAC，warning 日志标注 enforcement level；`DOCKER_READONLY_LANDLOCK=0` 可整体停用
-    - 语义边界：Landlock 不管 chmod/chown 等元数据修改，也不管未配置的网络——因此非特权 uid 层必须保留（root+Landlock 的进程可 chmod 放宽权限位让域外进程受益）
-  - 前提：工作区属主与该 uid 不碰撞、容器未挂 docker.sock（云端已验证）；macOS Docker Desktop 双重不适用（virtiofs fakeowner 不按 uid 检查；linuxkit 内核未编译 Landlock），仅 Linux 宿主生效
-  - 持久终端在 readonly/approval/auto_approval 下同以只读身份创建（`terminal_readonly_enabled` 判定，`terminal_readonly_getter` 注入）；终端里的写入会被拒，写命令走 run_command 审批通道；权限跨界切换（受限档⇄unrestricted）时销毁现有终端会话重建（`_apply_restricted_execution_mode_link` → `close_all()`）
-  - Dockerfile 创建 `agent` 用户 + `/etc/gitconfig` safe.directory + 去 setuid 加固；数字 uid 不依赖镜像内用户存在，旧镜像直接受益
+- **Docker/Web 容器执行的只读强制归 Docker 版本**（2026-08-30 设计，2026-09 Landlock 云端实测记录随 fork 维护）：非特权 uid 执行角色 + Landlock 进程级只读域，仅 Linux 宿主生效；主仓 Host 不依赖该路径。
 - **macOS 宿主机 = Seatbelt 白名单读模型**（`modules/host_sandbox_runner.py`）：
   - 只读/可写两个 profile **共用同一白名单读模型**（`_build_macos_whitelist_read_rules`），唯一区别是写权限：deny default + 系统路径白名单（`MACOS_MINIMAL_READABLE_PATHS`）+ 路径授权（writable + readable_extra）+ 工作区 + 祖先目录 literal allow（缺一个祖先进程 exec 直接 Abort trap，必须为 file-read*）+ env 注入 `GIT_CONFIG_GLOBAL=/dev/null`（可写/只读/持久终端三条 plan 均注入）
   - **xcselect 垫片兼容（2026-09-07 修复）**：/usr/bin 下的 python3/git/clang 等是 xcselect 垫片，启动即拉起 xcodebuild 读 `/Library/Preferences/com.apple.dt.Xcode.plist` 校验 license、并经 mach 服务 `com.apple.bsd.dirhelper` 解析 DARWIN_USER_TEMP_DIR——8-30 白名单化曾致其在沙箱内全灭。现两个 profile 均内置 `MACOS_BASE_MACH_RULES`（放行 dirhelper），白名单含 `/Library/Preferences`；可写 profile 额外放行 `$TMPDIR` 父目录（xcrun_db 缓存写入），只读 profile 不放行（缓存写失败仅噪音、非致命）
@@ -112,4 +103,4 @@
 
 ### 私有工作区记忆的内置路径能力（2026-11-07）
 
-用户配置来源仍为环境变量与路径授权文件；此外，受信任的 FileManager 资源装配会注册当前工作区对应的外置记忆目录。`get_macos_readable_paths`／`get_macos_writable_paths` 动态并入该精确目录，复用三平台沙箱与原生 IO 的共同入口，不写回用户配置、不授权共享数据根。子实例只追加此隐式读根，固定窄写根和 readonly/plan 限制不变。Docker 通过项目内独立 bind 暴露文件，继续服从原有容器和子实例权限；“主写子读”是默认维护策略，不声称缩小 full_access 等既有能力。已全文注入的主对话文件免工具预读、auto_approval 下按内置工作区资源放行，人工审批仍沿用原规则。完整说明见 `docs/workspace_memory.md`。
+用户配置来源仍为环境变量与路径授权文件；此外，受信任的 FileManager 资源装配会注册当前工作区对应的外置记忆目录。`get_macos_readable_paths`／`get_macos_writable_paths` 动态并入该精确目录，复用三平台沙箱与原生 IO 的共同入口，不写回用户配置、不授权共享数据根。子实例只追加此隐式读根，固定窄写根和 readonly/plan 限制不变。“主写子读”是默认维护策略，不声称缩小 full_access 等既有能力。已全文注入的主对话文件免工具预读、auto_approval 下按内置工作区资源放行，人工审批仍沿用原规则。完整说明见 `docs/workspace_memory.md`。

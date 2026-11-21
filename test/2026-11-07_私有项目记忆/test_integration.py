@@ -1,76 +1,14 @@
-"""Container command assembly, frozen child prompts and real tool guard checks."""
+"""Frozen child prompts and real Host tool guard checks."""
 from __future__ import annotations
 
-from pathlib import Path
-import subprocess
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch, Mock
 
 import test_workspace_memory as fixtures
-from modules.user_container_manager import ContainerHandle, UserContainerManager
 from modules.sub_agent.history import SubAgentHistoryMixin
 from modules.workspace_memory_context import child_prompt, main_prompt
 from modules.workspace_memory import PROMPT_KEY
-
-
-class ContainerTest(unittest.TestCase):
-    setUp = fixtures.MemoryTest.setUp
-    tearDown = fixtures.MemoryTest.tearDown
-
-    def manager(self):
-        manager = object.__new__(UserContainerManager)
-        manager.sandbox_bin = "docker"
-        manager.image = "test-image"
-        manager.mount_path = "/custom-project"
-        manager._project_label_key = "test.project"
-        manager._project_label_value = "test"
-        manager._kind_label_key = "test.kind"
-        manager._kind_label_value = "workspace"
-        manager.network = None
-        manager.cpus = None
-        manager.memory = None
-        manager.pids_limit = None
-        manager.binds = []
-        manager.extra_env = {}
-        manager._assert_docker_runtime_ready = Mock()
-        manager._kill_container = Mock()
-        manager._build_container_name = lambda key: "test-container"
-        return manager
-
-    def test_bind_uses_external_data_and_configured_project_root(self):
-        manager = self.manager()
-        source = self.data / "memory"
-        source.mkdir(parents=True)
-        (source / "MEMORY.md").write_text("persisted")
-        with patch("modules.user_container_manager.shutil.which", return_value="/test/docker"), patch(
-            "modules.user_container_manager.subprocess.run",
-            return_value=subprocess.CompletedProcess([], 0, "container-id", ""),
-        ) as run:
-            handle = manager._create_handle("user::workspace", str(self.project), "docker", memory_directory=str(source))
-        command = run.call_args.args[0]
-        self.assertIn(f"{source}:/custom-project/.astrion/astrion-memory", command)
-        self.assertIn(f"{self.project}:/custom-project", command)
-        self.assertNotIn(f"{self.data}:/custom-project", command)
-        self.assertEqual(str(source), handle.memory_directory)
-        self.assertEqual("persisted", (source / "MEMORY.md").read_text())
-        self.assertEqual([], list((self.project / ".astrion/astrion-memory").iterdir()))
-
-    def test_cached_old_container_is_not_killed_to_add_mount(self):
-        import threading
-        manager = self.manager()
-        manager._normalize_username = lambda value: value
-        manager.sandbox_mode = "docker"
-        manager._lock = threading.RLock()
-        manager._containers = {"user::workspace": ContainerHandle(
-            username="user", mode="docker", workspace_path=str(self.project),
-            mount_path="/workspace", container_name="active-old-container")}
-        manager._is_container_running = lambda handle: True
-        with patch("modules.user_container_manager.LINUX_SAFETY", False):
-            with self.assertRaisesRegex(RuntimeError, "挂载不匹配"):
-                manager.ensure_container("user", str(self.project), container_key="user::workspace",
-                                         preferred_mode="docker", data_dir=str(self.data))
-        manager._kill_container.assert_not_called()
 
 
 class ChildAndGuardTest(unittest.TestCase):

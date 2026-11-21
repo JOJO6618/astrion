@@ -76,7 +76,6 @@ export const workspaceNavigationMethods = {
   async handleSelectWorkspaceConversation(payload, options = {}) {
     const id = String(payload?.conversationId || '').trim();
     if (!id) return { success: false };
-    const scoped = !!(this.versioningHostMode || this.dockerProjectMode);
     const workspaceId = String(payload?.workspaceId || this.currentHostWorkspaceId || '').trim();
     const tabs = useConversationTabsStore();
     if (tabs.enabled) {
@@ -95,7 +94,7 @@ export const workspaceNavigationMethods = {
       !options.force &&
       id === this.currentConversationId &&
       !this.historyLoading &&
-      (!scoped || workspaceId === String(this.currentHostWorkspaceId || ''))
+      workspaceId === String(this.currentHostWorkspaceId || '')
     ) {
       this.suppressTitleTyping = false;
       this.titleReady = true;
@@ -107,13 +106,12 @@ export const workspaceNavigationMethods = {
     const owns = () => ownsConversationSession(this, session);
     this.suppressTitleTyping = true;
     this.titleReady = false;
-    this.hostWorkspaceSwitching =
-      scoped && workspaceId !== String(this.currentHostWorkspaceId || '');
+    this.hostWorkspaceSwitching = workspaceId !== String(this.currentHostWorkspaceId || '');
     try {
       // Storage/target draft can be read with explicit identity before selection.
       // Selection writes are ordered, so late cookies cannot select an older target.
       const selection =
-        !options.prepared && scoped && workspaceId
+        !options.prepared && workspaceId
           ? selectWorkspaceIdentity(this, workspaceId, owns)
           : Promise.resolve({});
       const draft = options.prepared
@@ -244,9 +242,7 @@ export const workspaceNavigationMethods = {
     } catch (error) {
       if (!owns()) return;
       this.uiPushToast({
-        title: this.versioningHostMode
-          ? t('appUi.switchWorkspaceFailed')
-          : t('appUi.switchProjectFailed'),
+        title: t('appUi.switchWorkspaceFailed'),
         message: String(error?.message || error),
         type: 'error'
       });

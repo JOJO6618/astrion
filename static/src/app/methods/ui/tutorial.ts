@@ -1,58 +1,24 @@
 // @ts-nocheck
-import { t } from '@/locales';
 import { usePersonalizationStore } from '../../../stores/personalization';
 import { useTutorialStore, TUTORIAL_ENABLED } from '../../../stores/tutorial';
 
 export const tutorialMethods = {
   async checkTutorialPrompt() {
-    // 新手教程暂时关闭不开放（TUTORIAL_ENABLED=false），不再弹出新用户教程提示
-    if (!TUTORIAL_ENABLED) {
-      this.tutorialPromptVisible = false;
-      return;
-    }
+    // 新手教程暂时关闭不开放（TUTORIAL_ENABLED=false），不再弹出新用户教程提示。
+    // Host-only 主仓没有按普通账号记录教程完成度的后端，提示状态只保留本地行为。
     this.tutorialPromptVisible = false;
     this.tutorialPromptUsername = '';
-    try {
-      const resp = await fetch('/api/tutorial-status', { credentials: 'same-origin' });
-      const data = await resp.json().catch(() => ({}));
-      if (!resp.ok || !data?.success) {
-        return;
-      }
-      const payload = data.data || {};
-      if (!payload.applicable || !payload.should_prompt) {
-        return;
-      }
-      this.tutorialPromptUsername = payload.username || '';
-      this.tutorialPromptVisible = true;
-    } catch (error) {
-      console.warn('获取新手教程提示状态失败:', error);
+    if (!TUTORIAL_ENABLED) {
+      return;
     }
   },
   async updateTutorialPromptStatus(completed = true) {
     this.tutorialPromptLoading = true;
     try {
-      const resp = await fetch('/api/tutorial-status', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify({ tutorial_completed: !!completed })
-      });
-      const data = await resp.json().catch(() => ({}));
-      if (!resp.ok || !data?.success) {
-        throw new Error(data?.error || t('appUi.updateTutorialStatusFailed'));
-      }
       const tutorialStore = useTutorialStore();
-      tutorialStore.markCompleted();
+      if (completed) tutorialStore.markCompleted();
       this.tutorialPromptVisible = false;
       return true;
-    } catch (error) {
-      console.warn('更新新手教程提示状态失败:', error);
-      this.uiPushToast({
-        title: t('appUi.notice'),
-        message: t('appUi.tutorialSaveFailedMessage'),
-        type: 'warning'
-      });
-      return false;
     } finally {
       this.tutorialPromptLoading = false;
     }

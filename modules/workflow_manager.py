@@ -2,8 +2,7 @@
 
 存储布局（对齐 skills 的双源合并模式）：
 - 内置示例：源码树 ``workflows/<name>/WORKFLOW.md``（只读种子）
-- 用户库：host 模式 ``<runtime_root>/host/workflows/``；web/docker 模式
-  ``users/<user>/personal/workflows/``（从 workspace data_dir 推断）
+- 用户库：``<runtime_root>/host/workflows/``
 
 文件格式：YAML frontmatter（snake_case 结构）+ markdown 正文（body）。
 API 层传输使用 camelCase dict，本模块负责双向转换。
@@ -21,7 +20,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import yaml
 
-from config.paths import CUSTOM_SKILLS_DIR, IS_HOST_MODE
+from config.paths import CUSTOM_SKILLS_DIR
 from modules.i18n import tr
 
 # 内置示例种子目录（源码树 workflows/）
@@ -38,32 +37,11 @@ _NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
 # ---------------------------------------------------------------- 路径推断
 
 
-def infer_user_workflows_dir(data_dir: str | Path | None) -> Optional[Path]:
-    """从 workspace data_dir 推断用户工作流库目录（对齐 infer_private_skills_dir）。
-
-    host 模式：统一运行态根下的 workflows/，不按用户拆分。
-    web/docker：users/<user>/personal/workflows/。
-    """
-    if IS_HOST_MODE:
-        root = Path(CUSTOM_WORKFLOWS_DIR).expanduser().resolve()
-        root.mkdir(parents=True, exist_ok=True)
-        return root
-    if not data_dir:
-        return None
-    try:
-        data_path = Path(data_dir).expanduser().resolve()
-        if data_path.name == "data" and data_path.parent.parent.name == "workspaces":
-            root = (data_path.parent.parent.parent / "workflows").resolve()
-            root.mkdir(parents=True, exist_ok=True)
-            return root
-        if data_path.name == "data" and data_path.parent.parent.name in ("projects", "project"):
-            user_root = data_path.parent.parent.parent
-            root = (user_root / "personal" / "workflows").resolve()
-            root.mkdir(parents=True, exist_ok=True)
-            return root
-    except Exception:
-        return None
-    return None
+def infer_user_workflows_dir(data_dir: str | Path | None) -> Path:
+    """Return the shared Host workflow library."""
+    root = Path(CUSTOM_WORKFLOWS_DIR).expanduser().resolve()
+    root.mkdir(parents=True, exist_ok=True)
+    return root
 
 
 def _workflow_file(root: Path, name: str) -> Path:

@@ -27,7 +27,6 @@ export default {
   navGeneral: 'General',
   navQuickChat: 'Quick Chat',
   navWorkspace: 'Workspace',
-  navWorkspaceProject: 'Project',
   navSearch: 'Web Search',
   navTools: 'Tools',
   navContext: 'Context & Memory',
@@ -70,11 +69,8 @@ export default {
   memoryMigration: {
     title: 'Move workspace project memories',
     hostEntry: 'Move workspace project memories',
-    dockerEntry: 'Move project memories for all users',
     hostIntro:
       'Astrion needs to move project memories to the data directory. Found {memories} memories in {workspaces} workspaces.',
-    dockerIntro:
-      'Found {memories} project memories in {workspaces} workspaces across {users} user accounts.',
     destination: 'Move to',
     showTargets: 'Show workspace destinations',
     hideTargets: 'Hide workspace destinations',
@@ -123,7 +119,6 @@ export default {
     unknown: 'The operation failed. Check directory permissions and try again.'
   },
   workspaceTitle: 'Workspace',
-  workspaceTitleProject: 'Project',
   searchTitle: 'Web Search',
   toolsTitle: 'Tools',
   contextTitle: 'Context & Memory',

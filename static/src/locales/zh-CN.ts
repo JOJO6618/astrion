@@ -10,7 +10,6 @@ import input from './zh-CN/input';
 import tutorial from './zh-CN/tutorial';
 import monitor from './zh-CN/monitor';
 import workflow from './zh-CN/workflow';
-import adminDashboard from './zh-CN/adminDashboard';
 import adminPolicy from './zh-CN/adminPolicy';
 import adminApi from './zh-CN/adminApi';
 import adminCustomTools from './zh-CN/adminCustomTools';
@@ -54,7 +53,6 @@ export default {
   tutorial,
   monitor,
   workflow,
-  adminDashboard,
   adminPolicy,
   adminApi,
   adminCustomTools,

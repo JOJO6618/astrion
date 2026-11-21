@@ -1280,6 +1280,7 @@ export const usePersonalizationStore = defineStore('personalization', {
     },
     async logout() {
       try {
+        await (window as any).ensureCsrfToken?.();
         const resp = await fetch('/logout', {
           method: 'POST',
           credentials: 'same-origin',

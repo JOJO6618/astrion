@@ -1,22 +1,23 @@
-# modules/terminal_ops.py - 终端操作模块（修复Python命令检测）
+# modules/terminal_ops/run.py - 前台命令执行（Host-only）
+#
+# 执行目标只有两种：Host 沙箱计划（sandbox）或宿主机直连（direct）。
+# Docker 容器执行（docker exec、容器只读 uid、容器作用域包装）已随 Docker
+# fork 拆出，本文件不再包含任何容器分支。
 
 import os
 import sys
 import asyncio
-import re
 import subprocess
-import shutil
 import time
 import signal
 from pathlib import Path
-from typing import Dict, Optional, Tuple, TYPE_CHECKING
-from types import SimpleNamespace
+from typing import Dict, Optional
+
 try:
     from config import (
         TERMINAL_COMMAND_TIMEOUT,
         OUTPUT_FORMATS,
         MAX_RUN_COMMAND_CHARS,
-        HOST_SANDBOX_NETWORK_PERMISSION,
     )
 except ImportError:
     project_root = Path(__file__).resolve().parents[1]
@@ -26,25 +27,16 @@ except ImportError:
         TERMINAL_COMMAND_TIMEOUT,
         OUTPUT_FORMATS,
         MAX_RUN_COMMAND_CHARS,
-        HOST_SANDBOX_NETWORK_PERMISSION,
     )
 from modules.host_sandbox_runner import (
     HostSandboxError,
-    NETWORK_PERMISSION_RESTRICTED,
     build_host_sandbox_plan,
     build_host_sandbox_readonly_plan,
     host_sandbox_enabled,
 )
-from modules.docker_readonly_exec import docker_readonly_exec_args, docker_readonly_wrap_inner
 from modules.i18n import tr
 from modules.execution_scope import current_execution_scope
-from modules.scoped_execution_policy import (
-    require_scoped_docker_support, scoped_work_path, scoped_write_access,
-)
-
-if TYPE_CHECKING:
-    from modules.user_container_manager import ContainerHandle
-    from modules.terminal_manager import TerminalManager
+from modules.scoped_execution_policy import scoped_work_path, scoped_write_access
 
 
 class RunMixin:
@@ -113,98 +105,25 @@ class RunMixin:
         command: str,
         work_path: Path,
         timeout: int,
-        session_override: Optional["ContainerHandle"] = None,
         sandbox_write_access: bool = True,
         network_permission: Optional[str] = None,
     ) -> Dict:
         start_ts = time.time()
         try:
             process = None
-            exec_cmd = None
-            use_shell = True
             stderr_ignore_regexes: list = []
+            self._assert_host_execution_target()
             scope = current_execution_scope()
             work_path = scoped_work_path(self.project_path, str(work_path), scope)
             sandbox_write_access = scoped_write_access(sandbox_write_access, scope)
-            session = session_override or self.container_session
-
-            # 如果存在容器会话且模式为docker，则在容器内执行
-            if session and getattr(session, "mode", None) == "docker":
-                require_scoped_docker_support(scope)
-                container_name = getattr(session, "container_name", None)
-                mount_path = getattr(session, "mount_path", "/workspace") or "/workspace"
-                docker_bin = shutil.which("docker") or "docker"
-                try:
-                    relative = work_path.relative_to(self.project_path).as_posix()
-                except ValueError:
-                    relative = ""
-                container_workdir = mount_path.rstrip("/")
-                if relative:
-                    container_workdir = f"{container_workdir}/{relative}"
-                exec_cmd = [docker_bin, "exec"]
-                inner_cmd = ["/bin/bash", "-lc", command]
-                if scope and scope.workspace_only:
-                    from modules.docker_scoped_exec import wrap_scoped_docker_command
-                    inner_cmd = wrap_scoped_docker_command(mount_path, inner_cmd, scope)
-                if not sandbox_write_access:
-                    # 只读执行：非特权 uid（内核 DAC 强制只读，见 modules/docker_readonly_exec.py）
-                    exec_cmd += docker_readonly_exec_args()
-                    # Landlock 加固：可用时再以进程级只读域封住工作区写（777/o+w 绕 DAC 的洞）；
-                    # 部署/自检有阻塞 docker 调用，放线程池；失败自动降级纯 DAC。
-                    inner_cmd = await asyncio.to_thread(
-                        docker_readonly_wrap_inner, container_name, mount_path, inner_cmd, docker_bin
-                    )
-                exec_cmd += [
-                    "-e",
-                    "PATH=/opt/agent-venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-                    "-e",
-                    "VIRTUAL_ENV=/opt/agent-venv",
-                    "-w",
-                    container_workdir,
-                    container_name,
-                    *inner_cmd,
-                ]
-                use_shell = False
 
             # 统一环境，确保 Python 输出无缓冲
             env = os.environ.copy()
             env.setdefault("PYTHONUNBUFFERED", "1")
 
-            if use_shell:
-                use_host_sandbox = (scope.execution_mode if scope else self.host_execution_mode) != "direct"
-                if use_host_sandbox and host_sandbox_enabled():
-                    if sandbox_write_access:
-                        plan = build_host_sandbox_plan(
-                            command, work_path, env, network_permission=network_permission,
-                            workspace_root=self.project_path,
-                        )
-                    else:
-                        plan = build_host_sandbox_readonly_plan(
-                            command, work_path, env, network_permission=network_permission,
-                            workspace_root=self.project_path,
-                        )
-                    cmd_args, pass_fds, seccomp_fd = self._materialize_seccomp_fd(
-                        plan.command,
-                        plan.seccomp_bpf_path,
-                    )
-                    stderr_ignore_regexes = list(getattr(plan, "stderr_ignore_regexes", None) or [])
-                    try:
-                        process = await asyncio.create_subprocess_exec(
-                            *cmd_args,
-                            stdout=asyncio.subprocess.PIPE,
-                            stderr=asyncio.subprocess.PIPE,
-                            cwd=plan.cwd,
-                            env=plan.env,
-                            start_new_session=True,
-                            pass_fds=pass_fds,
-                        )
-                    finally:
-                        if seccomp_fd is not None:
-                            try:
-                                os.close(seccomp_fd)
-                            except OSError:
-                                pass
-                elif use_host_sandbox:
+            use_host_sandbox = (scope.execution_mode if scope else self.host_execution_mode) != "direct"
+            if use_host_sandbox:
+                if not host_sandbox_enabled():
                     return {
                         "success": False,
                         "status": "error",
@@ -214,21 +133,44 @@ class RunMixin:
                         "timeout": timeout,
                         "elapsed_ms": int((time.time() - start_ts) * 1000)
                     }
+                if sandbox_write_access:
+                    plan = build_host_sandbox_plan(
+                        command, work_path, env, network_permission=network_permission,
+                        workspace_root=self.project_path,
+                    )
                 else:
-                    process = await asyncio.create_subprocess_shell(
-                        command,
+                    plan = build_host_sandbox_readonly_plan(
+                        command, work_path, env, network_permission=network_permission,
+                        workspace_root=self.project_path,
+                    )
+                cmd_args, pass_fds, seccomp_fd = self._materialize_seccomp_fd(
+                    plan.command,
+                    plan.seccomp_bpf_path,
+                )
+                stderr_ignore_regexes = list(getattr(plan, "stderr_ignore_regexes", None) or [])
+                try:
+                    process = await asyncio.create_subprocess_exec(
+                        *cmd_args,
                         stdout=asyncio.subprocess.PIPE,
                         stderr=asyncio.subprocess.PIPE,
-                        cwd=str(work_path),
-                        shell=True,
-                        env=env,
+                        cwd=plan.cwd,
+                        env=plan.env,
                         start_new_session=True,
+                        pass_fds=pass_fds,
                     )
+                finally:
+                    if seccomp_fd is not None:
+                        try:
+                            os.close(seccomp_fd)
+                        except OSError:
+                            pass
             else:
-                process = await asyncio.create_subprocess_exec(
-                    *exec_cmd,
+                process = await asyncio.create_subprocess_shell(
+                    command,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
+                    cwd=str(work_path),
+                    shell=True,
                     env=env,
                     start_new_session=True,
                 )
@@ -248,7 +190,7 @@ class RunMixin:
 
             stdout_task = asyncio.create_task(_read_stream(process.stdout, stdout_buf))
             stderr_task = asyncio.create_task(_read_stream(process.stderr, stderr_buf))
-            
+
             async def _finish_reader_tasks(force: bool = False) -> None:
                 """收口 reader 任务，避免因后台子进程持续占用管道而卡死。"""
                 join_timeout = 0.8 if force else 3.0
@@ -377,12 +319,12 @@ class RunMixin:
     ) -> Dict:
         """
         执行终端命令
-        
+
         Args:
             command: 要执行的命令
             working_dir: 工作目录
             timeout: 超时时间（秒）
-        
+
         Returns:
             执行结果字典
         """
@@ -394,10 +336,17 @@ class RunMixin:
                 "output": tr("terminal.timeout_missing"),
                 "return_code": -1
             }
-        # 尝试复用活动终端的容器（CLI 场景与 terminal_input 环境保持一致）
-        session_override = None
-        if not self.container_session:
-            session_override = self._resolve_active_container_session()
+        # Host-only：任何外部直接写入的 Docker 会话句柄都必须拒绝，不能回落 Host。
+        try:
+            self._assert_host_execution_target()
+        except ValueError as exc:
+            return {
+                "success": False,
+                "error": str(exc),
+                "status": "error",
+                "output": "",
+                "return_code": -1,
+            }
         # 验证命令
         valid, error = self._validate_command(command)
         if not valid:
@@ -407,7 +356,7 @@ class RunMixin:
                 "output": "",
                 "return_code": -1
             }
-        
+
         # 设置工作目录
         try:
             work_path = self._resolve_work_path(working_dir)
@@ -418,28 +367,20 @@ class RunMixin:
                 "output": "",
                 "return_code": -1
             }
-        
+
         # 默认10s，上限由 TERMINAL_COMMAND_TIMEOUT 控制
         timeout = self._clamp_timeout(timeout, default=10, max_limit=TERMINAL_COMMAND_TIMEOUT)
-        
+
         print(f"{OUTPUT_FORMATS['terminal']} 执行命令: {command}")
         print(f"{OUTPUT_FORMATS['info']} 工作目录: {work_path}")
 
         start_ts = time.time()
 
-        # 不变量（2026-09 核实）：container_session 恒非 None——TerminalOperator 唯一
-        # 构造点（core/main_terminal.py）总是传入 ensure_container() 的返回值；docker
-        # 模式下该函数要么返回有效句柄、要么直接抛异常，host 模式也返回 mode="host"
-        # 句柄。历史上此处曾有一条「无会话时经 ToolboxContainer 新建临时容器」的
-        # else 分支，在该架构下不可达，且新建容器缺 --memory-swap/--pids-limit 等
-        # 防护参数，已连同 modules/toolbox_container.py 一并删除。未来新增构造点时
-        # 必须维持同一不变量，严禁复活临时容器路径。
         try:
             result_payload = await self._run_command_subprocess(
                 command,
                 work_path,
                 timeout,
-                session_override=session_override,
                 sandbox_write_access=sandbox_write_access,
                 network_permission=network_permission,
             )
@@ -453,7 +394,7 @@ class RunMixin:
                 "timeout": timeout,
                 "elapsed_ms": int((time.time() - start_ts) * 1000)
             }
-        
+
         # 字符数检查
         if result_payload.get("success") and "output" in result_payload:
             char_count = len(result_payload["output"])
@@ -465,7 +406,7 @@ class RunMixin:
                     "limit": MAX_RUN_COMMAND_CHARS,
                     "command": command
                 }
-        
+
         result_payload.setdefault("status", "completed" if result_payload.get("success") else "error")
         result_payload["timeout"] = timeout
         result_payload["elapsed_ms"] = int((time.time() - start_ts) * 1000)

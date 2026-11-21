@@ -12,7 +12,7 @@ from flask import Blueprint, jsonify, request, send_file
 
 from modules.i18n import tr
 
-from .auth_helpers import api_login_required, resolve_admin_policy, get_current_user_record
+from .auth_helpers import api_login_required, resolve_admin_policy
 from .context import with_terminal, get_gui_manager
 from .utils_common import debug_log
 
@@ -22,7 +22,7 @@ files_bp = Blueprint("files", __name__)
 @api_login_required
 @with_terminal
 def get_files(terminal, workspace, username):
-    policy = resolve_admin_policy(get_current_user_record())
+    policy = resolve_admin_policy()
     if policy.get("ui_blocks", {}).get("collapse_workspace") or policy.get("ui_blocks", {}).get("block_file_manager"):
         return jsonify({"success": False, "error": tr("files.browse_disabled_admin")}), 403
     structure = terminal.context_manager.get_project_structure()
@@ -45,7 +45,7 @@ def _format_entry(entry) -> Dict[str, Any]:
 @api_login_required
 @with_terminal
 def gui_list_entries(terminal, workspace, username):
-    policy = resolve_admin_policy(get_current_user_record())
+    policy = resolve_admin_policy()
     if policy.get("ui_blocks", {}).get("block_file_manager"):
         return jsonify({"success": False, "error": tr("files.manage_disabled_admin")}), 403
     relative_path = request.args.get('path') or ""
@@ -206,7 +206,7 @@ def _scan_root_entries(project_path: Path) -> Tuple[List[Dict[str, Any]], List[D
 @with_terminal
 def search_project_files(terminal, workspace, username):
     """为 @文件 功能提供项目内文件/文件夹搜索（包含隐藏目录）。"""
-    policy = resolve_admin_policy(get_current_user_record())
+    policy = resolve_admin_policy()
     if policy.get("ui_blocks", {}).get("collapse_workspace") or policy.get("ui_blocks", {}).get("block_file_manager"):
         return jsonify({"success": False, "error": tr("files.browse_disabled_admin")}), 403
 

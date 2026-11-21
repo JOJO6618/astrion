@@ -12,16 +12,8 @@ import plistlib
 from pathlib import Path
 from flask import Blueprint, jsonify, request, send_file, session
 
-from server.auth_helpers import api_login_required, resolve_admin_policy
+from server.auth_helpers import api_login_required
 from server.context.data_decorators import with_workspace_data
-from server.state import (
-    PROJECT_STORAGE_CACHE,
-    PROJECT_STORAGE_CACHE_TTL_SECONDS,
-    PROJECT_MAX_STORAGE_MB,
-    container_manager,
-    user_manager,
-)
-from config import AGENT_VERSION, TERMINAL_SANDBOX_MODE
 from modules.host_workspace_manager import (
     create_host_workspace,
     delete_host_workspace,
@@ -32,7 +24,7 @@ from modules.host_workspace_manager import (
 )
 from utils.host_workspace_debug import write_host_workspace_debug
 from server.utils_common import log_conn_diag
-import server.state as state
+
 def _run_project_git(project_path: Path, args: list[str]) -> tuple[bool, str]:
     git_bin = shutil.which("git")
     if not git_bin:

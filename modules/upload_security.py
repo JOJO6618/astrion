@@ -28,7 +28,7 @@ from modules.i18n import tr
 from utils.logger import setup_logger
 
 if TYPE_CHECKING:
-    from modules.user_manager import UserWorkspace
+    from modules.workspace import UserWorkspace
     from werkzeug.datastructures import FileStorage
 
 

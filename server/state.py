@@ -6,26 +6,19 @@ from collections import defaultdict, deque
 from pathlib import Path
 from typing import Dict, Any, Optional
 
-from config import LOGS_DIR, PROJECT_MAX_STORAGE_BYTES, PROJECT_MAX_STORAGE_MB, WEB_SERVER_PORT
+from config import PROJECT_MAX_STORAGE_BYTES, PROJECT_MAX_STORAGE_MB, WEB_SERVER_PORT
 from core.web_terminal import WebTerminal
 from modules.custom_tool_registry import CustomToolRegistry
 from modules.mcp_server_registry import MCPServerRegistry
 from modules.mcp_client_manager import MCPClientManager
-from modules.usage_tracker import UsageTracker
-from modules.user_container_manager import UserContainerManager
-from modules.user_manager import UserManager
-from modules.api_user_manager import ApiUserManager
 from modules.tool_approval_manager import ToolApprovalManager
 from modules.user_question_manager import UserQuestionManager
 from modules.plan_approval_manager import PlanApprovalManager
 
 # 全局实例
-user_manager = UserManager()
-api_user_manager = ApiUserManager()
 custom_tool_registry = CustomToolRegistry()
 mcp_server_registry = MCPServerRegistry()
 mcp_client_manager = MCPClientManager(mcp_server_registry)
-container_manager = UserContainerManager()
 user_terminals: Dict[str, WebTerminal] = {}
 terminal_rooms: Dict[str, set] = {}
 connection_users: Dict[str, str] = {}
@@ -48,7 +41,6 @@ MONITOR_SNAPSHOT_CHAR_LIMIT = 60000
 MONITOR_MEMORY_ENTRY_LIMIT = 256
 RATE_LIMIT_BUCKETS: Dict[str, deque] = defaultdict(deque)
 FAILURE_TRACKERS: Dict[str, Dict[str, float]] = {}
-usage_trackers: Dict[str, UsageTracker] = {}
 active_login_nonces: Dict[str, set] = defaultdict(set)
 
 MONITOR_SNAPSHOT_CACHE: Dict[str, Dict[str, Any]] = {}
@@ -65,16 +57,11 @@ DEFAULT_PORT = WEB_SERVER_PORT
 CSRF_HEADER_NAME = "X-CSRF-Token"
 CSRF_SESSION_KEY = "_csrf_token"
 CSRF_SAFE_METHODS = {"GET", "HEAD", "OPTIONS", "TRACE"}
-CSRF_PROTECTED_PATHS = {"/login", "/register", "/logout", "/host-login"}
+CSRF_PROTECTED_PATHS = {"/logout", "/host-login"}
 CSRF_PROTECTED_PREFIXES = ("/api/",)
 CSRF_EXEMPT_PATHS = {"/api/csrf-token"}
 FAILED_LOGIN_LIMIT = 5
 FAILED_LOGIN_LOCK_SECONDS = 300
-USER_IDLE_TIMEOUT_SECONDS = int(os.environ.get("USER_IDLE_TIMEOUT_SECONDS", "900"))
-LAST_ACTIVE_FILE = Path(LOGS_DIR).expanduser().resolve() / "last_active.json"
-_last_active_lock = threading.Lock()
-_last_active_cache: Dict[str, float] = {}
-_idle_reaper_started = False
 TITLE_PROMPT_PATH = Path(__file__).resolve().parent.parent / "prompts" / "title_generation_prompt.txt"
 
 # 项目存储限制常量也会被使用
@@ -82,12 +69,9 @@ PROJECT_MAX_STORAGE_BYTES = PROJECT_MAX_STORAGE_BYTES
 PROJECT_MAX_STORAGE_MB = PROJECT_MAX_STORAGE_MB
 
 __all__ = [
-    "user_manager",
-    "api_user_manager",
     "custom_tool_registry",
     "mcp_server_registry",
     "mcp_client_manager",
-    "container_manager",
     "user_terminals",
     "terminal_rooms",
     "connection_users",
@@ -102,7 +86,6 @@ __all__ = [
     "MONITOR_MEMORY_ENTRY_LIMIT",
     "RATE_LIMIT_BUCKETS",
     "FAILURE_TRACKERS",
-    "usage_trackers",
     "active_login_nonces",
     "tool_approval_manager",
     "user_question_manager",
@@ -120,11 +103,6 @@ __all__ = [
     "CSRF_EXEMPT_PATHS",
     "FAILED_LOGIN_LIMIT",
     "FAILED_LOGIN_LOCK_SECONDS",
-    "USER_IDLE_TIMEOUT_SECONDS",
-    "LAST_ACTIVE_FILE",
-    "_last_active_lock",
-    "_last_active_cache",
-    "_idle_reaper_started",
     "TITLE_PROMPT_PATH",
     "PROJECT_MAX_STORAGE_BYTES",
     "PROJECT_MAX_STORAGE_MB",
@@ -134,39 +112,7 @@ __all__ = [
     "get_stop_flag",
     "set_stop_flag",
     "clear_stop_flag",
-    "get_last_active_ts",
 ]
-
-
-def get_last_active_ts(username: str, fallback: Optional[float] = None) -> Optional[float]:
-    """
-    返回最近活跃时间，优先使用缓存；当容器句柄中的时间更新、更晚时，自动刷新缓存。
-    这样避免“缓存过旧导致刚触碰的容器被立即回收”的问题。
-    """
-    fallback_val: Optional[float]
-    try:
-        fallback_val = float(fallback) if fallback is not None else None
-    except (TypeError, ValueError):
-        fallback_val = None
-
-    with _last_active_lock:
-        cached = _last_active_cache.get(username)
-        try:
-            cached_val = float(cached) if cached is not None else None
-        except (TypeError, ValueError):
-            cached_val = None
-
-        # 若没有缓存，或句柄时间更新、更晚，则刷新缓存
-        if cached_val is None:
-            if fallback_val is not None:
-                _last_active_cache[username] = fallback_val
-            return fallback_val
-
-        if fallback_val is not None and fallback_val > cached_val:
-            _last_active_cache[username] = fallback_val
-            return fallback_val
-    
-        return cached_val
 
 
 # ====== 停止标志辅助 ======

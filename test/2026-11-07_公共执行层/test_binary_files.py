@@ -47,11 +47,9 @@ os.environ.pop("ASTRION_TRUSTED_PROXIES", None)
 
 atexit.register(lambda: shutil.rmtree(_TEST_HOME, ignore_errors=True))
 
-from modules.container_file_proxy import CONTAINER_FILE_SCRIPT  # noqa: E402
 from modules.execution_plane.files import LocalFileSystem  # noqa: E402
 from modules.execution_scope import ExecutionScope, bind_execution_scope  # noqa: E402
 from modules.file_manager import FileManager  # noqa: E402
-from modules.user_container_manager import ContainerHandle  # noqa: E402
 
 # 导入完成后恢复 env，避免同进程 discover 时污染 test_local 的 fresh-interpreter 断言。
 for _key, _value in _ENV_BEFORE.items():
@@ -59,22 +57,6 @@ for _key, _value in _ENV_BEFORE.items():
         os.environ.pop(_key, None)
     else:
         os.environ[_key] = _value
-
-
-def _run_container_action(root: Path, action: str, payload: dict) -> dict:
-    request = {"action": action, "root": str(root), "payload": payload}
-    completed = subprocess.run(
-        [sys.executable, "-I", "-S", "-c", CONTAINER_FILE_SCRIPT],
-        input=json.dumps(request, ensure_ascii=False),
-        text=True,
-        capture_output=True,
-        timeout=60,
-    )
-    if completed.returncode != 0:
-        raise AssertionError(
-            f"container script rc={completed.returncode}: {completed.stderr}"
-        )
-    return json.loads((completed.stdout or "").strip())
 
 
 class HostBinaryWriteTest(unittest.TestCase):
@@ -145,104 +127,6 @@ class HostBinaryWriteTest(unittest.TestCase):
             result = self.fs.write_binary("alias.bin", b"overwrite")
         self.assertFalse(result["success"], result)
         self.assertEqual(original.read_bytes(), b"keep")
-
-
-class ContainerBinaryWriteTest(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls) -> None:
-        cls.root = Path(tempfile.mkdtemp(prefix="astrion_bin_container_")).resolve()
-        cls.outside = Path(
-            tempfile.mkdtemp(
-                prefix="astrion_bin_container_out_", dir=Path(__file__).resolve().parent
-            )
-        ).resolve()
-
-    @classmethod
-    def tearDownClass(cls) -> None:
-        shutil.rmtree(cls.root, ignore_errors=True)
-        shutil.rmtree(cls.outside, ignore_errors=True)
-
-    def action(self, name: str, payload: dict) -> dict:
-        return _run_container_action(self.root, name, payload)
-
-    def test_roundtrip_exact_bytes(self) -> None:
-        data = b"\x00\xff\xfe\x80container\r\n"
-        result = self.action(
-            "write_binary",
-            {"path": "sub/blob.bin", "b64": base64.b64encode(data).decode("ascii")},
-        )
-        self.assertTrue(result["success"], result)
-        self.assertEqual(result["size"], len(data))
-        read = self.action("read_binary", {"path": "sub/blob.bin"})
-        self.assertTrue(read["success"], read)
-        self.assertEqual(base64.b64decode(read["b64"]), data)
-
-    def test_rejects_hardlink_without_truncating(self) -> None:
-        original = self.root / "hard.bin"
-        original.write_bytes(b"keep")
-        alias = self.root / "hard-alias.bin"
-        os.link(original, alias)
-        result = self.action(
-            "write_binary",
-            {"path": "hard-alias.bin", "b64": base64.b64encode(b"overwrite").decode()},
-        )
-        self.assertFalse(result["success"], result)
-        self.assertEqual(original.read_bytes(), b"keep")
-
-    def test_rejects_invalid_base64_and_escape_path(self) -> None:
-        bad = self.action("write_binary", {"path": "bad.bin", "b64": "%%%"})
-        self.assertFalse(bad["success"], bad)
-        self.assertFalse((self.root / "bad.bin").exists())
-
-        escape = self.action(
-            "write_binary",
-            {"path": "../outside.bin", "b64": base64.b64encode(b"x").decode()},
-        )
-        self.assertFalse(escape["success"], escape)
-        self.assertFalse((self.outside / "outside.bin").exists())
-
-
-class ContainerModeAdapterBinaryTest(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls) -> None:
-        cls.host_root = Path(tempfile.mkdtemp(prefix="astrion_bin_docker_host_")).resolve()
-        cls.container_root = Path(tempfile.mkdtemp(prefix="astrion_bin_docker_container_")).resolve()
-        cls.handle = ContainerHandle(
-            username="test-user",
-            mode="docker",
-            workspace_path=str(cls.host_root),
-            mount_path="/workspace",
-            container_name="fake-container-not-started",
-        )
-        cls.file_manager = FileManager(
-            str(cls.host_root),
-            container_session=cls.handle,
-            data_dir=str(cls.host_root / ".test_data"),
-        )
-        cls.fs = LocalFileSystem(cls.file_manager)
-
-    @classmethod
-    def tearDownClass(cls) -> None:
-        shutil.rmtree(cls.host_root, ignore_errors=True)
-        shutil.rmtree(cls.container_root, ignore_errors=True)
-
-    def test_write_binary_uses_container_action_not_host(self) -> None:
-        calls: list = []
-        original = self.file_manager._container_call
-
-        def call(action: str, payload: dict) -> dict:
-            calls.append((action, payload))
-            return _run_container_action(self.container_root, action, payload)
-
-        self.file_manager._container_call = call
-        self.addCleanup(lambda: setattr(self.file_manager, "_container_call", original))
-        data = b"\x00\xffcontainer-bytes"
-        result = self.fs.write_binary("probe.bin", data)
-        self.assertTrue(result["success"], result)
-        self.assertEqual(calls[0][0], "write_binary")
-        self.assertEqual(calls[0][1]["path"], "probe.bin")
-        self.assertEqual((self.container_root / "probe.bin").read_bytes(), data)
-        self.assertFalse((self.host_root / "probe.bin").exists())
 
 
 if __name__ == "__main__":

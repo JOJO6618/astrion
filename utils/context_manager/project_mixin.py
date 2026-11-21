@@ -18,12 +18,7 @@ try:
         MAX_CONTEXT_SIZE,
         DATA_DIR,
         PROMPTS_DIR,
-        TERMINAL_SANDBOX_MOUNT_PATH,
-        TERMINAL_SANDBOX_CPUS,
-        TERMINAL_SANDBOX_MEMORY,
         PROJECT_MAX_STORAGE_MB,
-        TERMINAL_SANDBOX_MODE,
-        LINUX_SAFETY,
     )
     from config.model_profiles import (
         get_model_prompt_replacements,
@@ -41,12 +36,7 @@ except ImportError:
         MAX_CONTEXT_SIZE,
         DATA_DIR,
         PROMPTS_DIR,
-        TERMINAL_SANDBOX_MOUNT_PATH,
-        TERMINAL_SANDBOX_CPUS,
-        TERMINAL_SANDBOX_MEMORY,
         PROJECT_MAX_STORAGE_MB,
-        TERMINAL_SANDBOX_MODE,
-        LINUX_SAFETY,
     )
     from config.model_profiles import (
         get_model_prompt_replacements,
@@ -443,22 +433,8 @@ class ProjectMixin:
         env = execution_environment(self)
         if env is None:
             return str(structure.get("path") or "")
-        container = env.get("container") if isinstance(env.get("container"), dict) else {}
-        container_root = str(container.get("mount_path") or "").strip()
         workspace = str(env.get("workspace_root") or env.get("cwd") or "").strip()
-        target = str(env.get("execution_target") or "").strip().lower()
-        if target == "docker" and container_root:
-            return container_root.rstrip("/") or "/"
-        return workspace or container_root or "（执行后端未上报工作区路径）"
-
-    def _container_root_label(self, structure: Dict, project_name: str, container_root: str) -> str:
-        """容器挂载根标签。"""
-        container_root = (container_root or "").strip().rstrip("/") or "/"
-        if container_root == "/":
-            return "/ (项目根)"
-        if container_root.endswith(project_name):
-            return f"{container_root} (项目根)"
-        return f"{container_root} (映射自 {project_name})"
+        return workspace or "（执行后端未上报工作区路径）"
 
     def _build_file_tree(self, structure: Dict) -> str:
         """构建文件树字符串（修复版：正确显示树形结构）"""
@@ -467,27 +443,9 @@ class ProjectMixin:
         if not structure.get("tree"):
             return f"📁 {self._file_tree_root_path(structure)}/\n(空项目)"
         
-        lines = []
-        project_name = Path(str(structure.get('path') or '')).name
-        # 绑定执行后端时，平台/路径/模式一律用后端事实（get_environment），
-        # 不用控制端配置或控制端 OS 冒充执行目标。
-        env = execution_environment(self)
-        env_target = str((env or {}).get("execution_target") or "").strip().lower()
-        if env is None:
-            if self._is_host_mode_without_safety():
-                root_label = f"{structure['path']} (项目根)"
-            else:
-                root_label = self._container_root_label(
-                    structure, project_name, self.container_mount_path or "/workspace"
-                )
-        elif env_target != "docker":
-            root_label = f"{self._file_tree_root_path(structure)} (项目根)"
-        else:
-            root_label = self._container_root_label(
-                structure, project_name, self._file_tree_root_path(structure)
-            )
-        lines.append(f"{root_label}/")
-        
+        root_path = self._file_tree_root_path(structure)
+        lines = [f"{root_path} (项目根)/"]
+
         ROOT_FOLDER_CHILD_LIMIT = 20
 
         def count_descendants(item: Dict) -> int:

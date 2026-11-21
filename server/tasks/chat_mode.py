@@ -113,9 +113,6 @@ class ChatModeTaskMixin:
                                    username=record.username, role=record.principal.role)
             terminal.task_id = record.task_id
             terminal.is_stop_requested = lambda: record.stop_requested
-            if not record.principal.host_mode and not record.principal.is_api_user:
-                from modules.chat_mode.quota import tracker_for
-                terminal.usage_tracker = tracker_for(scope.root, record.principal.role)
             terminal.context_manager.set_web_terminal_callback(sender)
             terminal._display_trigger_message_id = record.trigger_message_id
             with VIEW_LOCK:

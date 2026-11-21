@@ -448,11 +448,6 @@
   padding-top: 44px;
 }
 
-.chat-container--mobile.chat-container--app-shell {
-  --chat-scrollbar-width: 0px !important;
-  --chat-message-rail-width: var(--chat-rail-width) !important;
-}
-
 @media (max-width: 768px) {
   .chat-container {
     --chat-rail-fluid: 100%;

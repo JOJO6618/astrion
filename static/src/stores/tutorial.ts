@@ -6,7 +6,6 @@ export type TutorialPlacement = 'auto' | 'top' | 'right' | 'bottom' | 'left' | '
 export type TutorialStepMode = 'info' | 'must_click';
 export type TutorialCondition =
   | 'model_supports_media'
-  | 'is_app_shell'
   | 'is_mobile_viewport'
   | 'not_mobile_viewport';
 
@@ -503,25 +502,6 @@ const TUTORIAL_STEP_DEFS: TutorialStepDef[] = [
     placement: 'right'
   },
   {
-    id: 'tab-app-update',
-    titleKey: 'tutorial.tabAppUpdateTitle',
-    descriptionKey: 'tutorial.tabAppUpdateDesc',
-    target: '[data-tutorial="personal-tab-app-update"]',
-    mode: 'info',
-    autoClick: true,
-    placement: 'right',
-    condition: 'is_app_shell'
-  },
-  {
-    id: 'page-app-update',
-    titleKey: 'tutorial.pageAppUpdateTitle',
-    descriptionKey: 'tutorial.pageAppUpdateDesc',
-    target: '[data-tutorial="personal-content-shell"]',
-    mode: 'info',
-    placement: 'right',
-    condition: 'is_app_shell'
-  },
-  {
     id: 'tab-behavior',
     titleKey: 'tutorial.tabBehaviorTitle',
     descriptionKey: 'tutorial.tabBehaviorDesc',
@@ -629,13 +609,6 @@ interface TutorialState {
   activeSelector: string | null;
 }
 
-const detectAppShell = () => {
-  if (typeof window === 'undefined') return false;
-  const params = new URLSearchParams(window.location.search);
-  if (params.has('app_shell')) return true;
-  return Boolean((window as any)?.AndroidThemeBridge);
-};
-
 const detectMobileViewport = () => {
   if (typeof window === 'undefined') return false;
   return window.innerWidth <= 768;
@@ -643,9 +616,6 @@ const detectMobileViewport = () => {
 
 const shouldIncludeStepByCondition = (step: TutorialStepDef): boolean => {
   if (!step.condition) return true;
-  if (step.condition === 'is_app_shell') {
-    return detectAppShell();
-  }
   if (step.condition === 'model_supports_media') {
     const modelStore = useModelStore();
     const current = modelStore.currentModel as any;

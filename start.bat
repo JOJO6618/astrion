@@ -5,7 +5,7 @@ rem   2. 确保 Node 依赖就绪（缺失才安装）
 rem   3. 若没有 .env（首次启动），自动运行配置向导
 rem   4. 启动 python -m server.app
 rem
-rem 端口/监听地址/模式等由 .env 决定（见 config/server.py、config/paths.py）。
+rem 端口/监听地址等由 .env 决定（见 config/server.py、config/paths.py；主仓固定 host 模式）。
 rem 透传的命令行参数会传给 server.app（如 --port / --path / --thinking-mode）。
 rem
 rem 用法：

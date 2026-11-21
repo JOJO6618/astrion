@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import { useCommandBlockingStore } from '@/stores/commandBlocking';
-import { useSettingsStore } from '@/stores/settings';
 import UiDialog from '@/components/ui/UiDialog.vue';
 import UiDialogButton from '@/components/ui/UiDialogButton.vue';
 
@@ -10,7 +9,6 @@ defineOptions({ name: 'CommandBlockingDialog' });
 // 状态全部由 store 驱动：窗口打开/草稿/加载/保存/错误，App.vue 统一挂载，
 // 设置路由（settingsRoute）与聊天界面共用同一实例。
 const store = useCommandBlockingStore();
-const settingsStore = useSettingsStore();
 
 /** 本次打开后追加的推荐规则条数（只用于框下提示） */
 const appended = ref(0);
@@ -38,12 +36,9 @@ function applyRecommended() {
   >
     <p class="ui-dialog-text">
       {{
-        $t(
-          settingsStore.isHostMode ? 'commandBlocking.summary' : 'commandBlocking.summaryProject',
-          {
-            status: store.enabled ? $t('commandBlocking.statusOn') : $t('commandBlocking.statusOff')
-          }
-        )
+        $t('commandBlocking.summary', {
+          status: store.enabled ? $t('commandBlocking.statusOn') : $t('commandBlocking.statusOff')
+        })
       }}
     </p>
 

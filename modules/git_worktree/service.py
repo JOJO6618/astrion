@@ -37,10 +37,6 @@ class Worktrees:
 
     def command_path(self, path: str | Path) -> str:
         path = Path(path)
-        session = getattr(self.owner, 'container_session', None)
-        if getattr(session, 'mode', None) == 'docker':
-            from config import TERMINAL_SANDBOX_MOUNT_PATH
-            return str(getattr(session, 'mount_path', None) or TERMINAL_SANDBOX_MOUNT_PATH or '/workspace').rstrip('/') + '/' + path.relative_to(self.workspace).as_posix()
         if os.name == 'nt' and self.backend.execution_mode != 'direct':
             from modules.host_sandbox_runner import _win_path_to_wsl
             return _win_path_to_wsl(path)
@@ -62,15 +58,6 @@ class Worktrees:
         return str(result['stdout'])
 
     def host_path(self, raw: str) -> Path:
-        session = getattr(self.owner, 'container_session', None)
-        if getattr(session, 'mode', None) == 'docker':
-            from config import TERMINAL_SANDBOX_MOUNT_PATH
-            mount = str(getattr(session, 'mount_path', None) or TERMINAL_SANDBOX_MOUNT_PATH or '/workspace').rstrip('/')
-            if raw == mount:
-                return self.workspace
-            if not raw.startswith(mount + '/'):
-                raise WorktreeError('Git 工作树不属于当前工作区。')
-            return self.workspace / raw[len(mount) + 1:]
         if os.name == 'nt' and self.backend.execution_mode != 'direct':
             match = re.fullmatch(r'/mnt/([A-Za-z])(?:/(.*))?', raw)
             if not match:

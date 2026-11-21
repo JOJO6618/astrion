@@ -19,12 +19,7 @@ try:
         MAX_CONTEXT_SIZE,
         DATA_DIR,
         PROMPTS_DIR,
-        TERMINAL_SANDBOX_MOUNT_PATH,
-        TERMINAL_SANDBOX_CPUS,
-        TERMINAL_SANDBOX_MEMORY,
         PROJECT_MAX_STORAGE_MB,
-        TERMINAL_SANDBOX_MODE,
-        LINUX_SAFETY,
     )
     from config.model_profiles import (
         get_model_prompt_replacements,
@@ -42,12 +37,7 @@ except ImportError:
         MAX_CONTEXT_SIZE,
         DATA_DIR,
         PROMPTS_DIR,
-        TERMINAL_SANDBOX_MOUNT_PATH,
-        TERMINAL_SANDBOX_CPUS,
-        TERMINAL_SANDBOX_MEMORY,
         PROJECT_MAX_STORAGE_MB,
-        TERMINAL_SANDBOX_MODE,
-        LINUX_SAFETY,
     )
     from config.model_profiles import (
         get_model_prompt_replacements,
@@ -280,74 +270,16 @@ class RuntimeMixin:
         return "\n".join(lines)
 
     def _resolve_runtime_display(self) -> Dict[str, str]:
-        """统一执行环境显示：runtime_environment / resource_limit / container_path。
-
-        - 无绑定后端：完全保留既有本地表现（含 ``_host_runtime_cache`` 复用）；
-        - 本地后端：目标就是本机，宿主机文本继续走缓存；
-        - 非本地（含 docker）后端：平台/路径/模式只用 ``get_environment``，
-          缺失就写“未知”，不拿控制端 OS/路径充当目标。
-        """
+        """Build the runtime summary using the selected execution backend."""
         from utils.context_manager.fs_access import execution_environment
 
         env = execution_environment(self)
-        container_path = self.container_mount_path or "/workspace"
-
-        if env is None:
-            if self._is_host_mode_without_safety() and getattr(self, "project_path", None) is not None:
-                return {
-                    "runtime_environment": self._build_host_runtime_environment(),
-                    "resource_limit": "宿主机模式无限制",
-                    "container_path": container_path,
-                }
-            return {
-                "runtime_environment": (
-                    f"隔离容器中（挂载目录 {container_path}），宿主机路径已隐藏"
-                ),
-                "resource_limit": (
-                    f"CPU {self.container_cpu_limit} 核，内存 {self.container_memory_limit}，"
-                    f"磁盘配额 {self.project_storage_limit}"
-                ),
-                "container_path": container_path,
-            }
-
-        container = env.get("container") if isinstance(env.get("container"), dict) else {}
-        reported_container_path = str(
-            container.get("mount_path") or env.get("cwd") or ""
-        ).strip()
-        if reported_container_path:
-            container_path = reported_container_path
-
-        target = str(env.get("execution_target") or "").strip().lower()
-        is_local = bool(env.get("is_local"))
-        backend_name = str(env.get("backend") or "").strip()
-
-        if target == "docker":
-            os_text = str(container.get("os") or "").strip()
-            if not os_text or os_text.lower() in {"unknown", "none"}:
-                os_text = "未知（容器内系统未探测）"
-            label = f"隔离容器中（挂载目录 {container_path}）"
-            if not is_local and backend_name:
-                label = f"隔离容器中（挂载目录 {container_path}，后端 {backend_name}）"
-            return {
-                "runtime_environment": f"{label}\n  OS: {os_text}",
-                "resource_limit": (
-                    f"CPU {self.container_cpu_limit} 核，内存 {self.container_memory_limit}，"
-                    f"磁盘配额 {self.project_storage_limit}"
-                    if is_local
-                    else "由执行后端决定（未上报资源配额）"
-                ),
-                "container_path": container_path,
-            }
-
-        if is_local:
+        if env is None or env.get("is_local"):
             return {
                 "runtime_environment": self._build_host_runtime_environment(),
                 "resource_limit": "宿主机模式无限制",
-                "container_path": container_path,
             }
-
         return {
             "runtime_environment": self._build_remote_runtime_environment(env),
             "resource_limit": "由执行后端决定（未上报资源配额）",
-            "container_path": container_path,
         }

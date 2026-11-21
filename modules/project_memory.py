@@ -1,4 +1,4 @@
-"""Storage identity and shared lookup for indexed workspace memories."""
+"""Storage identity and shared lookup for indexed Host workspace memories."""
 from __future__ import annotations
 
 import os
@@ -10,15 +10,15 @@ from uuid import uuid4
 
 from config import WORKSPACE_MEMORY_DIRNAME
 from modules.execution_plane.access import get_execution_backend, is_local_backend
+from modules.execution_scope import uses_docker
 from modules.workspace_memory import location, prepare_directory
 
 NOTICE_NAME = "00_READ_ME_项目记忆已迁移.md"
 TOPICS_DIRNAME = "topics"
-_DOCKER_ACTIVATED = ".project-memory-topics-external"
 
 
-def topic_directory(project_path: str, data_dir: str, *, docker: bool = False) -> Path:
-    return location(project_path, data_dir, docker=docker).directory / TOPICS_DIRNAME
+def topic_directory(project_path: str, data_dir: str) -> Path:
+    return location(project_path, data_dir).directory / TOPICS_DIRNAME
 
 
 def memory_filename(name: str) -> bool:
@@ -38,8 +38,8 @@ def legacy_files(project: Path) -> list[Path]:
             and not stat.S_ISDIR(entry.lstat().st_mode)]
 
 
-def prepare_topic_directory(project_path: str, data_dir: str, *, docker: bool = False) -> Path:
-    memory = location(project_path, data_dir, docker=docker)
+def prepare_topic_directory(project_path: str, data_dir: str) -> Path:
+    memory = location(project_path, data_dir)
     prepare_directory(memory)
     target = memory.directory / TOPICS_DIRNAME
     if target.is_symlink() or getattr(target, "is_junction", lambda: False)():
@@ -87,32 +87,12 @@ def publish_memory_file(path: Path, content: bytes | Callable[[BinaryIO], None],
         os.unlink(temporary)
 
 
-def activate_docker_topics(target: Path) -> None:
-    """Publish the selected storage location before removing any old files."""
-    from modules.file_manager.scoped_io import open_checked
-
-    for path in (target / ".gitignore", target.parent.parent / _DOCKER_ACTIVATED):
-        try:
-            publish_memory_file(path, b"*\n", mode=0o644)
-        except FileExistsError:
-            with open_checked(path) as stream:
-                if stream.read() != "*\n":
-                    raise PermissionError(f"项目记忆挂载标记无效：{path}")
-
-
-def docker_bind_directory(project_path: str, data_dir: str) -> Path | None:
-    """Keep the legacy view until all copies have been verified."""
-    target = topic_directory(project_path, data_dir, docker=True)
-    if not (target.parent.parent / _DOCKER_ACTIVATED).is_file() and legacy_files(Path(project_path)):
-        return None
-    target = prepare_topic_directory(project_path, data_dir, docker=True)
-    activate_docker_topics(target)
-    return target
-
-
 def _host_topic_location(owner) -> tuple[str, str] | None:
-    if not is_local_backend(owner) or getattr(getattr(owner, "container_session", None), "mode", None) == "docker":
+    if not is_local_backend(owner):
         return None
+    # A legacy container session is rejected rather than served the Host path.
+    if uses_docker(owner):
+        raise PermissionError("当前版本仅支持宿主机专题记忆，不能为容器会话解析目录")
     data_dir = getattr(owner, "data_dir", None)
     return (str(owner.project_path), str(data_dir)) if data_dir else None
 
@@ -136,14 +116,9 @@ def prepare_tool_write(owner) -> None:
 
 
 def scan_index(owner) -> list[dict]:
-    """Read through the bound filesystem, including a Docker bind over the old path."""
+    """Read the Host topic index through the bound filesystem."""
     files = get_execution_backend(owner).files
     directory = tool_directory(owner)
-    from modules.execution_plane.files import LocalFileSystem
-    if isinstance(files, LocalFileSystem):
-        result = files.container_project_memory_index(directory, NOTICE_NAME)
-        if result is not None:
-            return sorted(result.get("entries", []), key=lambda item: (-item["mtime"], item["file"]))
     listing = files.list_files(directory)
     if not listing.get("success"):
         return []

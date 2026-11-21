@@ -57,8 +57,7 @@
                 type="button"
                 class="git-change-file__open-btn"
                 :class="{ open: openMenuPath === file.path || appsLoadingPath === file.path }"
-                :disabled="!hostMode"
-                :title="hostMode ? $t('shell.openFileWithApp') : $t('shell.dockerModeUnavailable')"
+                :title="$t('shell.openFileWithApp')"
                 @click.stop.prevent="toggleOpenMenu(file.path)"
               >
                 <img

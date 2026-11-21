@@ -16,9 +16,18 @@ schedules_bp = Blueprint('schedules', __name__)
 logger = logging.getLogger(__name__)
 
 
-def principal():
+def require_host_identity():
+    """只接受已认证的 Host 身份；历史普通用户／API 用户主体一律拒绝。"""
     from server.context.workspace import request_identity
-    return {'username': get_current_username(), **asdict(request_identity())}
+    identity = request_identity()
+    if not identity.host_mode or get_current_username() != "host":
+        raise PermissionError("Host identity required")
+    return identity
+
+
+def principal():
+    identity = require_host_identity()
+    return {'username': get_current_username(), **asdict(identity)}
 
 
 def payload():
@@ -34,6 +43,7 @@ def endpoint(function):
     @wraps(function)
     def guarded(*args, **kwargs):
         try:
+            require_host_identity()
             return jsonify({'success': True, 'data': function(*args, **kwargs)})
         except ConflictError as exc:
             return jsonify(success=False, error=str(exc)), 409
@@ -93,26 +103,20 @@ def validate():
 @schedules_bp.get('/api/schedules/options')
 @endpoint
 def options():
-    from server import state
-    from server.context.workspace import request_identity
     from config.model_profiles import get_registered_model_profiles
     from modules.admin_policy_manager import get_effective_policy
+    from modules.host_workspace_manager import load_host_workspace_catalog
     from zoneinfo import available_timezones
     p = principal()
-    if p['host_mode']:
-        from modules.host_workspace_manager import load_host_workspace_catalog
-        workspaces = [{'id': item['workspace_id'], 'label': item.get('label') or item['workspace_id']} for item in load_host_workspace_catalog().get('workspaces', [])]
-    elif p['is_api_user']:
-        workspaces = [{'id': key, 'label': key} for key in state.api_user_manager.list_workspaces(p['username'])]
-    else:
-        workspaces = [{'id': key, 'label': value.get('label') or key} for key, value in state.user_manager.list_user_workspaces(p['username'], prepare=False).items()]
-    user = None if p['host_mode'] or p['is_api_user'] else state.user_manager.get_user(p['username'])
-    disabled = set(get_effective_policy(p['username'], request_identity().role, getattr(user, 'invite_code', None)).get('disabled_models') or [])
+    workspaces = [{'id': item['workspace_id'], 'label': item.get('label') or item['workspace_id']}
+                  for item in load_host_workspace_catalog().get('workspaces', [])]
+    # Host 没有普通用户记录或邀请码，策略按其显式 Host 角色解析。
+    disabled = set(get_effective_policy(p['username'], p['role'], None).get('disabled_models') or [])
     models = [{'value': key, 'label': value.get('display_name') or value.get('name') or key,
                'thinking': bool(value.get('supports_thinking')), 'reasoning': bool(value.get('supports_reasoning_effort'))}
               for key, value in get_registered_model_profiles().items() if key not in disabled]
     return {'workspaces': workspaces, 'models': models, 'timezones': sorted(available_timezones()),
-            'host_admin': p['host_mode'] and request_identity().role == 'admin'}
+            'host_admin': p['role'] == 'admin'}
 
 
 @schedules_bp.get('/api/schedules/<schedule_id>')

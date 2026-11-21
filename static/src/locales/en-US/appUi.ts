@@ -160,7 +160,6 @@ export default {
     'Click the "Workspace" button in the sidebar to create your first workspace',
   statusApiRequestFailed: 'Status API request failed: {status}',
   hostModeFileTreeUnavailable: 'The file tree is unavailable in host mode',
-  dockerModeFilesChanged: 'In Docker mode the files area now shows the project list',
 
   // ── Upload (entries.ts / picker.ts / process.ts / quick.ts) ──
   uploadingTitle: 'Uploading',

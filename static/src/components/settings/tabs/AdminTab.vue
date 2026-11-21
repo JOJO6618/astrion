@@ -1,60 +1,24 @@
 <script setup lang="ts">
 import { inject } from 'vue';
-import { useSettingsStore } from '@/stores/settings';
-import { useProjectMemoryMigrationStore } from '@/stores/projectMemoryMigration';
 
 defineOptions({ name: 'AdminTab' });
-
-const settings = useSettingsStore();
-const migration = useProjectMemoryMigrationStore();
 
 /**
  * 共享上下文由 usePersonalizationContext（PersonalizationDrawer / SettingsShell 各自 provide 同一份）注入。
  * 解构出的名称与主文件 script 顶层绑定一致，模板可直接引用。
  */
 const ctx = inject<Record<string, any>>('personalizationDrawer')!;
-const { openAdminPanel, openApiAdmin, openCustomTools, openMcpConfig, showMcpConfigEntry } = ctx;
+const { openCustomTools, openMcpConfig, showMcpConfigEntry } = ctx;
 </script>
 
 <template>
   <section class="stg-page admin-monitor-page">
-    <div
-      v-if="
-        settings.sessionStatusLoaded &&
-        !settings.sessionHostMode &&
-        settings.sessionRole === 'admin'
-      "
-      class="stg-card"
-    >
-      <div class="stg-action-row">
-        <button type="button" class="stg-secondary-button stg-row-title" @click="migration.show()">
-          {{ $t('settings.memoryMigration.dockerEntry') }}
-        </button>
-      </div>
-    </div>
-
     <div class="stg-card">
       <div class="stg-action-row" v-if="showMcpConfigEntry">
         <span class="stg-row-copy"
           ><span class="stg-row-title">{{ $t('personalization.mcpConfigTitle') }}</span
           ><span class="stg-row-desc">{{ $t('personalization.mcpConfigDesc') }}</span></span
         ><button type="button" class="stg-secondary-button" @click="openMcpConfig">
-          {{ $t('personalization.open') }}
-        </button>
-      </div>
-      <div class="stg-action-row">
-        <span class="stg-row-copy"
-          ><span class="stg-row-title">{{ $t('personalization.adminMonitorTitle') }}</span
-          ><span class="stg-row-desc">{{ $t('personalization.adminMonitorDesc') }}</span></span
-        ><button type="button" class="stg-secondary-button" @click="openAdminPanel">
-          {{ $t('personalization.open') }}
-        </button>
-      </div>
-      <div class="stg-action-row">
-        <span class="stg-row-copy"
-          ><span class="stg-row-title">{{ $t('personalization.apiAdminTitle') }}</span
-          ><span class="stg-row-desc">{{ $t('personalization.apiAdminDesc') }}</span></span
-        ><button type="button" class="stg-secondary-button" @click="openApiAdmin">
           {{ $t('personalization.open') }}
         </button>
       </div>

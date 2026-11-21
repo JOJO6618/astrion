@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from modules.execution_plane.access import get_execution_backend, is_local_backend
+from modules.execution_scope import uses_docker
 from modules.workspace_memory import (
     ENABLED_KEY, PROMPT_KEY, SNAPSHOT_KEY, content_version, location,
     prepare_directory, register_host_memory,
@@ -15,15 +16,16 @@ def owner_location(owner):
     # No controller filesystem fallback for a bound remote/fake executor.
     if not is_local_backend(owner):
         raise RuntimeError("当前执行后端尚不支持私有工作区记忆位置解析")
-    session = getattr(owner, "container_session", None)
-    docker = getattr(session, "mode", None) == "docker"
-    return location(str(owner.project_path), str(owner.data_dir), docker=docker)
+    # A legacy container session is rejected instead of being served the Host
+    # location: the container product owns its own memory layout.
+    if uses_docker(owner):
+        raise RuntimeError("当前版本仅支持宿主机工作区记忆，不能为容器会话解析记忆位置")
+    return location(str(owner.project_path), str(owner.data_dir))
 
 
 def read_snapshot(owner) -> dict:
     target = owner_location(owner)
-    if not target.docker:
-        register_host_memory(str(owner.project_path), str(owner.data_dir))
+    register_host_memory(str(owner.project_path), str(owner.data_dir))
     prepare_directory(target)
     backend = get_execution_backend(owner)
     info = backend.files.inspect_path(target.tool_path)

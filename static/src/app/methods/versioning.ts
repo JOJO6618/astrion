@@ -1,7 +1,6 @@
 // @ts-nocheck
 import { beginAuxiliaryRequest } from './auxiliaryOwnership';
 import { t } from '@/locales';
-import { persistWorkspaceMode } from '../state';
 import { workspaceScopedFetch as fetch } from './workspaceRequestScope';
 
 const normalizeTrackingMode = (value: any): 'workspace_and_conversation' | 'conversation_only' => {
@@ -27,8 +26,6 @@ export const versioningMethods = {
         return null;
       }
       const payload = data.data || {};
-      this.versioningHostMode = !!payload.host_mode;
-      persistWorkspaceMode(!!payload.host_mode);
       this.versioningEnabled = !!payload.enabled;
       this.versioningMode = 'overwrite';
       this.versioningRestoreMode = 'overwrite';

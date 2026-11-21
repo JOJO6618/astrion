@@ -4,10 +4,9 @@
 - 元数据（存在性/是否普通文件/后缀）走 `backend.files.inspect_path`，
   它先做 `_validate_path` + `_ensure_host_access` 再 stat，不存在越界 peek；
 - 内容走 `backend.files.read_binary`，沿用同一安全读取（no-follow 描述符、
-  容器代理、固定 scope 写根等既有语义）。
+  固定 scope 写根等既有语义）。
 
-本地 `exists()`/`resolve()` 一律不在这里使用；容器模式元数据接口未就绪时
-fail-closed 到「直接读二进制」，不回退宿主镜像 stat。
+本地 `exists()`/`resolve()` 一律不在这里使用；元数据接口返回失败时直接回填错误。
 """
 from __future__ import annotations
 
@@ -17,8 +16,6 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from modules.i18n import tr
-
-_METADATA_UNSUPPORTED = "metadata_unsupported_in_container"
 
 
 def _files_view(backend: Any, file_manager: Any) -> Any:
@@ -54,10 +51,7 @@ async def handle_read_mediafile(
         error = info.get("error") if isinstance(info, dict) else None
         return {"success": False, "error": error or tr("sub_agent_tools.invalid_path")}
 
-    container_metadata_unsupported = info.get("code") == _METADATA_UNSUPPORTED
-    if not container_metadata_unsupported and (
-        not info.get("exists") or not info.get("is_file")
-    ):
+    if not info.get("exists") or not info.get("is_file"):
         return {"success": False, "error": tr("sub_agent_tools.file_not_found", path=path)}
 
     metadata_path = info.get("path") or str(path)

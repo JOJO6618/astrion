@@ -13,10 +13,6 @@ try:
         READ_TOOL_MAX_CONTEXT_BEFORE, READ_TOOL_MAX_CONTEXT_AFTER,
         READ_TOOL_DEFAULT_MAX_MATCHES, READ_TOOL_MAX_MATCHES,
         READ_TOOL_MAX_FILE_SIZE,
-        TERMINAL_SANDBOX_MOUNT_PATH,
-        TERMINAL_SANDBOX_MODE,
-        TERMINAL_SANDBOX_CPUS,
-        TERMINAL_SANDBOX_MEMORY,
         PROJECT_MAX_STORAGE_MB,
         CUSTOM_TOOLS_ENABLED,
     )
@@ -33,10 +29,6 @@ except ImportError:
         READ_TOOL_MAX_CONTEXT_BEFORE, READ_TOOL_MAX_CONTEXT_AFTER,
         READ_TOOL_DEFAULT_MAX_MATCHES, READ_TOOL_MAX_MATCHES,
         READ_TOOL_MAX_FILE_SIZE,
-        TERMINAL_SANDBOX_MOUNT_PATH,
-        TERMINAL_SANDBOX_MODE,
-        TERMINAL_SANDBOX_CPUS,
-        TERMINAL_SANDBOX_MEMORY,
         PROJECT_MAX_STORAGE_MB,
         CUSTOM_TOOLS_ENABLED,
     )
@@ -66,7 +58,6 @@ from modules.custom_tool_executor import CustomToolExecutor
 from modules.mcp_server_registry import MCPServerRegistry, build_default_mcp_category
 
 
-from modules.container_monitor import collect_stats, inspect_state
 from core.tool_config import TOOL_CATEGORIES
 from utils.api_client import APIClient
 from utils.context_manager import ContextManager
@@ -170,7 +161,7 @@ class ToolsDefinitionTerminalToolsMixin:
                         "type": "function",
 	                "function": {
 	                    "name": "run_command",
-	                    "description": "执行一次性终端命令，适合查看文件信息（file/ls/stat/iconv 等）、转换编码或调用 CLI 工具。禁止启动交互式程序。必须提供 timeout。前台模式（run_in_background=false，默认）上限120秒，超时会打断；后台模式（run_in_background=true）上限3600秒，会先等待5秒返回已有输出并继续在后台运行，完成后由系统通知。后台模式会返回所有指令输出结果，禁止用于启动后台服务。完成已授权任务确需超出沙箱权限或使用宿主机原生工具链时，可设置 request_full_access=true，并填写非空 full_access_reason。申请前简短说明原因，然后直接发起工具申请，无需在聊天中重复询问。单次完全访问默认需要人工批准，自动审核模式下默认还须自动审核通过；自动审核或无限制模式下，用户开启允许自动审核通过单次完全访问请求后，审核智能体批准即可执行，无需人工批准。人工审批模式始终需要人工批准。仅本次命令脱离沙箱，不改变全局权限或执行环境。计划模式、只读模式及子智能体不可申请，Docker 不支持。已处于完全访问环境无需单次申请，但人工审批或自动审核模式下每条命令仍先审核再执行。Windows 沙箱使用 Linux bash，完全访问使用 Windows cmd.exe，须使用对应命令和路径。拒绝后不得通过换命令、换工具或重复申请规避决定。",
+	                    "description": "执行一次性终端命令，适合查看文件信息（file/ls/stat/iconv 等）、转换编码或调用 CLI 工具。禁止启动交互式程序。必须提供 timeout。前台模式（run_in_background=false，默认）上限120秒，超时会打断；后台模式（run_in_background=true）上限3600秒，会先等待5秒返回已有输出并继续在后台运行，完成后由系统通知。后台模式会返回所有指令输出结果，禁止用于启动后台服务。完成已授权任务确需超出沙箱权限或使用宿主机原生工具链时，可设置 request_full_access=true，并填写非空 full_access_reason。申请前简短说明原因，然后直接发起工具申请，无需在聊天中重复询问。单次完全访问默认需要人工批准，自动审核模式下默认还须自动审核通过；自动审核或无限制模式下，用户开启允许自动审核通过单次完全访问请求后，审核智能体批准即可执行，无需人工批准。人工审批模式始终需要人工批准。仅本次命令脱离沙箱，不改变全局权限或执行环境。计划模式、只读模式及子智能体不可申请。已处于完全访问环境无需单次申请，但人工审批或自动审核模式下每条命令仍先审核再执行。Windows 沙箱使用 Linux bash，完全访问使用 Windows cmd.exe，须使用对应命令和路径。拒绝后不得通过换命令、换工具或重复申请规避决定。",
 	                    "parameters": {
 	                        "type": "object",
 	                        "properties": self._inject_intent({

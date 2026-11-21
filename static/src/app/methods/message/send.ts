@@ -124,12 +124,6 @@ export const sendMethods = {
       return false;
     }
 
-    const quotaType = this.thinkingMode ? 'thinking' : 'fast';
-    if (this.isQuotaExceeded(quotaType)) {
-      this.showQuotaToast({ type: quotaType });
-      return false;
-    }
-
     const currentModel = useModelStore().currentModel;
     if (!currentModel) {
       this.uiPushToast({ message: t('appCore.modelNotSelected'), type: 'error' });
@@ -144,7 +138,7 @@ export const sendMethods = {
       return false;
     }
 
-    if (hasVideos && !currentModel?.supportsVideo) {
+    if (hasVideos && !currentModel.supportsVideo) {
       this.uiPushToast({
         title: t('appMessages.modelNoVideoTitle'),
         message: t('appMessages.modelNoVideoMessage'),
@@ -197,7 +191,6 @@ export const sendMethods = {
       try {
         const personalizationStore = usePersonalizationStore();
         const shouldShowBackupToast =
-          this.versioningHostMode &&
           personalizationStore.form.versioning_enabled_by_default &&
           personalizationStore.form.versioning_backup_mode === 'full';
         if (shouldShowBackupToast) {

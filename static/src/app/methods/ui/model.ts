@@ -78,7 +78,7 @@ export const modelMethods = {
     const owns = beginAuxiliaryRequest(this, 'model');
     try {
       let data: any = {};
-      if (this.versioningHostMode && !this.currentHostWorkspaceId) {
+      if (!this.currentHostWorkspaceId) {
         // 空态（尚未创建/选择工作区）：/api/model 依赖工作区终端，会返回 no_workspace。
         // 但「配模型」与「建工作区」没有逻辑先后——此时改写个性化 default_model，
         // 首个工作区/对话创建时按个性化默认模型落地。

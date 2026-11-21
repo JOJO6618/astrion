@@ -23,11 +23,20 @@ from .state import TERMINAL_STATUSES
 logger = setup_logger(__name__)
 
 
+def _reject_container_session(session) -> None:
+    """Host-only: a legacy container session must not be treated as Host."""
+    if session is not None and str(getattr(session, "mode", "") or "").lower() == "docker":
+        raise ValueError("当前版本仅支持宿主机执行，不能为子智能体绑定容器会话。")
+
+
 class SubAgentManager(SubAgentStatsMixin, SubAgentCreationMixin):
     def __init__(self, project_path: str, data_dir: str, container_session=None,
                  owner_conversation_id: str | None = None):
         self.project_path = Path(project_path).resolve()
         self.data_dir = Path(data_dir).resolve()
+        # The argument stays for existing Host call sites; Docker is rejected
+        # instead of being silently converted to Host resources.
+        _reject_container_session(container_session)
         self.container_session = container_session
         self.owner_conversation_id = owner_conversation_id
         self.terminal = None
@@ -58,6 +67,7 @@ class SubAgentManager(SubAgentStatsMixin, SubAgentCreationMixin):
         self.terminal = terminal
 
     def set_container_session(self, session):
+        _reject_container_session(session)
         self.container_session = session
 
     def set_host_execution_mode(self, mode):

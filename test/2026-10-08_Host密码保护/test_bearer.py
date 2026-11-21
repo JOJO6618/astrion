@@ -23,10 +23,6 @@ class BearerTests(unittest.TestCase):
         self.addCleanup(self.stack.close)
         self.directory = self.stack.enter_context(tempfile.TemporaryDirectory())
         self.stack.enter_context(patch.object(policy, 'DATA_DIR', self.directory))
-        self.stack.enter_context(patch.object(policy, 'TERMINAL_SANDBOX_MODE', 'host'))
-        self.stack.enter_context(patch.object(policy, 'LINUX_SAFETY', False))
-        self.stack.enter_context(patch.object(gateway, 'TERMINAL_SANDBOX_MODE', 'host'))
-        self.stack.enter_context(patch.object(gateway, 'LINUX_SAFETY', False))
         self.stack.enter_context(patch.dict(os.environ, {'ASTRION_DESKTOP_VERSION': ''}))
         self.stack.enter_context(patch.object(gateway, 'get_or_create_host_api_token', return_value='synthetic-token'))
         self.stack.enter_context(patch.object(gateway, 'resolve_host_workspace', return_value=(None, None)))
@@ -51,7 +47,7 @@ class BearerTests(unittest.TestCase):
         @app.get('/api/synthetic-cookie')
         def cookie():
             session.update(username='host', role='admin', host_mode=True)
-            _issue_login_nonce('host')
+            _issue_login_nonce()
             return jsonify(token=get_csrf_token())
 
         self.app = app

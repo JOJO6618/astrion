@@ -1,10 +1,13 @@
 """Backend i18n message pack: auth-family user-visible error messages.
 
-Covers server/auth.py, server/api_auth.py, server/auth_helpers.py and
-server/usage.py. Pure data module — do not import anything here.
-Auto-discovered and merged by modules/i18n.py at import time.
+Covers server/auth.py, server/host_password.py, server/auth_helpers.py,
+server/gateway_auth.py and server/usage.py. Pure data module — do not import
+anything here. Auto-discovered and merged by modules/i18n.py at import time.
 zh-CN copy is verbatim from source; en-US is concise product-level
 English (sentence case).
+
+server/api_auth.py（API Token）已随 Docker fork 移出，对应 auth.missing_bearer_token
+已删除；auth.invalid_token 仍被 Host Bearer（server/gateway_auth.py）使用。
 """
 
 MESSAGES = {
@@ -70,11 +73,7 @@ MESSAGES = {
         "en-US": "Realtime terminal has been disabled by the administrator",
     },
 
-    # ── server/api_auth.py ──
-    "auth.missing_bearer_token": {
-        "zh-CN": "缺少 Bearer Token",
-        "en-US": "Missing Bearer Token",
-    },
+    # ── server/gateway_auth.py（Host Bearer） ──
     "auth.invalid_token": {
         "zh-CN": "无效的 Token",
         "en-US": "Invalid Token",

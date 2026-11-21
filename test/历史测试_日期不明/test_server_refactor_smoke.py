@@ -30,14 +30,6 @@ class ServerRefactorSmokeTest(unittest.TestCase):
         self.assertEqual(helpers.resolve_monitor_path({"file_path": "  a.txt  "}), "a.txt")
         self.assertEqual(helpers.resolve_monitor_memory([1, 2, 3], entry_limit=2), ["1", "2"])
 
-    def test_conversation_stats_exports(self):
-        import server.conversation as conversation
-        import server.conversation_stats as stats
-
-        self.assertTrue(callable(stats.build_admin_dashboard_snapshot))
-        self.assertTrue(callable(conversation.compute_workspace_storage))
-        self.assertTrue(callable(conversation.collect_upload_events))
-
     def test_custom_tools_refresh_disabled_after_dynamic_load(self):
         from core.main_terminal_parts.tools_definition import MainTerminalToolsDefinitionMixin
 

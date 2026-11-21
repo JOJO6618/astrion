@@ -28,12 +28,12 @@ from modules.skills_manager import (
 )
 from modules.upload_security import UploadSecurityError
 from modules.host_sandbox_policy import load_policy, save_policy
-from modules.user_manager import UserWorkspace
+from modules.workspace import UserWorkspace
 from core.web_terminal import WebTerminal
 from config.model_profiles import get_model_context_window
 
-from server.auth_helpers import api_login_required, resolve_admin_policy, get_current_user_record, get_current_username
-from server.context import with_terminal, get_gui_manager, get_upload_guard, build_upload_error_response, ensure_conversation_loaded, get_or_create_usage_tracker
+from server.auth_helpers import api_login_required, resolve_admin_policy, get_current_username
+from server.context import with_terminal, get_gui_manager, get_upload_guard, build_upload_error_response, ensure_conversation_loaded
 from server.security import rate_limited
 from server.utils_common import debug_log
 from server.state import PROJECT_MAX_STORAGE_MB
@@ -84,7 +84,7 @@ def _derive_filename_from_upload(uploaded_file) -> str:
 @rate_limited("legacy_upload", 20, 300, scope="user")
 def upload_file(terminal: WebTerminal, workspace: UserWorkspace, username: str):
     """处理前端文件上传请求"""
-    policy = resolve_admin_policy(get_current_user_record())
+    policy = resolve_admin_policy()
     if policy.get("ui_blocks", {}).get("block_upload"):
         return jsonify({
             "success": False,

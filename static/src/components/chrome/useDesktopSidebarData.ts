@@ -63,8 +63,6 @@ export function useDesktopSidebarData() {
 
   const taskIndex = reactive({
     ...workspaceTaskMethods,
-    versioningHostMode: true,
-    dockerProjectMode: false,
     runningWorkspaceTasks: [] as any[],
     runningWorkspaceTasksRefreshTimer: null as number | null,
     workspaceTaskIndexRefreshedAt: 0,
