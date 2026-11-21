@@ -41,8 +41,13 @@ export class TabDriver {
   run(task, fileURLs = []) {
     const guarded = async () => {
       this.fileURLs = fileURLs;
-      try { this.assertWebPage(); const result = await task(); this.assertWebPage(); return result; }
-      finally { this.fileURLs = []; }
+      try {
+        this.assertWebPage();
+        const result = await task();
+        const closedWithDownload = this.wc.isDestroyed() && result.downloads?.length;
+        if (!closedWithDownload) this.assertWebPage();
+        return result;
+      } finally { this.fileURLs = []; }
     };
     const next = this.queue.then(guarded, guarded);
     this.queue = next.catch(() => {});
@@ -170,15 +175,19 @@ export class TabDriver {
   }
   zoom() { return this.wc.getZoomFactor() || 1; }
   /** 输入事件会在网页同步弹出 alert/confirm 时一直不返回；对话框出现即视为已送达。 */
-  input(method, params) {
-    if (this.dialog) return Promise.resolve();
-    const sent = this.cdp(method, params);
-    sent.catch(() => {});
-    return new Promise((resolve, reject) => {
-      const wake = () => { this.dialogWaiters.delete(wake); resolve(); };
-      this.dialogWaiters.add(wake);
-      sent.then(() => { this.dialogWaiters.delete(wake); resolve(); }, error => { this.dialogWaiters.delete(wake); if (this.dialog) resolve(); else reject(error); });
-    });
+  async input(method, params) {
+    if (this.dialog) return;
+    this.tab.aiSendingInput = true;
+    try {
+      const sent = this.cdp(method, params);
+      await new Promise((resolve, reject) => {
+        const wake = () => { this.dialogWaiters.delete(wake); resolve(); };
+        this.dialogWaiters.add(wake);
+        sent.then(() => { this.dialogWaiters.delete(wake); resolve(); }, error => { this.dialogWaiters.delete(wake); if (this.dialog) resolve(); else reject(error); });
+      });
+    } finally {
+      this.tab.aiSendingInput = false;
+    }
   }
   async mouse(type, x, y, extra = {}) {
     const zoom = this.zoom();
@@ -377,6 +386,7 @@ export class TabDriver {
     await sleep(60);
     for (;;) {
       if (signal?.aborted) throw new BrowserToolError('cancelled', '已取消。');
+      if (this.tab.retiredDownload || this.wc.isDestroyed()) return { closed: true };
       if (this.dialog) return { ms: Date.now() - start, dialog: true };
       const loading = this.wc.isLoadingMainFrame() && [...this.inflight].some(id => this.requests.get(id)?.type === 'Document');
       const limit = loading ? 15000 : cap;

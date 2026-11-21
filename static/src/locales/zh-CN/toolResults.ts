@@ -195,6 +195,8 @@ export default {
     unchanged: '页面无变化',
     screenshot: '截图：',
     downloads: '下载：',
+    downloadId: '下载 ID',
+    emptyDownloads: '本对话还没有模型发起的下载记录。',
     dialog: '对话框：'
   },
   fields: {

@@ -188,6 +188,8 @@ export default {
     unchanged: 'No page change',
     screenshot: 'Screenshot:',
     downloads: 'Downloads:',
+    downloadId: 'Download ID',
+    emptyDownloads: 'This conversation has no model-initiated downloads.',
     dialog: 'Dialog:'
   },
   fields: {

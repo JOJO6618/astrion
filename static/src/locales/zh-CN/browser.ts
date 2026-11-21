@@ -61,6 +61,8 @@ export default {
   progressing: '下载中',
   interrupted: '已中断',
   cancelled: '已取消',
+  downloadEstimatedCompletion: '预计 {time} 完成',
+  downloadActualCompletion: '{time} 完成',
   generated: '已生成',
   theme: '主题',
   classic: '经典',

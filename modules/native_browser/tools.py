@@ -5,7 +5,7 @@ from typing import Any, Dict, Optional
 
 READ_OPS = frozenset({
     "navigate", "snapshot", "find", "take_screenshot", "wait_for", "console_messages",
-    "network_requests", "network_request", "tabs", "scroll", "hover", "emulate_media",
+    "network_requests", "network_request", "downloads", "tabs", "scroll", "hover", "emulate_media",
 })
 ACTION_OPS = frozenset({
     "click", "type", "fill_form", "select_option", "press_key", "drag", "drop",

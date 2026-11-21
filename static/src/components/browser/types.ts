@@ -38,9 +38,12 @@ export interface BrowserDownload {
   id: string;
   name: string;
   received: number;
-  total: number;
+  total: number | null;
   state: string;
   at: number;
+  bytesPerSecond?: number | null;
+  estimatedCompletionAt?: number | null;
+  completedAt?: number | null;
 }
 export interface BrowserPermission {
   id: string;

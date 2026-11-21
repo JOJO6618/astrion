@@ -91,7 +91,7 @@ class Regression(unittest.TestCase):
     def test_formatter(self):
         text = format_for_model({"success": True, "op": "click", "tab": {"id": "t1", "title": "T", "url": "https://a"}, "snapshot": {"kind": "none"}})
         self.assertIn("页面无变化", text)
-        self.assertEqual(len(BROWSER_TOOL_NAMES), 23)
+        self.assertEqual(len(BROWSER_TOOL_NAMES), 24)
 
 
 if __name__ == "__main__":

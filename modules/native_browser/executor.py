@@ -158,8 +158,9 @@ async def execute(terminal: Any, tool_name: str, arguments: Dict[str, Any]) -> D
     payload: Dict[str, Any] = {
         "call_id": f"browser_{uuid.uuid4().hex}", "op": op, "args": args, "identity": _identity(terminal),
         "epoch": snapshot_epoch(terminal), "reveal": prefs.get("browser_auto_open", True) is not False,
-        "download_dir": _download_dir(terminal, prefs),
     }
+    if op != "downloads":
+        payload["download_dir"] = _download_dir(terminal, prefs)
     if not all(payload["identity"].values()):
         return {"success": False, "code": "browser_identity", "error": "当前对话尚未创建完成，暂时不能使用浏览器。"}
     # 动作授权：Electron 在发出输入前核对页面当前站点（审批与执行之间页面可能已跳转）。
@@ -179,7 +180,7 @@ async def execute(terminal: Any, tool_name: str, arguments: Dict[str, Any]) -> D
             if isinstance(target, str) and target.strip().lower().startswith("file:"):
                 args["url"], granted = _file_navigation(terminal, target.strip())
                 file_urls.extend(granted)
-        if op != "tabs" or args.get("action") == "select":
+        if op != "downloads" and (op != "tabs" or args.get("action") == "select"):
             current = await asyncio.to_thread(preflight, terminal, args)
             current_url = current.get("url")
             if isinstance(current_url, str) and current_url.lower().startswith("file:"):

@@ -6,6 +6,12 @@
 
 import { t } from '@/locales';
 import { withWorkspaceScope } from '@/app/methods/workspaceRequestScope';
+import {
+  downloadProgress,
+  downloadTime,
+  downloadTransfer
+} from '@/components/browser/downloadPresentation';
+import type { BrowserDownload } from '@/components/browser/types';
 import { renderSubAgentResult } from './subAgentResults';
 import { renderEditFileDiff } from './editFileDiff';
 import { renderScheduleResult } from './scheduleResults';
@@ -262,6 +268,7 @@ function renderBrowserTool(name: string, result: any, args: any): string {
     param(B('paths'), Array.isArray(args.paths) ? args.paths.join('\n') : ''),
     param(B('function'), args.function, { mono: true }),
     param(B('tab'), args.tab_id),
+    param(B('downloadId'), args.download_id),
     pendingStatus(result)
   );
   const parts: string[] = [];
@@ -274,7 +281,33 @@ function renderBrowserTool(name: string, result: any, args: any): string {
   (result.notes || []).forEach((note: string) => add('', note));
   if (result.message) add('', result.message);
   if (result.dialog) add(B('dialog'), `${result.dialog.type}: ${result.dialog.message}`);
-  (result.downloads || []).forEach((d: any) => add(B('downloads'), d.path));
+  if (name === 'browser_downloads' && result.success !== false && !result.downloads?.length) {
+    add('', B('emptyDownloads'));
+  }
+  (result.downloads || []).forEach(
+    (download: BrowserDownload & { path?: string; url?: string }) => {
+      if (!download.id) {
+        add(B('downloads'), download.path);
+        return;
+      }
+      const completed = download.completedAt
+        ? t('browser.downloadActualCompletion', { time: downloadTime(download.completedAt) })
+        : '';
+      add(
+        B('downloads'),
+        [
+          `${download.name} · ${B('downloadId')} ${download.id}`,
+          downloadProgress(download),
+          downloadTransfer(download),
+          completed,
+          download.url,
+          download.path
+        ]
+          .filter(Boolean)
+          .join('\n')
+      );
+    }
+  );
   if (Array.isArray(result.tabs))
     add(
       '',

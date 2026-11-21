@@ -163,9 +163,9 @@ IPC 只接受各宿主（主窗口 / 对话独立窗口）自身 webContents 的
 - 输入栏 `+` 菜单的「浏览器」开关按对话保存（metadata）。工具定义与提示词始终注入（保持工具数组与前缀缓存稳定），关闭时调用返回「浏览器未开启」错误；切换沿用运行模式切换的同一套机制，运行中可切，并插入 user 通知消息。开关只约束模型调用，用户随时可手动浏览；关闭后模型已开的标签保留。
 - 设置页新增「浏览器」分区，仅含：新对话默认开关（默认关闭）、模型在当前可见对话操作时自动打开面板（默认开启）、模型触发下载的目录（默认工作区 `.astrion/browser_downloads/`，用户手动下载仍进 `~/Downloads/Astrion/`）、AI 站点权限列表（查看／撤销）。不开放快照上限等参数。
 
-### 工具（23 个，全部第一期，不走延迟加载）
+### 工具（24 个，不走延迟加载）
 
-`browser_tabs`(action=list/new/select/close, tab_id, url)、`browser_navigate`(url 或 action=back/forward/reload, tab_id)、`browser_snapshot`(tab_id, target, depth)、`browser_find`(text/regex)、`browser_click`(target*, element, double_click, button, modifiers)、`browser_type`(target*, element, text*, submit, slowly)、`browser_fill_form`(fields[])、`browser_select_option`(target*, element, values*)、`browser_hover`、`browser_drag`(start/end target)、`browser_press_key`(key*)、`browser_scroll`(target, direction, amount)、`browser_wait_for`(time/text/text_gone, timeout)、`browser_take_screenshot`(target, full_page)、`browser_handle_dialog`(accept*, prompt_text)、`browser_file_upload`(paths)、`browser_drop`(target*, paths, data)、`browser_evaluate`(function*, target)、`browser_fill_saved_login`(password_target*, username_target, username)、`browser_console_messages`、`browser_network_requests`、`browser_network_request`、`browser_emulate_media`。
+`browser_tabs`(action=list/new/select/close, tab_id, url)、`browser_navigate`(url 或 action=back/forward/reload, tab_id)、`browser_snapshot`(tab_id, target, depth)、`browser_find`(text/regex)、`browser_click`(target*, element, double_click, button, modifiers)、`browser_type`(target*, element, text*, submit, slowly)、`browser_fill_form`(fields[])、`browser_select_option`(target*, element, values*)、`browser_hover`、`browser_drag`(start/end target)、`browser_press_key`(key*)、`browser_scroll`(target, direction, amount)、`browser_wait_for`(time/text/text_gone, timeout)、`browser_take_screenshot`(target, full_page)、`browser_handle_dialog`(accept*, prompt_text)、`browser_file_upload`(paths)、`browser_drop`(target*, paths, data)、`browser_evaluate`(function*, target)、`browser_fill_saved_login`(password_target*, username_target, username)、`browser_console_messages`、`browser_network_requests`、`browser_network_request`、`browser_emulate_media`、`browser_downloads`(download_id)。
 
 - 参数尽量对齐 Playwright MCP；`tab_id` 用短 ID（如 `t1`），不用会随拖动变化的序号；`element` 为人类可读描述，用于工具卡片 meta 与审批展示。
 - 不做：`browser_run_code_unsafe`（等同 RCE）、`browser_close`、`browser_resize`、`browser_install`。
@@ -187,7 +187,7 @@ IPC 只接受各宿主（主窗口 / 对话独立窗口）自身 webContents 的
 ### 权限与站点审批
 
 - 工具分读取类与动作类；`readonly`／`plan` 只能用读取类。读取类不审批，站点第一次有动作时审批。站点按域名（含子域名），localhost／IP 按主机＋端口。
-  - 读取类：`navigate`、`snapshot`、`find`、`take_screenshot`、`wait_for`、`console_messages`、`network_requests`、`network_request`、`tabs`（含新建／切换／关闭；关闭触发的离开提示交给 `handle_dialog`）、`scroll`、`hover`、`emulate_media`。
+  - 读取类：`navigate`、`snapshot`、`find`、`take_screenshot`、`wait_for`、`console_messages`、`network_requests`、`network_request`、`downloads`、`tabs`（含新建／切换／关闭；关闭触发的离开提示交给 `handle_dialog`）、`scroll`、`hover`、`emulate_media`。
   - 动作类：`click`、`type`、`fill_form`、`select_option`、`press_key`、`drag`、`drop`、`file_upload`、`evaluate` 与 `fill_saved_login`（这两个另需每次审批，人工审批也不提供「以后都允许」）。
   - `handle_dialog` 按回答拆分：确认 alert、取消／关闭任意对话框属读取类（避免只读模式被页面加载时的 alert 卡住）；确认 confirm、提交 prompt、确认离开页面属动作类。
 - 批准模式：拒绝／允许一次／以后都允许。自动审核模式：已「以后都允许」直接执行，否则送审且审核只能批准这一次。无限制模式：全部不审批。
@@ -207,6 +207,12 @@ IPC 只接受各宿主（主窗口 / 对话独立窗口）自身 webContents 的
 - 后处理：只有 `[active]` 焦点变化视为无变化；同层连续 ≥3 个未变化节点折叠为一行（500 项列表改一项 15,260 → 381 字符）；末尾列出「已移除 N 个节点」，最多列 5 个。
 - ref 只在角色与名称不变时稳定；文字变化或重渲染会换新 ref。Playwright 对旧 ref 只会等到超时，实现时必须立即返回「ref 已失效，请看最新快照」。
 - 页面稳定：DOM 静默 300ms 且无进行中的 fetch／xhr／文档请求（忽略图片、埋点、长连接），上限 3 秒并注明「页面持续变化」；判定「无变化」前再多等 1 秒。实测真实网站 0.3–2.8 秒，无超时；纯 DOM 判断会漏掉请求返回后的更新，纯定时器延迟仍可能漏。
+
+### 下载回执与进度
+
+- 收到 Electron 的 `will-download` 并登记文件后，触发操作返回下载 ID、路径和状态。网页快照失败时，已登记的下载仍随回执返回。新标签直接返回附件时继承发起操作的归属。动作结束后保留 5 秒接收延迟启动的下载，标签收到手动输入或导航时结束归属窗口。
+- `browser_downloads` 即时查询。传 `download_id` 查单条，省略则返回本对话由模型触发的最近 10 条记录。查询按可信对话身份过滤，可在相关标签关闭后执行。回执和查询返回实际下载地址、保存路径、状态、字节数、速度，以及预计或实际完成时间。
+- 下载浮层和完整下载页共用 Electron 进度快照。主进程每秒采样 Chromium 的当前下载速度，并用剩余字节和速度估算完成时间。总大小未知时省略预计完成时间，3 秒没有收到新字节时隐藏速度及预计时间。实际完成时间在收到 `done` 的 `completed` 状态时记录。
 
 ### 提示词与结果显示
 

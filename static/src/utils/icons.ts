@@ -185,6 +185,7 @@ export const TOOL_ICON_MAP = Object.freeze({
   browser_console_messages: 'browser',
   browser_network_requests: 'browser',
   browser_network_request: 'browser',
+  browser_downloads: 'browser',
   browser_emulate_media: 'browser',
   write_file: 'pencil',
   edit_file: 'pencil',

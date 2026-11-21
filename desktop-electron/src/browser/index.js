@@ -186,6 +186,7 @@ export class NativeBrowser {
   resize(host) { this.layout(); for (const row of host ? [host] : this.viewHosts.values()) row.send('browser:geometry-request', {}); }
   snapshot(host) {
     const active = host.active(), profile = host.profile, detached = host.detached;
+    const features = profile && this.profileFeatures(profile);
     return { lease: host.lease, revision: ++this.revision, activeId: active?.id || '', window: host.kind, detached,
       tabs: detached ? [] : [...this.tabs.values()].filter(tab => tab.owner === host.owner).map(tab => {
         if (tab.section) return internalSnapshot(tab);
@@ -196,9 +197,9 @@ export class NativeBrowser {
       history: profile?.data.history || [],
       settings: { searchEngine: profile?.data.settings.searchEngine || '', followAi: profile?.data.settings.followAi !== false },
       shortcuts: profile?.data.shortcuts || { pinned: [], hidden: [] },
-      downloads: (profile?.data.downloads || []).map(({ path: _path, ...row }) => row),
+      downloads: (profile?.data.downloads || []).map(row => features.downloadInfo(row)),
       credentials: this.credentials.snapshot(host),
-      permissions: profile && !detached ? this.profileFeatures(profile).snapshot(host.owner) : [] };
+      permissions: features && !detached ? features.snapshot(host.owner) : [] };
   }
   publish() { for (const host of this.hosts()) if (host.lease) host.send('browser:state', this.snapshot(host)); }
   /** 返回发送方对应的宿主；只接受各宿主自身 webContents 顶层可信来源及其路由。 */
@@ -263,7 +264,11 @@ export class NativeBrowser {
       const section = internalSection(value);
       if (section) this.registry.createInternal(section, { owner, profile });
       else if (!id && !host.active()) this.registry.create(manualNavigationURL(value, profile.searchEngine()), { owner, profile });
-      else this.registry.load(this.tab(host, id), value);
+      else {
+        const tab = this.tab(host, id);
+        this.registry.clearDownloadAttribution(tab);
+        this.registry.load(tab, value);
+      }
     }
     else if (action === 'duplicate') this.registry.create(this.tab(host, id).url, { duplicate: true, owner, profile });
     else if (action === 'reorder') {
@@ -289,6 +294,7 @@ export class NativeBrowser {
       const tab = this.tab(host, id);
       if (tab.section) throw new Error('browser_action_requires_webpage');
       const wc = tab.view.webContents;
+      if (['back', 'forward', 'reload'].includes(action)) this.registry.clearDownloadAttribution(tab);
       if (action === 'back') { if (wc.navigationHistory.canGoBack()) wc.navigationHistory.goBack(); }
       else if (action === 'forward') { if (wc.navigationHistory.canGoForward()) wc.navigationHistory.goForward(); }
       else if (action === 'reload') { tab.error = ''; wc.reload(); }

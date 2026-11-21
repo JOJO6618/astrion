@@ -42,6 +42,10 @@ export class BrowserTabs {
       this.persist(tab.owner, tab.profile); manager.profileFeatures(tab.profile).denyStale(); manager.layout(); manager.publish();
     }
   }
+  clearDownloadAttribution(tab) {
+    tab.aiDownload = null;
+    tab.openingDownload = null;
+  }
   create(url = 'about:blank', options = {}) {
     const manager = this.manager;
     const section = internalSection(url);
@@ -60,6 +64,7 @@ export class BrowserTabs {
       lastActive: Date.now(), lastAi: 0, suspended: false, textDocument: false,
       pendingURL: options.targetURL || '', committedDocument: false, retiredDownload: false,
       closeOnDownload: !!options.nativeOptions || (!!url && url !== 'about:blank'),
+      openingDownload: options.openingDownload,
       previousId: manager.selected.get(owner) };
     const wc = view.webContents;
     manager.tabs.set(tab.id, tab); manager.attach(tab);
@@ -90,7 +95,10 @@ export class BrowserTabs {
     wc.on('did-navigate', (_event, destination) => {
       if (tab.retiredDownload) return;
       tab.error = ''; tab.pendingURL = ''; tab.url = destination; tab.favicon = '';
-      if (destination !== 'about:blank') tab.committedDocument = true;
+      if (destination !== 'about:blank') {
+        tab.committedDocument = true;
+        tab.openingDownload = null;
+      }
       profile.record(destination, wc.getTitle()); update();
     });
     wc.on('page-title-updated', (_event, title) => {
@@ -111,6 +119,11 @@ export class BrowserTabs {
     } catch { event.preventDefault(); manager.message('unsupported_browser_url', tab.owner); } });
     wc.on('will-redirect', (event, destination) => { try { navigationURL(destination); } catch { event.preventDefault(); } });
     wc.on('will-attach-webview', event => event.preventDefault());
+    wc.on('input-event', (_event, input) => {
+      if (!tab.aiSendingInput && ['mouseDown', 'rawKeyDown', 'keyDown', 'touchStart'].includes(input.type)) {
+        this.clearDownloadAttribution(tab);
+      }
+    });
     wc.on('before-input-event', (event, input) => {
       const host = manager.hostFor(tab.owner);
       if (input.type !== 'keyDown' || !(input.meta || input.control) || !host) return;
@@ -128,7 +141,8 @@ export class BrowserTabs {
       if ((!manager.hostFor(tab.owner) && !manager.ai?.drivers.has(tab.id)) || [...manager.tabs.values()].filter(row => row.owner === owner).length >= 48) return { action: 'deny' };
       // Adopted popups are browser tabs: keep their lifetime independent of the opener.
       return { action: 'allow', outlivesOpener: true, overrideBrowserWindowOptions: { webPreferences: { ...SECURE_WEB_PREFERENCES, session: profile.session, preload: passwordPreload } },
-        createWindow: nativeOptions => this.create(null, { owner, profile, nativeOptions, targetURL: destination }).view.webContents };
+        createWindow: nativeOptions => this.create(null, { owner: tab.owner, profile, nativeOptions,
+          targetURL: destination, openingDownload: tab.aiDownload }).view.webContents };
     });
     wc.once('destroyed', () => { if (tab.view !== view) return; manager.ai?.release(tab); this.remove(tab); });
     this.persist(owner); manager.layout(); manager.publish();

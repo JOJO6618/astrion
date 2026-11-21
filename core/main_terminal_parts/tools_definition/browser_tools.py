@@ -140,6 +140,9 @@ class ToolsDefinitionBrowserToolsMixin:
                 "id": {"type": "integer", "description": "browser_network_requests 返回的请求编号"},
                 "tab_id": _TAB,
             }), ["id"]),
+            _tool("browser_downloads", "即时查询本对话由模型发起的下载。返回下载链接、保存路径、状态、已下载大小、总大小、速度及预计或实际完成时间。网页标签关闭后也能查询。", intent({
+                "download_id": {"type": "string", "description": "下载工具回执中的下载 ID。省略时列出最近 10 条下载。"},
+            }), []),
             _tool("browser_emulate_media", "模拟媒体特性（打印样式、深浅色、减少动画），只影响该标签。取值 default 表示恢复默认；未提供的参数恢复默认。", intent({
                 "media": {"type": "string", "enum": ["screen", "print", "default"], "description": "媒体类型"},
                 "color_scheme": {"type": "string", "enum": ["light", "dark", "no-preference", "default"], "description": "prefers-color-scheme"},

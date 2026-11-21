@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from typing import Any, Dict, List
 
 
@@ -26,6 +27,25 @@ def _snapshot_block(snapshot: Dict[str, Any]) -> List[str]:
             "用 browser_find 查找内容，或用 browser_snapshot 的 target/depth 查看局部]"
         )
     return lines
+
+
+def _download_block(item: Dict[str, Any]) -> List[str]:
+    if not item.get("id"):
+        return [f"已开始下载：{item.get('name')} → {item.get('path')}"]
+    states = {"progressing": "下载中", "completed": "已完成", "cancelled": "已取消", "interrupted": "已中断"}
+    state = states.get(item.get("state"), item.get("state") or "未知")
+    total = f"{item['total']} B" if item.get("total") is not None else "未知"
+    speed = f"{item['bytesPerSecond']} B/s" if item.get("bytesPerSecond") is not None else "暂无"
+    completed_at = item.get("completedAt")
+    timestamp = completed_at or item.get("estimatedCompletionAt")
+    time_label = "完成时间" if completed_at else "预计完成时间"
+    time = datetime.fromtimestamp(timestamp / 1000).astimezone().isoformat(timespec="seconds") if timestamp else "暂无"
+    return [
+        f"- {item.get('name')}（download_id: {item['id']}） · {state}",
+        f"  下载链接：{item.get('url') or '无'}",
+        f"  保存路径：{item.get('path') or '无'}",
+        f"  已下载／总大小：{item.get('received', 0)} B / {total} · 速度 {speed} · {time_label} {time}",
+    ]
 
 
 def format_for_model(result: Dict[str, Any]) -> str:
@@ -53,8 +73,11 @@ def format_for_model(result: Dict[str, Any]) -> str:
         lines.append(str(result["message"]))
     for note in result.get("notes") or []:
         lines.append(str(note))
-    for item in result.get("downloads") or []:
-        lines.append(f"已开始下载：{item.get('name')} → {item.get('path')}")
+    downloads = result.get("downloads") or []
+    if op == "downloads" and not downloads:
+        lines.append("本对话还没有模型发起的下载记录。")
+    for item in downloads:
+        lines.extend(_download_block(item))
     dialog = result.get("dialog")
     if isinstance(dialog, dict):
         extra = f"（默认输入：{dialog.get('defaultPrompt')}）" if dialog.get("defaultPrompt") else ""

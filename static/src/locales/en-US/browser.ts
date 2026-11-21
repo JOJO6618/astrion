@@ -61,6 +61,8 @@ export default {
   progressing: 'Downloading',
   interrupted: 'Interrupted',
   cancelled: 'Cancelled',
+  downloadEstimatedCompletion: 'Expected at {time}',
+  downloadActualCompletion: 'Completed at {time}',
   generated: 'Generated',
   theme: 'Theme',
   classic: 'Classic',

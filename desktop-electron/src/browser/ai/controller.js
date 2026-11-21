@@ -11,6 +11,9 @@ import { passwordOrigin } from '../passwords/vault.js';
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const ACTION_OPS = new Set(['click', 'type', 'fill_form', 'select_option', 'press_key', 'drag', 'drop', 'file_upload', 'evaluate', 'fill_saved_login']);
+const DOWNLOAD_OPS = new Set([...ACTION_OPS, 'navigate', 'handle_dialog', 'hover', 'scroll']);
+const DOWNLOAD_GRACE_MS = 5000;
+const DOWNLOAD_WITHOUT_SNAPSHOT = '下载已登记，网页快照不可用。';
 const DEFAULT_SIZE = { width: 1280, height: 800 };
 
 export function aiOwner(identity) {
@@ -133,6 +136,15 @@ export class BrowserAI {
     const profile = this.profileFor(username);
     const manager = this.manager;
     if (op === 'tabs') return this.tabsOp(owner, profile, args, payload, signal);
+    if (op === 'downloads') {
+      const id = args.download_id ?? undefined;
+      if (id !== undefined && (typeof id !== 'string' || !id.trim())) throw new BrowserToolError('invalid_argument', 'download_id 必须是下载记录的 ID。');
+      const features = manager.profileFeatures?.(profile);
+      if (!features) throw new BrowserToolError('unsupported_operation', '当前浏览器不支持查询下载记录。');
+      const downloads = features.modelDownloads(owner, id);
+      if (id !== undefined && !downloads.length) throw new BrowserToolError('unknown_download', '本对话没有这个下载 ID。');
+      return { success: true, downloads };
+    }
     if (op === 'navigate' && !args.tab_id && !this.ownerTabs(owner).length) {
       if (!args.url) throw new BrowserToolError('no_tab', '本对话还没有浏览器标签，请提供 url。');
       const tab = manager.registry.create('about:blank', { owner, profile, ai: true, select: false });
@@ -157,15 +169,32 @@ export class BrowserAI {
       await driver.fixViewport(panel ? { width: panel.width / zoom, height: panel.height / zoom } : null);
       this.reveal(owner, tab, payload);
       if (ACTION_OPS.has(op)) this.guardSite(tab, payload);
-      tab.aiDownload = payload.download_dir ? { dir: payload.download_dir, until: Infinity, items: [] } : null;
+      const previousDownload = tab.aiDownload;
+      const download = payload.download_dir && DOWNLOAD_OPS.has(op) ? { dir: payload.download_dir, until: Infinity, items: [] } : null;
+      if (download) tab.aiDownload = download;
       tab.aiBusy = true;
       let result;
-      try { result = await this.operate(op, args, { owner, profile, tab, driver, payload, signal }); }
-      finally { tab.aiBusy = false; tab.lastActive = tab.lastAi = Date.now(); }
+      try {
+        result = await this.operate(op, args, { owner, profile, tab, driver, payload, signal, download });
+      } catch (error) {
+        const pageClosed = tab.retiredDownload || tab.view.webContents.isDestroyed();
+        if (signal.aborted || error.code === 'path_not_allowed' || !pageClosed || !download?.items.length) throw error;
+        result = { notes: [DOWNLOAD_WITHOUT_SNAPSHOT] };
+      } finally {
+        if (download) {
+          const trackDelayedDownloads = (result && result.success !== false) || download.items.length > 0;
+          download.until = trackDelayedDownloads ? Date.now() + DOWNLOAD_GRACE_MS : 0;
+          if (!download.until && tab.aiDownload === download) tab.aiDownload = previousDownload;
+        }
+        tab.aiBusy = false; tab.lastActive = tab.lastAi = Date.now();
+      }
       if (restored) { result.notes = [...(result.notes || []), '该标签已在内存回收后重新加载，原页面运行状态已丢失。']; tab.restored = false; }
-      if (tab.aiDownload) { tab.aiDownload.until = Date.now() + 5000; if (tab.aiDownload.items.length) result.downloads = tab.aiDownload.items.slice(); }
+      if (download?.items.length) {
+        const features = manager.profileFeatures?.(profile);
+        result.downloads = features ? download.items.map(row => features.downloadInfo(row, true)) : download.items.slice();
+      }
       if (driver.fileChooser && op !== 'file_upload') result.notes = [...(result.notes || []), '页面打开了文件选择框，请调用 browser_file_upload 提供文件（paths 为空数组表示取消）。'];
-      result.tab = result.tab || this.tabInfo(owner, tab);
+      if (!result.tab && !tab.retiredDownload && !tab.view.webContents.isDestroyed()) result.tab = this.tabInfo(owner, tab);
       return { success: true, ...result };
     }, payload.file_urls);
   }
@@ -233,11 +262,17 @@ export class BrowserAI {
     }), 30000, 'navigation_timeout').catch(error => { if (error.code !== 'navigation_timeout') throw error; });
   }
   async operate(op, args, context) {
-    const { tab, driver, payload, signal, profile } = context;
+    const { tab, driver, payload, signal, profile, download } = context;
     const wc = tab.view.webContents, manager = this.manager;
     const settleAndSnap = async (options = {}) => {
-      const settled = await driver.settle(signal);
-      return this.respondAfterAction(tab, driver, payload, settled, options, signal);
+      try {
+        const settled = await driver.settle(signal);
+        if (settled.closed) throw new BrowserToolError('tab_closed', '标签已关闭。');
+        return await this.respondAfterAction(tab, driver, payload, settled, options, signal);
+      } catch (error) {
+        if (signal.aborted || error.code === 'path_not_allowed' || !download?.items.length) throw error;
+      }
+      return { notes: [...(options.notes || []), DOWNLOAD_WITHOUT_SNAPSHOT] };
     };
     const withChooser = async action => {
       await driver.interceptFileChooser(true);
