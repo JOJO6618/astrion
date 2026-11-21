@@ -130,9 +130,12 @@ export const sendMethods = {
       return false;
     }
 
-    const modelStore = useModelStore();
-    const currentModel = modelStore.models.find((m) => m.key === this.currentModelKey);
-    if (hasImages && !currentModel?.supportsImage) {
+    const currentModel = useModelStore().currentModel;
+    if (!currentModel) {
+      this.uiPushToast({ message: t('appCore.modelNotSelected'), type: 'error' });
+      return false;
+    }
+    if (hasImages && !currentModel.supportsImage) {
       this.uiPushToast({
         title: t('appMessages.modelNoImageTitle'),
         message: t('appMessages.modelNoImageMessage'),

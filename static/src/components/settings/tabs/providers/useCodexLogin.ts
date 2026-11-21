@@ -10,9 +10,9 @@ import { useUiStore } from '@/stores/ui';
  * （CodexConnectDialog.vue）；Codex 分区（CodexTab.vue）只保留状态展示与
  * 高级管理（用量/重置/代理），不再内联登录 / 断开 / 刷新模型。
  */
-export function useCodexLogin(options: { onCompleted?: () => void } = {}) {
+export function useCodexLogin(options: { reconnectId?: string; onCompleted?: () => Promise<void> } = {}) {
   const uiStore = useUiStore();
-
+  const query = options.reconnectId ? `?account_id=${encodeURIComponent(options.reconnectId)}` : '';
   const busy = ref(false);
   const error = ref('');
   const loginFlow = ref<Record<string, any>>({ status: 'idle' });
@@ -22,7 +22,10 @@ export function useCodexLogin(options: { onCompleted?: () => void } = {}) {
   const pending = computed(() => flowStatus.value === 'pending');
   const flowMode = computed<string>(() => loginFlow.value?.flow_mode || 'browser');
   const phase = computed<string>(() => loginFlow.value?.phase || '');
-  const errorText = computed<string>(() => loginFlow.value?.error || error.value || '');
+  const errorText = computed<string>(() => {
+    const message = loginFlow.value?.error || error.value || '';
+    return message === 'reconnect_account_mismatch' ? t('settings.codexReconnectMismatch') : message;
+  });
   const userCode = computed<string>(() => loginFlow.value?.user_code || '');
   const verificationUri = computed<string>(() => loginFlow.value?.verification_uri || '');
   const devicePending = computed(() => pending.value && flowMode.value === 'device');
@@ -30,6 +33,8 @@ export function useCodexLogin(options: { onCompleted?: () => void } = {}) {
   const deviceStarting = computed(() => devicePending.value && phase.value === 'starting');
   /** 任一流程：用户已授权，后端正在换 token（可重试，可能持续数秒） */
   const exchanging = computed(() => pending.value && phase.value === 'exchanging');
+  const refreshingModels = computed(() => pending.value && phase.value === 'refreshing_models');
+  const modelsRefreshFailed = computed(() => loginFlow.value.models_refresh_failed === true);
 
   const stopPolling = () => {
     if (pollTimer) {
@@ -40,22 +45,30 @@ export function useCodexLogin(options: { onCompleted?: () => void } = {}) {
 
   const startPolling = () => {
     stopPolling();
+    let polling = false;
     pollTimer = setInterval(async () => {
+      if (polling) return;
+      polling = true;
+      const timer = pollTimer;
       try {
         const resp = await fetch('/api/codex/login/poll', { cache: 'no-store' });
         const data = await resp.json();
+        if (pollTimer !== timer) return;
         const flow = data?.status;
         if (flow && flow !== 'pending') {
           stopPolling();
-          loginFlow.value = { ...loginFlow.value, ...data };
           if (flow === 'completed') {
-            options.onCompleted?.();
+            loginFlow.value = { ...data, status: 'pending', phase: 'refreshing_models' };
+            await options.onCompleted?.();
           }
+          loginFlow.value = data;
         } else {
           loginFlow.value = { ...loginFlow.value, ...data };
         }
       } catch {
         /* 轮询失败下轮再说 */
+      } finally {
+        polling = false;
       }
     }, 1500);
   };
@@ -64,8 +77,9 @@ export function useCodexLogin(options: { onCompleted?: () => void } = {}) {
   const startBrowserLogin = async () => {
     busy.value = true;
     error.value = '';
+    loginFlow.value = { status: 'idle' };
     try {
-      const resp = await fetch('/api/codex/login/start', { method: 'POST' });
+      const resp = await fetch(`/api/codex/login/start${query}`, { method: 'POST' });
       const data = await resp.json();
       if (!data?.success) {
         // 同时只允许一个登录流程：409 login_in_progress 明确提示，不静默接管别人的登录
@@ -101,8 +115,9 @@ export function useCodexLogin(options: { onCompleted?: () => void } = {}) {
   const startDeviceLogin = async () => {
     busy.value = true;
     error.value = '';
+    loginFlow.value = { status: 'idle' };
     try {
-      const resp = await fetch('/api/codex/login/device/start', { method: 'POST' });
+      const resp = await fetch(`/api/codex/login/device/start${query}`, { method: 'POST' });
       const data = await resp.json();
       if (!data?.success) {
         error.value =
@@ -123,7 +138,12 @@ export function useCodexLogin(options: { onCompleted?: () => void } = {}) {
   const cancelLogin = async () => {
     stopPolling();
     try {
-      await fetch('/api/codex/login/cancel', { method: 'POST' });
+      const response = await fetch('/api/codex/login/cancel', { method: 'POST' });
+      const state = await response.json();
+      if (state.status === 'pending' || state.status === 'completed') {
+        startPolling();
+        return;
+      }
     } catch {
       /* ignore */
     }
@@ -155,6 +175,8 @@ export function useCodexLogin(options: { onCompleted?: () => void } = {}) {
     devicePending,
     deviceStarting,
     exchanging,
+    refreshingModels,
+    modelsRefreshFailed,
     errorText,
     userCode,
     verificationUri,

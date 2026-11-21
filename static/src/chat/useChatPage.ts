@@ -63,23 +63,13 @@ export function useChatPage() {
   );
   const title = computed(() => chat.document?.title || '');
   const modelOptions = computed(() =>
-    (chat.settings?.models || []).map((m) => ({
-      key: m.key,
-      label: m.name,
-      description: '',
-      supportsImage: m.supports_images,
-      supportsVideo: m.supports_videos,
-      contextWindow: m.context_window,
-      supportsThinking: m.supports_thinking,
-      fastOnly: !m.supports_thinking,
-      supportsReasoningEffort: m.supports_thinking,
-      isChatgptModel: m.is_chatgpt_model === true,
-      supportsChatgptFastMode: m.supports_chatgpt_fast_mode === true,
-      providerId: m.provider_id,
-      providerName: m.provider_name
+    models.visibleModels.map((model) => ({
+      ...model,
+      providerId: model.providerId ?? undefined,
+      providerName: model.providerName ?? undefined
     }))
   );
-  const currentModel = computed(() => modelOptions.value.find((m) => m.key === chat.model));
+  const currentModel = computed(() => models.allModels.find((m) => m.key === chat.model));
   const groups = computed(() =>
     filterModelGroups(
       groupModelOptions(modelOptions.value, { custom: t('appCore.modelGroupCustom') }),
@@ -325,7 +315,8 @@ export function useChatPage() {
       await chat.initialize({ loadHistory: !hasDesktopSidebar() });
       personalization.applyPersonalizationData(chat.settings?.personalization || {});
       personalization.loaded = true;
-      models.setModels(modelOptions.value);
+      await models.fetchModels().catch(() => undefined);
+      if (!alive) return;
       models.setModel(chat.model);
       const id = window.location.pathname.split('/')[2];
       await load(id && id !== 'new' ? `conv_${id.replace(/^conv_/, '')}` : '');

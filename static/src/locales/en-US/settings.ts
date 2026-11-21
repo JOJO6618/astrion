@@ -167,6 +167,7 @@ export default {
   providerConnected: 'Connected',
   providerModelsCount: '{count} models available',
   providerRefresh: 'Refresh models',
+  providerReconnect: 'Reconnect',
   providerDisconnect: 'Disconnect',
   providerDisconnecting: 'Disconnecting…',
   providerDelete: 'Delete',
@@ -200,6 +201,8 @@ export default {
   codexConnectDesc:
     'Sign in with a ChatGPT Pro/Plus subscription (shares the Codex sign-in flow); models included in the subscription are fetched automatically after authorization.',
   codexConnectSuccess: 'Authorized. ChatGPT subscription connected.',
+  codexReconnectMismatch: 'The authorized account differs from this connection. Try again with the original account.',
+  codexModelsRefreshFailed: 'The model list could not be refreshed. You can retry from the provider menu.',
   codexBrowserAuth: 'Browser authorization',
   codexBrowserAuthDesc: 'Open the browser to authorize with your ChatGPT account',
   codexDeviceAuth: 'Headless mode',

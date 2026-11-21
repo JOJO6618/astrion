@@ -99,8 +99,10 @@ class CodexOAuthFlow:
     决定「更新原账号」还是「新建账号」（不在这里直接写凭证文件）。
     """
 
-    def __init__(self, account_store) -> None:
+    def __init__(self, account_store, *, reconnect_id: Optional[str] = None) -> None:
         self._store = account_store
+        self._reconnect_id = reconnect_id
+        self._models_refresh_failed = False
         self._status = "pending"
         self._error: Optional[str] = None
         self._account_id: Optional[str] = None
@@ -217,16 +219,18 @@ class CodexOAuthFlow:
                 threading.Thread(
                     target=self._exchange, daemon=True, name="codex-oauth-exchange"
                 ).start()
+        status = self._status
         result: Dict[str, Any] = {
-            "status": self._status,
+            "status": "pending" if status == "committed" else status,
             "error": self._error,
+            "models_refresh_failed": self._models_refresh_failed,
             "account_id": self._account_id,
             "connection_id": self._connection_id,
             "account_hash": self._account_hash,
             "flow_mode": "browser",
         }
-        if self._status == "pending":
-            result["phase"] = self._phase
+        if status in ("pending", "committed"):
+            result["phase"] = "refreshing_models" if status == "committed" else self._phase
         return result
 
     def cancel(self) -> None:
@@ -250,10 +254,11 @@ class CodexOAuthFlow:
                 redirect_uri=OAUTH_REDIRECT_URI,
                 should_abort=lambda: self._status != "pending",
                 commit=self._commit_tokens,
+                reconnect_id=self._reconnect_id,
             )
         except _LoginCancelled:
             return  # 取消先于提交：不写凭证，终态仍为 cancelled
-        if self._status not in ("pending", "completed"):
+        if self._status not in ("pending", "committed"):
             return  # 已取消/超时判负：不覆盖终态
         if error:
             self._fail(error)
@@ -262,6 +267,7 @@ class CodexOAuthFlow:
         if record:
             self._connection_id = str(record.get("id") or "") or None
             self._account_hash = str(record.get("hash") or "") or None
+        self._models_refresh_failed = not _refresh_authorized_models(self._connection_id)
         self._status = "completed"
         self._shutdown_server()
 
@@ -271,8 +277,8 @@ class CodexOAuthFlow:
             if self._status != "pending":
                 raise _LoginCancelled()
             record = action()
-            # 与落盘同一临界区置 completed：之后到来的 cancel 只能看到已完成。
-            self._status = "completed"
+            # 凭证已落盘，取消不再生效。刷新模型后才对外报告完成。
+            self._status = "committed"
             return record
 
     def _fail(self, message: str) -> None:
@@ -304,6 +310,17 @@ class CodexOAuthFlow:
 # ---------------------------------------------------------------------------
 
 
+def _refresh_authorized_models(connection_id: Optional[str]) -> bool:
+    if not connection_id:
+        return False
+    try:
+        from utils.api_client.codex.models import get_models_manager
+
+        return get_models_manager(connection_id).refresh_sync().get("refreshed") is True
+    except Exception:
+        return False
+
+
 def _exchange_code_for_tokens(
     account_store,
     *,
@@ -311,6 +328,7 @@ def _exchange_code_for_tokens(
     verifier: str,
     redirect_uri: str,
     commit: Optional[Any] = None,
+    reconnect_id: Optional[str] = None,
 ) -> tuple[Optional[str], Optional[str], Optional[Dict[str, Any]], bool]:
     """授权码 + PKCE verifier 换 token 并由账号注册表落盘。
 
@@ -357,6 +375,7 @@ def _exchange_code_for_tokens(
             refresh_token=refresh,
             id_token=id_token,
             account_id=account_id,
+            reconnect_id=reconnect_id,
         )
 
     try:
@@ -367,6 +386,8 @@ def _exchange_code_for_tokens(
     except _LoginCancelled:
         raise
     except Exception as exc:
+        if str(exc) == "reconnect_account_mismatch":
+            return "reconnect_account_mismatch", None, None, False
         return f"写入凭证失败: {exc}", None, None, False
     return None, account_id, record, False
 
@@ -382,6 +403,7 @@ def _exchange_code_for_tokens_with_retry(
     redirect_uri: str,
     should_abort: Optional[Any] = None,
     commit: Optional[Any] = None,
+    reconnect_id: Optional[str] = None,
 ) -> tuple[Optional[str], Optional[str], Optional[Dict[str, Any]]]:
     """换 token 带网络重试（最多 3 次，间隔 2s/4s）。
 
@@ -406,6 +428,7 @@ def _exchange_code_for_tokens_with_retry(
             verifier=verifier,
             redirect_uri=redirect_uri,
             commit=commit,
+            reconnect_id=reconnect_id,
         )
         if error is None:
             return None, account_id, record
@@ -426,8 +449,10 @@ class CodexDeviceFlow:
     status/poll 等 Flask 请求端点零阻塞，慢代理下不会再卡住页面加载。
     """
 
-    def __init__(self, account_store) -> None:
+    def __init__(self, account_store, *, reconnect_id: Optional[str] = None) -> None:
         self._store = account_store
+        self._reconnect_id = reconnect_id
+        self._models_refresh_failed = False
         self._status = "pending"
         self._error: Optional[str] = None
         self._account_id: Optional[str] = None
@@ -512,9 +537,11 @@ class CodexDeviceFlow:
 
     def poll(self) -> Dict[str, Any]:
         """前端轮询入口：纯内存状态快照（网络 IO 全部在后台线程），零阻塞。"""
+        status = self._status
         result: Dict[str, Any] = {
-            "status": self._status,
+            "status": "pending" if status == "committed" else status,
             "error": self._error,
+            "models_refresh_failed": self._models_refresh_failed,
             "account_id": self._account_id,
             "connection_id": self._connection_id,
             "account_hash": self._account_hash,
@@ -522,8 +549,8 @@ class CodexDeviceFlow:
             "verification_uri": self.verification_uri,
             "flow_mode": "device",
         }
-        if self._status == "pending":
-            result["phase"] = self._phase
+        if status in ("pending", "committed"):
+            result["phase"] = "refreshing_models" if status == "committed" else self._phase
         return result
 
     def cancel(self) -> None:
@@ -585,10 +612,11 @@ class CodexDeviceFlow:
                 redirect_uri=OAUTH_DEVICE_REDIRECT_URI,
                 should_abort=lambda: self._status != "pending",
                 commit=self._commit_tokens,
+                reconnect_id=self._reconnect_id,
             )
         except _LoginCancelled:
             return  # 取消先于提交：不写凭证
-        if self._status not in ("pending", "completed"):
+        if self._status not in ("pending", "committed"):
             return  # 已取消：不覆盖终态
         if error:
             self._fail(error)
@@ -597,6 +625,7 @@ class CodexDeviceFlow:
         if record:
             self._connection_id = str(record.get("id") or "") or None
             self._account_hash = str(record.get("hash") or "") or None
+        self._models_refresh_failed = not _refresh_authorized_models(self._connection_id)
         self._status = "completed"
 
     def _commit_tokens(self, action):
@@ -605,7 +634,7 @@ class CodexDeviceFlow:
             if self._status != "pending":
                 raise _LoginCancelled()
             record = action()
-            self._status = "completed"
+            self._status = "committed"
             return record
 
     def _fail(self, message: str) -> None:
@@ -624,7 +653,7 @@ _current_flow: Optional[Any] = None  # CodexOAuthFlow | CodexDeviceFlow
 _flow_lock = threading.Lock()
 
 
-def start_login_flow(account_store) -> Dict[str, Any]:
+def start_login_flow(account_store, *, reconnect_id: Optional[str] = None) -> Dict[str, Any]:
     """开启浏览器登录流程。
 
     **串行约束（2026-10-29）**：已有进行中的登录流程时明确拒绝新请求
@@ -638,7 +667,7 @@ def start_login_flow(account_store) -> Dict[str, Any]:
             if state["status"] == "pending":
                 return {**state, "reused": True, "error": "login_in_progress"}
             _current_flow = None
-        flow = CodexOAuthFlow(account_store)
+        flow = CodexOAuthFlow(account_store, reconnect_id=reconnect_id)
         flow.start()
         state = flow.poll()
         if state["status"] == "failed":
@@ -647,7 +676,7 @@ def start_login_flow(account_store) -> Dict[str, Any]:
         return {"authorize_url": flow.authorize_url, **state}
 
 
-def start_device_login_flow(account_store) -> Dict[str, Any]:
+def start_device_login_flow(account_store, *, reconnect_id: Optional[str] = None) -> Dict[str, Any]:
     """开启设备码登录流程；已有进行中的流程时明确拒绝（不覆盖/不取消）。
 
     start() 仅 spawn 后台线程，本函数立即返回 pending（phase=starting）；
@@ -660,7 +689,7 @@ def start_device_login_flow(account_store) -> Dict[str, Any]:
             if state["status"] == "pending":
                 return {**state, "reused": True, "error": "login_in_progress"}
             _current_flow = None
-        flow = CodexDeviceFlow(account_store)
+        flow = CodexDeviceFlow(account_store, reconnect_id=reconnect_id)
         flow.start()
         state = flow.poll()
         if state["status"] == "failed":
@@ -681,5 +710,8 @@ def cancel_login_flow() -> Dict[str, Any]:
     with _flow_lock:
         if _current_flow is not None:
             _current_flow.cancel()
+            state = _current_flow.poll()
+            if state["status"] in ("pending", "completed"):
+                return state
             _current_flow = None
         return {"status": "cancelled"}

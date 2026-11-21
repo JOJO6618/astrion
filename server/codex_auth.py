@@ -22,8 +22,6 @@ docker 多用户模式下由管理员统一登录账号，订阅凭证全局共�
 
 from __future__ import annotations
 
-import threading
-
 from flask import Blueprint, jsonify, request
 
 from server.auth_helpers import admin_api_required, api_login_required
@@ -158,8 +156,9 @@ def codex_login_start():
     登录目标账号在授权完成后按账号身份决定（同账号更新、新账号新建）；
     已有进行中的登录流程时明确拒绝（409 login_in_progress）。
     """
-    store = get_codex_account_store()
-    result = start_login_flow(store)
+    result, err = _start_oauth_flow(start_login_flow)
+    if err:
+        return err
     if result.get("error") == "login_in_progress":
         return jsonify({"success": False, **result}), 409
     if result.get("status") == "failed":
@@ -171,16 +170,17 @@ def codex_login_start():
 @api_login_required
 @admin_api_required
 def codex_login_poll():
-    """轮询登录进度；完成时后台刷新「本次登录落到的那一个账号」的模型列表。"""
-    state = poll_login_flow()
-    if state.get("status") == "completed":
-        target = str(state.get("connection_id") or "").strip()
-        if target:
-            models = get_models_manager(target)
-            threading.Thread(
-                target=models.refresh_sync, daemon=True, name="codex-models-refresh"
-            ).start()
-    return jsonify({"success": True, **state})
+    """读取 OAuth 和模型刷新进度。"""
+    return jsonify({"success": True, **poll_login_flow()})
+
+
+def _start_oauth_flow(start):
+    reconnect_id = _requested_account_id()
+    if reconnect_id:
+        reconnect_id, err = _resolve_account(reconnect_id)
+        if err:
+            return None, err
+    return start(get_codex_account_store(), reconnect_id=reconnect_id), None
 
 
 @codex_auth_bp.route("/api/codex/login/device/start", methods=["POST"])
@@ -194,8 +194,9 @@ def codex_login_device_start():
     官方授权页（无 localhost 回调，docker 部署可用）。
     前提：ChatGPT 账号设置 → 安全里已开启 device code authentication。
     """
-    store = get_codex_account_store()
-    result = start_device_login_flow(store)
+    result, err = _start_oauth_flow(start_device_login_flow)
+    if err:
+        return err
     if result.get("error") == "login_in_progress":
         return jsonify({"success": False, **result}), 409
     # 失败不再同步返回（后台线程异步置 failed，经 poll 呈现）；保留分支作防御

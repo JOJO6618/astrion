@@ -616,10 +616,10 @@ def sanitize_personalization_payload(
     chosen_model = data.get("default_model", base.get("default_model"))
     if isinstance(chosen_model, str) and chosen_model in allowed_models:
         base["default_model"] = chosen_model
-    elif allowed_models and base.get("default_model") not in allowed_models:
+    elif allowed_models and not base.get("default_model"):
         try:
             base["default_model"] = get_default_model_key(visible_only=True)
-        except Exception:
+        except ValueError:
             base["default_model"] = None
 
     # 图片压缩模式

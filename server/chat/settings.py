@@ -289,26 +289,6 @@ def update_model(terminal: WebTerminal, workspace: UserWorkspace, username: str)
                 _new_ctx.has_images = False
                 _new_ctx.has_videos = False
 
-        # 协议级互切锁定（2026-09-25 泛化，替代原 codex/ 前缀锁）：已打开的对话
-        # 禁止 chat_completions ↔ responses 互切（历史序列化与 reasoning 语义不兼容）；
-        # 同协议内自由切换（responses 跨 provider 放行，不兼容的加密 reasoning 块
-        # 由转换层剥离）。/new 页（对话尚未创建、terminal 未绑定对话）不受限。
-        _bound_cid = requested_cid or getattr(terminal, "_bound_conversation_id", None)
-        if _bound_cid:
-            _current_key = str(getattr(terminal, "model_key", "") or "")
-            try:
-                from config.model_profiles import get_registered_model_profiles
-                _profiles = get_registered_model_profiles()
-                _cur_proto = str((_profiles.get(_current_key) or {}).get("api_protocol") or "chat_completions")
-                _new_proto = str((_profiles.get(str(model_key)) or {}).get("api_protocol") or "chat_completions")
-            except Exception:
-                _cur_proto = _new_proto = None
-            if _cur_proto and _new_proto and _cur_proto != _new_proto:
-                return jsonify({
-                    "success": False,
-                    "error": tr("chat_settings.protocol_switch_locked"),
-                }), 409
-
         _previous_model_key = str(getattr(terminal, "model_key", "") or "")
         terminal.set_model(model_key)
         try:

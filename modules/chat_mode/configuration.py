@@ -1,4 +1,4 @@
-"""Conversation-local model settings, shared provider protocol restrictions."""
+"""Conversation-local model settings."""
 from config.limits import REASONING_EFFORT_LEVELS
 from config.model_profiles import get_model_profile
 
@@ -26,11 +26,6 @@ def configure_conversation(storage, conversation_id, settings):
             selected = profile or get_model_profile(metadata.get("model_key")) or {}
             if selected.get("responses_auth") == "codex_oauth" and not selected.get("supports_chatgpt_fast_mode"):
                 raise ValueError("Selected ChatGPT model does not support Fast mode")
-        if profile and metadata.get("model_key") and document["messages"]:
-            previous = get_model_profile(metadata["model_key"])
-            if ((previous.get("api_protocol") == "responses") !=
-                    (profile.get("api_protocol") == "responses")):
-                raise RuntimeError("Cannot switch API protocol within a conversation")
         metadata.update(settings)
         if "thinking_mode" in settings:
             metadata["run_mode"] = "thinking" if settings["thinking_mode"] else "fast"

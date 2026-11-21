@@ -39,7 +39,7 @@
             :mobile="isMobile"
             :header-menu-open="headerMenuOpen"
             :is-connected="!!chat.settings"
-            :current-model-label="currentModel?.label || $t('chatMode.model')"
+            :current-model-label="currentModel?.label || $t('appCore.modelNotSelected')"
             :header-effort-label="
               chat.thinking && currentModel?.supportsThinking
                 ? String(chat.effort ?? '')

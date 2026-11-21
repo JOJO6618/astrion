@@ -3,6 +3,8 @@ import { chatApi, command, loadView, operationId, releasePresentation } from './
 import { activeStatuses, pathOf, textOf } from './types';
 import type { ChatDocument, ChatMessage, ChatSettings, ChatView, MediaRef } from './types';
 import { prepareGeneratingLabels } from '@/utils/generatingLabel';
+import { t } from '@/locales';
+import { useModelStore } from '@/stores/model';
 
 export function useChat(onTaskError: (data: Record<string, any>) => void = () => {}) {
   const settings = ref<ChatSettings | null>(null);
@@ -93,7 +95,7 @@ export function useChat(onTaskError: (data: Record<string, any>) => void = () =>
     document.value = view.document;
     display.value = view.display;
     const metadata = view.document.metadata;
-    model.value = metadata.model_key || model.value;
+    model.value = metadata.model_key || '';
     thinking.value = metadata.thinking_mode ?? thinking.value;
     effort.value = metadata.reasoning_effort ?? null;
     fastMode.value = metadata.chatgpt_fast_mode === true;
@@ -179,6 +181,10 @@ export function useChat(onTaskError: (data: Record<string, any>) => void = () =>
   }
   async function send(text: string, media: MediaRef[], extra: Record<string, unknown> = {}) {
     if (busy.value) return null;
+    if (!useModelStore().allModels.some((option) => option.key === model.value)) {
+      report(t('appCore.modelNotSelected'));
+      return null;
+    }
     const token = epoch;
     sending.value = true;
     error.value = '';

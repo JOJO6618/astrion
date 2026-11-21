@@ -112,7 +112,6 @@ class AgentRuntimeAdapter:
 
     def validate(self, definition, principal):
         from server.context.new_conversation import validate_creation_settings
-        from config.model_profiles import get_registered_model_profiles
         data, identity = self._scope(principal, definition["target"]["workspace_id"])
         settings, old = self._settings(definition, principal, data)
         validate_creation_settings(settings, host_mode=identity.host_mode, can_manage=identity.role == "admin")
@@ -127,11 +126,6 @@ class AgentRuntimeAdapter:
                 raise ValueError('请选择已注册且可用的非主目录工作树分支')
             if not target['authorized'] and settings['execution_mode'] != 'direct':
                 raise PermissionError('目标工作树不在当前路径授权范围内')
-        if old and old.get("model_key") != settings["model_key"]:
-            profiles = get_registered_model_profiles()
-            before, after = profiles.get(old.get("model_key")), profiles.get(settings["model_key"])
-            if before and after and (before.get("api_protocol") == "responses") != (after.get("api_protocol") == "responses"):
-                raise ValueError("已有对话不允许跨 Chat Completions / Responses 协议切换模型")
         return self._validated_principal(principal, data, identity, settings,
                                          freeze=definition["target"]["conversation"]["mode"] == "new")
 

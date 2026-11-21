@@ -373,7 +373,7 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 6. **custom_models.json**：`/api/custom-models` CRUD 直读部署目录，`_sanitize_custom_model` 白名单校验，**写入始终落 `DEPLOY_CONFIG_DIR`**。**模型可见性 = 用户级**：`personalization.hidden_models` 后端只注册 + sanitize，**过滤在前端** `stores/model.ts`，与提供商管理是两条独立线。
 7. **Codex 即 openai-codex**：OpenAI 拆 `openai-api`（api key）与 `openai-codex`（订阅 OAuth）。**连接管理单一入口**：连接/断开/刷新只在「提供商」分区（`useCodexLogin.ts` + `CodexConnectDialog.vue`），**禁止**在 Codex 分区内联登录/断开/刷新。
 8. **其余**：图标在 `static/icons/providers/`（新增提供商先补图标）；`ollama`/`lmstudio` 是 auth=none；models.dev 数据源 = 快照 + 在线缓存 6h，`protocol_source` 门控必须存在。
-9. **Responses 互切锁**：chat↔responses 跨协议切换 409；跨 provider 自由切（加密 reasoning 块按 `_same_responses_provider()` 判定，非同 provider 剥离回插）；老对话 `api_protocol=None` 不锁。**codex 身份已泛化（无兼容）**：改 `responses_auth="codex_oauth"`，老对话 `codex/xxx` 需重选。
+9. **模型切换与重连**：Chat Completions 与 Responses 可互切；只向同一 Responses 连接回放加密推理。OAuth 重连验证账号身份并保留连接 ID，刷新目录后报告完成。目录暂缺时对话与设置保留原模型 key，无法使用的对话模型显示「未选择模型」。细则见 `AD/settings_and_providers.md`。
 10. **模型目录自动刷新**：`POST /api/providers/refresh-all` 刷全部已连接 + Codex，前端进入应用与每小时各调一次（挂在 `app/lifecycle.ts` 的 settingsRoute 分支之前），进程内每小时最多真跑一次、重复调用返回 `skipped`。**不要在 `start_background_jobs` 加后端定时器**（会变成应用关着也刷）。
 11. **Responses 请求形状（绕开 OpenAI 6.2 缓存回归）**：gpt-6.2 系**不缓存 `instructions`**（缓存缺口≈system 大小），`input` 前缀照常缓存；工具 schema 编译更严（`propertyNames` 直接 `invalid_json_schema`）。`translate.py` 两条硬约定：① OpenAI 系端点把 system 作为 `input` 首条 `role:"developer"` 发送且**完全不写 `instructions`**（第三方网关上的非 OpenAI 模型保持原形状）；② `flatten_tools()` 前必须过 `sanitize_json_schema()`（剥 `propertyNames`／`patternProperties`／`if-then-else`，参数名不动）。只做减法；`prompt_cache_key` 只对 codex_oauth／openai-api／第一方端点下发。**改前先确认 OpenAI 是否已修复**；回归 `test/2026-11-19_*`。
 

@@ -180,6 +180,9 @@ const menuItems = computed<UiMenuItem[]>(() => {
       icon: 'refresh-cw',
       disabled: busy || missing
     },
+    ...(entry.auth === 'codex_oauth'
+      ? [{ value: 'reconnect', label: t('settings.providerReconnect'), icon: 'log-in', disabled: busy }]
+      : []),
     {
       value: 'disconnect',
       label: entry.custom
@@ -198,6 +201,7 @@ const onMenuSelect = (value: string) => {
   const entry = menuEntry.value;
   if (!entry) return;
   if (value === 'refresh') void refresh(entry);
+  else if (value === 'reconnect') codexTarget.value = entry;
   else if (value === 'disconnect') void disconnect(entry);
 };
 

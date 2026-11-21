@@ -24,7 +24,7 @@ def settings_payload(scope):
                "context_window": value.get("context_window", 128000)}
               for key, value in profiles.items() if key not in hidden and not value.get("hidden")]
     settings = {key: preferences.get(key, default) for key, default in CHAT_DEFAULTS.items()}
-    if not settings["chat_default_model"] or settings["chat_default_model"] not in profiles:
+    if not settings["chat_default_model"]:
         settings["chat_default_model"] = get_default_model_key() if profiles else ""
     # Same account preferences consumed by the shared UI store. Runtime resources
     # and credentials are stored separately; reading this payload provisions none.

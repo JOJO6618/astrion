@@ -55,6 +55,8 @@ interface ModelState {
   hiddenModelKeys: string[];
 }
 
+let latestCatalogRequest = 0;
+
 export const useModelStore = defineStore('model', {
   state: (): ModelState => ({
     currentModelKey: '',
@@ -69,9 +71,7 @@ export const useModelStore = defineStore('model', {
     },
     currentModel(state): ModelOption | null {
       // 当前模型允许被用户隐藏（仅影响选择器显示），查表走全量列表
-      return (
-        state.allModels.find((m) => m.key === state.currentModelKey) || state.models[0] || null
-      );
+      return state.allModels.find((m) => m.key === state.currentModelKey) || null;
     }
   },
   actions: {
@@ -92,39 +92,15 @@ export const useModelStore = defineStore('model', {
       if (!Array.isArray(models)) return;
       this.allModels = models;
       this.recomputeVisibleModels();
-      const exists =
-        this.currentModelKey && this.allModels.some((m) => m.key === this.currentModelKey);
-      if (!exists) {
-        this.currentModelKey = this.models[0]?.key || '';
-      }
     },
     setModel(key: ModelKey) {
-      if (this.currentModelKey === key) return;
-      const exists = this.allModels.some((m) => m.key === key);
-      if (exists) {
-        this.currentModelKey = key;
-        return;
-      }
-      // 如果列表中还没有该模型（例如 fetchModels 失败），
-      // 临时插入一个 fallback 项，避免首屏显示“未选择模型”
-      if (key) {
-        this.allModels = [
-          ...this.allModels,
-          {
-            key,
-            label: key,
-            description: '',
-            fastOnly: false,
-            supportsThinking: true
-          }
-        ];
-        this.recomputeVisibleModels();
-        this.currentModelKey = key;
-      }
+      this.currentModelKey = key;
     },
     async fetchModels() {
+      const request = ++latestCatalogRequest;
       const resp = await fetch('/api/v1/models', { cache: 'no-store' });
       const data = await resp.json();
+      if (request !== latestCatalogRequest) return;
       if (!resp.ok || !data?.success || !Array.isArray(data.items)) {
         throw new Error(data?.error || t('stores.loadModelListFailed'));
       }

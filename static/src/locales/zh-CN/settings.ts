@@ -161,6 +161,7 @@ export default {
   providerConnected: '已连接',
   providerModelsCount: '{count} 个模型可用',
   providerRefresh: '刷新模型',
+  providerReconnect: '重新连接',
   providerDisconnect: '断开',
   providerDisconnecting: '断开中…',
   providerDelete: '删除',
@@ -191,6 +192,8 @@ export default {
   codexConnectDesc:
     '使用 ChatGPT Pro/Plus 订阅登录（与 Codex 登录共用链路），授权后自动获取订阅包含的模型。',
   codexConnectSuccess: '授权成功，已连接 ChatGPT 订阅。',
+  codexReconnectMismatch: '授权的账号与要重新连接的账号不同，请使用原账号重试。',
+  codexModelsRefreshFailed: '模型列表刷新失败，可在提供商菜单中重试。',
   codexBrowserAuth: '浏览器授权',
   codexBrowserAuthDesc: '打开浏览器完成 ChatGPT 账号授权',
   codexDeviceAuth: '无头模式',

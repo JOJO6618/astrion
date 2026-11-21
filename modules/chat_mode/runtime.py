@@ -69,9 +69,6 @@ class ChatRuntime:
         profile = get_model_profile(model_key)
         if not profile:
             raise ValueError("Unknown Chat model")
-        previous = self.model_profile or {}
-        if previous and (previous.get("api_protocol") == "responses") != (profile.get("api_protocol") == "responses"):
-            raise ValueError("Cannot switch Chat API protocol within a conversation")
         self.model_key = model_key
         self.apply_model_profile(profile)
 
