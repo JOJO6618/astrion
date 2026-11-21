@@ -16,6 +16,7 @@ from modules.mcp_client_manager.manager import MCPClientManager
 from modules.mcp_client_manager.models import MCPToolBinding
 from modules.mcp_client_manager.runtime_scope import MCPRuntimeScope, prepare_stdio_server
 from modules.mcp_client_manager.stdio_client import _StdioMCPClient
+from modules.mcp_server_registry import MCPServerRegistry
 
 
 HERE = Path(__file__).resolve().parent
@@ -53,7 +54,8 @@ class RuntimeScopeTests(unittest.TestCase):
         return self.prepared(**kwargs)["args"][-1]
 
     def manager(self, cid="conv_a", resolver=None):
-        registry = SimpleNamespace(get_server=lambda _: self.server)
+        registry = MCPServerRegistry(str(self.root / "mcp_servers.json"), enabled=True)
+        registry.upsert_server(self.server)
         scope = replace(self.scope, conversation_id=cid)
         manager = MCPClientManager(registry, container_session=self.session,
                                    runtime_scope_resolver=resolver or (lambda: scope))

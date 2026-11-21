@@ -12,6 +12,7 @@ import ChatTab from './tabs/ChatTab.vue';
 import QuickEntrySettings from './tabs/QuickEntrySettings.vue';
 import WorkspaceTab from './tabs/WorkspaceTab.vue';
 import ToolsTab from './tabs/ToolsTab.vue';
+import McpTab from './tabs/McpTab.vue';
 import SearchTab from './tabs/SearchTab.vue';
 import ContextTab from './tabs/ContextTab.vue';
 import FilesTab from './tabs/FilesTab.vue';
@@ -110,6 +111,7 @@ const SECTION_COMPONENTS: Record<SettingsSection, Component> = {
   workspace: WorkspaceTab,
   search: SearchTab,
   tools: ToolsTab,
+  mcp: McpTab,
   context: ContextTab,
   files: FilesTab,
   browser: BrowserTab,

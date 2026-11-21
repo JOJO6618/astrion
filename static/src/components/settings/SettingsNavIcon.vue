@@ -25,6 +25,7 @@ const ICON_FILES: Record<string, string> = {
   workspace: 'folder-open',
   search: 'globe',
   tools: 'wrench',
+  mcp: 'mcp-logo',
   context: 'notebook',
   files: 'file',
   voice: 'mic',

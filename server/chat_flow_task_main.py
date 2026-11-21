@@ -867,6 +867,10 @@ async def handle_task_with_sender(
         prepare_request = getattr(web_terminal, "prepare_model_messages", None)
         if callable(prepare_request):
             messages = await prepare_request(messages, sender=sender)
+        if current_iteration > 1 and is_agent:
+            refresh_mcp_tools = getattr(web_terminal, "refresh_mcp_tools", None)
+            if refresh_mcp_tools is not None:
+                tools = refresh_mcp_tools(tools)
         stream_result = await run_streaming_attempts(
             web_terminal=web_terminal,
             messages=messages,

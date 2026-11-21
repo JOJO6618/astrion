@@ -22,20 +22,11 @@
 
 ---
 
-## 2. 配置入口（如果你是个人类）
+## 2. 配置入口
 
-### 2.1 管理后台入口（推荐）
+在「设置 → 系统 → MCP」（`/settings/mcp`）添加、编辑、启停和同步服务。使用当前 Host 会话即可保存。
 
-- 打开：`/admin/policy`
-- 页面中的「**MCP 服务配置（统一工具扩展）**」区域可做增删改查、同步工具
-
-### 2.2 个人空间入口（宿主机管理员）
-
-- 个人空间里有单独的「**MCP 配置**」入口
-- 仅在 **宿主机模式 + 管理员** 时显示
-- 点击后会跳转到 `/admin/policy`
-
-> 管理 API 受管理员权限和二级密码校验保护，建议优先使用页面配置，不建议直接手改请求。
+用「全局默认」分别设置主、子智能体的服务名单。需要调整单个工作区时，选中该工作区，再分别选择「跟随全局」或「按工作区设置」。全局停用服务会关闭所有工作区的访问。
 
 ---
 
@@ -55,9 +46,9 @@
 
 ---
 
-## 4. 第二步：在后台新增服务配置
+## 4. 第二步：新增服务配置
 
-在 `/admin/policy` 的 MCP 区域点击“新增 MCP 服务”，填写核心字段：
+在 MCP 设置中点击「添加服务」，填写核心字段：
 
 - `id`：必须以字母开头，仅允许字母/数字/`_`/`-`
 - `transport`：`stdio` 或 `streamable_http`
@@ -178,9 +169,9 @@
    - 检查 `include_tools/exclude_tools`
 
 3. **工具在页面有，但模型看不到**
-   - 确认服务 `enabled=true`
-   - 确认管理策略没禁用 MCP 分类
-   - 重新“同步工具”后再试
+   - 确认服务全局启用
+   - 查看该工作区的主智能体或子智能体名单是否包含服务
+   - 重新同步工具后再试
 
 4. **调用时报超时**
    - 提高 `timeout_seconds`
@@ -193,9 +184,9 @@
 - MCP 配置：`config/mcp.py`
 - 服务注册表：`modules/mcp_server_registry.py`
 - MCP 客户端桥接：`modules/mcp_client_manager/`（子包）
-- 管理 API：`server/admin.py`
+- 设置 API：`server/mcp_settings.py`
 - 工具定义/执行：
   - `core/main_terminal_parts/tools_definition/`（子包，`tools_definition.py` 为兼容入口）
   - `core/main_terminal_parts/tools_execution.py`
-- 管理端页面：`static/src/admin/PolicyApp.vue`
+- MCP 设置分区：`static/src/components/settings/tabs/McpTab.vue`
 - 测试示例服务：`scripts/mcp_calculator_server.py`

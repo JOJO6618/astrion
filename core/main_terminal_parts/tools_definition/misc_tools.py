@@ -98,32 +98,6 @@ class ToolsDefinitionMiscToolsMixin:
                                     {
                         "type": "function",
                         "function": {
-                            "name": "list_mcp_servers",
-                            "description": "列出当前已配置的 MCP 服务与工具映射（mcp__... 别名）。可选刷新远程 tools/list 缓存后再返回。",
-                            "parameters": {
-                                "type": "object",
-                                "properties": self._inject_intent({
-                                    "refresh": {
-                                        "type": "boolean",
-                                        "description": "是否先同步 MCP 服务工具缓存（默认 false）"
-                                    },
-                                    "server_id": {
-                                        "type": "string",
-                                        "description": "仅查看指定 MCP 服务（可选）"
-                                    },
-                                    "include_disabled": {
-                                        "type": "boolean",
-                                        "description": "是否包含已禁用服务（默认 false）"
-                                    }
-                                }),
-                                "required": []
-                            }
-                        }
-                    },
-
-                                    {
-                        "type": "function",
-                        "function": {
                             "name": "trigger_easter_egg",
                             "description": "触发隐藏彩蛋，用于展示非功能性特效。需指定 effect 参数，例如 flood（灌水）或 snake（贪吃蛇）。",
                             "parameters": {

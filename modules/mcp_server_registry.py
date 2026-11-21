@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+import threading
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -13,6 +14,11 @@ from config import (
     MCP_TOOLS_ENABLED,
     MCP_DEFAULT_TIMEOUT_SECONDS,
 )
+from utils.atomic_io import atomic_write_json
+
+_CONFIG_LOCK = threading.RLock()
+_CACHE_FIELDS = {"tools_cache", "tools_cache_updated_at", "last_error"}
+_CONNECTION_FIELDS = ("transport", "command", "args", "cwd", "env", "url", "headers")
 
 
 class MCPServerRegistry:
@@ -134,24 +140,21 @@ class MCPServerRegistry:
             "silent_when_disabled": False,
         }
 
-    def _ensure_file(self) -> None:
-        if self.config_path.exists():
-            return
-        payload = {"servers": []}
-        self.config_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-
-    def _read_file(self) -> Dict[str, Any]:
-        self._ensure_file()
+    def _read_file(self, *, strict: bool = False) -> Dict[str, Any]:
         try:
             data = json.loads(self.config_path.read_text(encoding="utf-8"))
-            if isinstance(data, dict):
-                return data
-        except Exception:
-            pass
-        return {"servers": []}
+            if not isinstance(data, dict):
+                raise ValueError("Invalid MCP configuration")
+            return data
+        except FileNotFoundError:
+            return {"servers": []}
+        except (OSError, ValueError):
+            if strict:
+                raise
+            return {"servers": []}
 
     def _write_file(self, payload: Dict[str, Any]) -> None:
-        self.config_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        atomic_write_json(self.config_path, payload)
 
     def _normalize_server(self, item: Dict[str, Any]) -> Dict[str, Any]:
         data = dict(item or {})
@@ -199,20 +202,42 @@ class MCPServerRegistry:
     # ------------------------------------------------------------------
     # 对外接口
     # ------------------------------------------------------------------
-    def reload(self) -> List[Dict[str, Any]]:
-        data = self._read_file()
+    def _load_servers(self, data: Dict[str, Any]) -> List[Dict[str, Any]]:
         servers = data.get("servers")
-        output: List[Dict[str, Any]] = []
-        if isinstance(servers, list):
-            for item in servers:
-                if not isinstance(item, dict):
-                    continue
-                normalized = self._normalize_server(item)
-                if not normalized.get("id"):
-                    continue
-                output.append(normalized)
-        self._cache = output
-        return list(self._cache)
+        if not isinstance(servers, list):
+            return []
+        return [self._normalize_server(item) for item in servers
+                if isinstance(item, dict) and str(item.get("id") or "").strip()]
+
+    def read_settings(self) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+        with _CONFIG_LOCK:
+            data = self._read_file()
+            self._cache = self._load_servers(data)
+            access = data.get("access")
+            return self.list_servers(), access if isinstance(access, dict) else {}
+
+    def reload(self) -> List[Dict[str, Any]]:
+        servers, _ = self.read_settings()
+        return servers
+
+    def save_access(self, actor: str, selection: Any, workspace_id: Optional[str] = None) -> None:
+        from modules.mcp_access import normalize_selection
+
+        with _CONFIG_LOCK:
+            data = self._read_file(strict=True)
+            ids = {server["id"] for server in self._load_servers(data)}
+            access = data.setdefault("access", {})
+            if workspace_id is None:
+                access.setdefault("defaults", {})[actor] = normalize_selection(selection, ids)
+            else:
+                if not isinstance(selection, dict) or not isinstance(selection.get("inherit"), bool):
+                    raise ValueError("Invalid workspace MCP selection")
+                workspace = access.setdefault("workspaces", {}).setdefault(workspace_id, {})
+                workspace[actor] = {
+                    "inherit": selection["inherit"],
+                    "server_ids": normalize_selection(selection.get("server_ids"), ids),
+                }
+            self._write_file(data)
 
     def list_servers(self, include_disabled: bool = True) -> List[Dict[str, Any]]:
         if include_disabled:
@@ -229,39 +254,44 @@ class MCPServerRegistry:
                 return dict(item)
         return None
 
-    def upsert_server(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        normalized = self._normalize_server(payload or {})
-        ok, error = self._validate_server(normalized)
-        if not ok:
-            raise ValueError(error)
-
-        current = {item["id"]: item for item in self._cache if item.get("id")}
-        existing = current.get(normalized["id"]) or {}
-        if existing:
-            # 保留历史缓存字段，除非显式覆盖
-            if not normalized.get("tools_cache"):
-                normalized["tools_cache"] = existing.get("tools_cache") or []
-            if not normalized.get("tools_cache_updated_at"):
-                normalized["tools_cache_updated_at"] = existing.get("tools_cache_updated_at") or ""
-            if not normalized.get("last_error"):
-                normalized["last_error"] = existing.get("last_error") or ""
-        current[normalized["id"]] = normalized
-        updated = sorted(current.values(), key=lambda x: str(x.get("id")))
-        self._cache = updated
-        self._write_file({"servers": updated})
-        return dict(normalized)
+    def upsert_server(
+        self, payload: Dict[str, Any], *, create: Optional[bool] = None,
+    ) -> Dict[str, Any]:
+        with _CONFIG_LOCK:
+            data = self._read_file(strict=True)
+            current = {item["id"]: item for item in self._load_servers(data)}
+            server_id = str(payload.get("id") or "").strip()
+            existing = current.get(server_id)
+            if create is True and existing is not None:
+                raise ValueError("MCP server ID already exists")
+            if create is False and existing is None:
+                raise KeyError(server_id)
+            fields = {key: value for key, value in payload.items() if key not in _CACHE_FIELDS}
+            normalized = self._normalize_server({**(existing or {}), **fields})
+            ok, error = self._validate_server(normalized)
+            if not ok:
+                raise ValueError(error)
+            if existing and any(existing[key] != normalized[key] for key in _CONNECTION_FIELDS):
+                normalized.update(tools_cache=[], tools_cache_updated_at="", last_error="")
+            current[server_id] = normalized
+            updated = sorted(current.values(), key=lambda item: item["id"])
+            self._write_file({**data, "servers": updated})
+            self._cache = updated
+            return dict(normalized)
 
     def delete_server(self, server_id: str) -> bool:
-        target = str(server_id or "").strip()
-        if not target:
-            return False
-        before = len(self._cache)
-        after = [item for item in self._cache if item.get("id") != target]
-        if len(after) == before:
-            return False
-        self._cache = after
-        self._write_file({"servers": after})
-        return True
+        from modules.mcp_access import remove_server_from_access
+
+        with _CONFIG_LOCK:
+            data = self._read_file(strict=True)
+            servers = self._load_servers(data)
+            updated = [item for item in servers if item["id"] != server_id]
+            if len(updated) == len(servers):
+                return False
+            remove_server_from_access(data.get("access"), server_id)
+            self._write_file({**data, "servers": updated})
+            self._cache = updated
+            return True
 
     def update_tools_cache(
         self,
@@ -270,33 +300,27 @@ class MCPServerRegistry:
         tools: Optional[List[Dict[str, Any]]] = None,
         error: Optional[str] = None,
         touched: bool = True,
+        expected_server: Optional[Dict[str, Any]] = None,
     ) -> Optional[Dict[str, Any]]:
-        target = str(server_id or "").strip()
-        if not target:
+        with _CONFIG_LOCK:
+            data = self._read_file(strict=True)
+            servers = self._load_servers(data)
+            for item in servers:
+                if item["id"] != server_id:
+                    continue
+                if expected_server and any(item[key] != expected_server.get(key) for key in _CONNECTION_FIELDS):
+                    return None
+                if tools is not None:
+                    item["tools_cache"] = tools
+                if error is not None:
+                    item["last_error"] = str(error)
+                if touched:
+                    item["tools_cache_updated_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
+                if tools is not None or error is not None or touched:
+                    self._write_file({**data, "servers": servers})
+                    self._cache = servers
+                return dict(item)
             return None
-        changed = False
-        updated: List[Dict[str, Any]] = []
-        matched: Optional[Dict[str, Any]] = None
-        for item in self._cache:
-            if item.get("id") != target:
-                updated.append(item)
-                continue
-            next_item = dict(item)
-            if tools is not None:
-                next_item["tools_cache"] = tools
-                changed = True
-            if error is not None:
-                next_item["last_error"] = str(error)
-                changed = True
-            if touched:
-                next_item["tools_cache_updated_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
-                changed = True
-            updated.append(next_item)
-            matched = next_item
-        if changed:
-            self._cache = updated
-            self._write_file({"servers": updated})
-        return dict(matched) if matched else None
 
     def build_cached_alias_list(self, server_id: Optional[str] = None) -> List[str]:
         aliases: List[str] = []

@@ -124,7 +124,7 @@ def tool_settings(terminal: WebTerminal, workspace: UserWorkspace, username: str
 
     data = request.get_json() or {}
     category = data.get('category')
-    if category is None:
+    if not isinstance(category, str) or not category:
         return jsonify({
             "success": False,
             "error": tr("chat_misc.missing_category"),
@@ -146,9 +146,11 @@ def tool_settings(terminal: WebTerminal, workspace: UserWorkspace, username: str
                 "error": tr("chat_misc.tool_toggle_admin_disabled"),
                 "message": tr("chat_misc.admin_forced_disabled")
             }), 403
+        from modules.mcp_access import is_mcp_category
+
         enabled = bool(data['enabled'])
-        forced = getattr(terminal, "admin_forced_category_states", {}) or {}
-        if isinstance(forced.get(category), bool) and forced[category] != enabled:
+        forced = (getattr(terminal, "admin_forced_category_states", {}) or {}).get(category)
+        if isinstance(forced, bool) and forced != enabled and not is_mcp_category(category):
             return jsonify({
                 "success": False,
                 "error": tr("chat_misc.category_forced"),

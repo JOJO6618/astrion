@@ -39,8 +39,10 @@ class MCPClientManager:
         container_session: Any = None,
         *,
         runtime_scope_resolver: Optional[Callable[[], MCPRuntimeScope]] = None,
+        available_servers_resolver: Optional[Callable[[], List[Dict[str, Any]]]] = None,
     ):
         self.registry = registry
+        self.available_servers_resolver = available_servers_resolver
         self.protocol_version = str(protocol_version or MCP_PROTOCOL_VERSION)
         self.runtime_scope_resolver = runtime_scope_resolver
         # Host-only: None stays supported; a Docker handle is rejected rather
@@ -169,14 +171,21 @@ class MCPClientManager:
         operation: Callable[[Any], Any],
     ) -> Tuple[Any, Dict[str, Any]]:
         last_exc: Optional[Exception] = None
+        sid = server["id"]
         for attempt in range(2):
             with self._pool_lock:
+                current = next((item for item in self.available_servers() if item["id"] == sid), None)
+                if current is None:
+                    raise MCPClientError(tr("mcp.server_disabled", server_id=sid))
+                if self._server_signature(current) != self._server_signature(server) or any(
+                    current.get(key) != server.get(key) for key in ("include_tools", "exclude_tools")
+                ):
+                    raise MCPClientError(tr("mcp.tool_mapping_not_found", tool_alias=sid))
                 client, init_result = self._ensure_client_locked(
                     server,
                     timeout_seconds,
                     force_recreate=attempt > 0,
                 )
-                sid = str(server.get("id") or "").strip()
                 try:
                     output = operation(client)
                     entry = self._client_pool.get(sid)
@@ -323,9 +332,15 @@ class MCPClientManager:
                 break
         return tools
 
+    def available_servers(self) -> List[Dict[str, Any]]:
+        if self.available_servers_resolver is not None:
+            return self.available_servers_resolver()
+        self.registry.reload()
+        return self.registry.list_enabled_servers() if self.registry.enabled else []
+
     def discover_tools_for_server(self, server_id: str, *, timeout_seconds: Optional[int] = None) -> Dict[str, Any]:
-        server = self.registry.get_server(server_id)
-        if not server:
+        server = next((item for item in self.available_servers() if item["id"] == server_id), None)
+        if server is None:
             return {"success": False, "error": tr("mcp.server_not_found", server_id=server_id)}
         timeout = int(timeout_seconds or server.get("timeout_seconds") or MCP_DEFAULT_TIMEOUT_SECONDS)
         started = time.time()
@@ -335,7 +350,7 @@ class MCPClientManager:
                 timeout,
                 lambda client: self._paged_list_tools(client),
             )
-            self.registry.update_tools_cache(server_id, tools=tools, error="", touched=True)
+            self.registry.update_tools_cache(server_id, tools=tools, error="", expected_server=server)
             elapsed_ms = int((time.time() - started) * 1000)
             return {
                 "success": True,
@@ -346,30 +361,18 @@ class MCPClientManager:
                 "elapsed_ms": elapsed_ms,
             }
         except Exception as exc:
-            self.registry.update_tools_cache(server_id, error=str(exc), touched=True)
+            self.registry.update_tools_cache(server_id, error=str(exc), expected_server=server)
             return {"success": False, "server_id": server_id, "error": str(exc)}
 
     def sync_servers(self, server_id: Optional[str] = None) -> Dict[str, Any]:
-        # 先从磁盘重载一次，避免「文件已改但进程内缓存未刷新」导致同步遗漏，
-        # 以及后续 update_tools_cache 把旧缓存反写覆盖新配置。
-        self.registry.reload()
+        enabled_ids = {item["id"] for item in self.available_servers()}
         with self._pool_lock:
-            enabled_ids = {
-                str(item.get("id") or "").strip()
-                for item in self.registry.list_enabled_servers()
-                if str(item.get("id") or "").strip()
-            }
-            stale_ids = [sid for sid in list(self._client_pool.keys()) if sid not in enabled_ids]
-            for sid in stale_ids:
-                self._close_pool_entry_locked(sid)
+            for sid in list(self._client_pool):
+                if sid not in enabled_ids:
+                    self._close_pool_entry_locked(sid)
         if server_id:
             return self.discover_tools_for_server(server_id)
-        results = []
-        for server in self.registry.list_enabled_servers():
-            sid = server.get("id")
-            if not sid:
-                continue
-            results.append(self.discover_tools_for_server(sid))
+        results = [self.discover_tools_for_server(sid) for sid in sorted(enabled_ids)]
         ok_count = sum(1 for item in results if item.get("success"))
         overall_success = (not results) or (ok_count == len(results))
         return {
@@ -404,20 +407,17 @@ class MCPClientManager:
         tools: List[Dict[str, Any]] = []
         alias_map: Dict[str, MCPToolBinding] = {}
 
-        # 防止“外部直接改配置文件但进程内缓存没刷新”：
-        # 这里在常规构建阶段主动重载一次，避免后续 discover/update 把旧缓存反写回磁盘。
+        servers = self.available_servers()
         if ensure_discovery:
-            self.registry.reload()
-
-        servers = self.registry.list_enabled_servers()
-        for server in servers:
-            sid = str(server.get("id") or "").strip()
-            if not sid:
-                continue
-            if ensure_discovery and not (server.get("tools_cache") or []):
+            pending = [server["id"] for server in servers if not server.get("tools_cache_updated_at")
+                       and not server.get("tools_cache")]
+            for sid in pending:
                 self.discover_tools_for_server(sid, timeout_seconds=discovery_timeout_seconds)
-                server = self.registry.get_server(sid) or server
+            if pending:
+                servers = self.available_servers()
 
+        for server in servers:
+            sid = server["id"]
             for item in self._iter_visible_tools(server):
                 remote_name = str(item.get("name") or "").strip()
                 alias_base = self.registry.make_tool_alias(sid, remote_name)
@@ -461,8 +461,8 @@ class MCPClientManager:
         tool_alias: str,
         alias_map: Optional[Dict[str, MCPToolBinding]] = None,
     ) -> Optional[MCPToolBinding]:
-        if alias_map and tool_alias in alias_map:
-            return alias_map[tool_alias]
+        if alias_map is not None:
+            return alias_map.get(tool_alias)
         if tool_alias in self._latest_alias_map:
             return self._latest_alias_map[tool_alias]
 
@@ -480,11 +480,12 @@ class MCPClientManager:
         binding = self._resolve_binding(tool_alias, alias_map)
         if not binding:
             return {"success": False, "error": tr("mcp.tool_mapping_not_found", tool_alias=tool_alias)}
-        server = self.registry.get_server(binding.server_id)
-        if not server:
-            return {"success": False, "error": tr("mcp.server_not_found", server_id=binding.server_id)}
-        if not server.get("enabled", True):
+        server = next((item for item in self.available_servers() if item["id"] == binding.server_id), None)
+        if server is None:
             return {"success": False, "error": tr("mcp.server_disabled", server_id=binding.server_id)}
+        include = server.get("include_tools") or []
+        if (include and binding.remote_name not in include) or binding.remote_name in (server.get("exclude_tools") or []):
+            return {"success": False, "error": tr("mcp.tool_mapping_not_found", tool_alias=tool_alias)}
 
         timeout = int(server.get("timeout_seconds") or binding.timeout_seconds or MCP_DEFAULT_TIMEOUT_SECONDS)
         started = time.time()

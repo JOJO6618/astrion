@@ -36,36 +36,33 @@ async def execute_custom_tool(owner: Any, tool_name: str, arguments: dict) -> An
 
 async def list_mcp_servers(owner: Any, arguments: dict) -> dict:
     manager = getattr(owner, "mcp_client_manager", None)
-    registry = getattr(owner, "mcp_server_registry", None)
-    if manager is None or registry is None:
+    if manager is None:
         return _error("tools_exec.mcp_module_unavailable")
+    return await asyncio.to_thread(describe_mcp_servers, manager, arguments)
+
+
+def describe_mcp_servers(manager: Any, arguments: dict) -> dict:
     server_id = str(arguments.get("server_id") or "").strip() or None
     sync_result = None
-    if arguments.get("refresh", False):
-        sync_result = await asyncio.to_thread(manager.sync_servers, server_id=server_id)
-    await asyncio.to_thread(registry.reload)
-    servers = registry.list_servers(include_disabled=bool(arguments.get("include_disabled", False)))
-    if server_id:
-        servers = [item for item in servers if item.get("id") == server_id]
+    if arguments.get("refresh"):
+        result = manager.sync_servers(server_id=server_id)
+        fields = ("success", "server_id", "servers_total", "servers_success", "servers_failed")
+        sync_result = {key: result[key] for key in fields if key in result}
     _, alias_map = manager.build_llm_tools(ensure_discovery=False)
-    aliases_by_server: dict[str, list[str]] = {}
-    for alias, binding in (alias_map or {}).items():
-        sid = getattr(binding, "server_id", "")
-        if sid:
-            aliases_by_server.setdefault(sid, []).append(alias)
     items = []
-    for item in servers:
-        sid = str(item.get("id") or "")
-        names = [str((tool or {}).get("name") or "").strip()
-                 for tool in (item.get("tools_cache") or []) if isinstance(tool, dict)]
-        names = [name for name in names if name]
+    for item in manager.available_servers():
+        sid = item["id"]
+        if server_id and sid != server_id:
+            continue
+        bindings = {alias: binding for alias, binding in alias_map.items() if binding.server_id == sid}
+        names = sorted({binding.remote_name for binding in bindings.values()})
         items.append({
             "id": sid, "name": item.get("name") or sid,
             "enabled": bool(item.get("enabled", True)),
             "transport": item.get("transport"), "timeout_seconds": item.get("timeout_seconds"),
             "tools_cache_count": len(names), "tools_cache_names": names,
-            "tool_aliases": sorted(aliases_by_server.get(sid, [])),
+            "tool_aliases": sorted(bindings),
             "tools_cache_updated_at": item.get("tools_cache_updated_at"),
-            "last_error": item.get("last_error") or "",
+            "last_error": "MCP sync failed" if item.get("last_error") else "",
         })
     return {"success": True, "count": len(items), "servers": items, "sync_result": sync_result}

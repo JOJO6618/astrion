@@ -50,6 +50,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { id: 'workspace', labelKey: 'settings.navWorkspace', icon: 'workspace' },
       { id: 'search', labelKey: 'settings.navSearch', icon: 'search' },
       { id: 'tools', labelKey: 'settings.navTools', icon: 'tools' },
+      { id: 'mcp', labelKey: 'settings.navMcp', icon: 'mcp' },
       { id: 'context', labelKey: 'settings.navContext', icon: 'context' },
       { id: 'files', labelKey: 'settings.navFiles', icon: 'files' },
       { id: 'browser', labelKey: 'settings.navBrowser', icon: 'browser' }
@@ -89,6 +90,7 @@ export const SECTION_TITLE_KEYS: Record<SettingsSection, string> = {
   workspace: 'settings.workspaceTitle',
   search: 'settings.searchTitle',
   tools: 'settings.toolsTitle',
+  mcp: 'settings.navMcp',
   context: 'settings.contextTitle',
   files: 'settings.filesTitle',
   browser: 'settings.browserTitle',
@@ -229,7 +231,12 @@ const SEARCH_ENTRIES: SearchEntry[] = [
     `${P}minimalExpandHeightTitle`,
     `${P}compactMessageTitle`
   ]),
-  ...entries('admin', [`${P}mcpConfigTitle`, `${P}customToolsAdminTitle`])
+  ...entries('mcp', [
+    ['settings.mcp.services', 'settings.mcp.servicesDesc'],
+    'settings.mcp.defaults',
+    ['settings.mcp.workspace', 'settings.mcp.workspaceDesc']
+  ]),
+  ...entries('admin', [`${P}customToolsAdminTitle`])
 ];
 
 export interface SearchResult {

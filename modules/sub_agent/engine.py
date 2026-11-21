@@ -79,6 +79,9 @@ class SubAgentEngineMixin:
             client, model_key = self._engine_client
             if self._engine_tools is None:
                 self._engine_tools = await self._build_runtime_tools()
+            elif self._mcp_manager is not None:
+                from modules.mcp_access import replace_mcp_tools
+                self._engine_tools = replace_mcp_tools(self._engine_tools, await self._build_sub_mcp_tools())
             tools = self._engine_tools
 
             turn += 1

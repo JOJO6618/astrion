@@ -10,7 +10,9 @@ from modules.execution_scope import ExecutionScope, bind_execution_scope, curren
 from modules.file_manager import FileManager
 from modules.scoped_execution_policy import fixed_working_dir, scoped_work_path
 from modules.sub_agent.runtime import SubAgentRuntimeMixin
+from modules.mcp_client_manager.manager import MCPClientManager
 from modules.mcp_client_manager.runtime_scope import MCPRuntimeScope, prepare_stdio_server
+from modules.mcp_server_registry import MCPServerRegistry
 
 
 class DirectoryScopeTests(unittest.TestCase):
@@ -69,31 +71,39 @@ class DirectoryScopeTests(unittest.TestCase):
 class PluginTests(unittest.IsolatedAsyncioTestCase):
     async def test_child_has_separate_manager_filters_tools_and_calls_outside_native_scope(self):
         created = []
-        binding = SimpleNamespace(server_id="external")
+        calls = []
 
-        class Client:
+        class Client(MCPClientManager):
             def __init__(self, registry, **kwargs):
+                super().__init__(registry, **kwargs)
                 self.scope = kwargs["runtime_scope_resolver"]()
                 self.closed = False
                 created.append(self)
 
-            def build_llm_tools(self):
-                return ([{"type": "function", "function": {"name": name, "parameters": {}}}
-                         for name in ("mcp__external__allowed", "mcp__external__hidden")],
-                        {"mcp__external__allowed": binding, "mcp__external__hidden": binding})
-
-            def call_tool_by_alias(self, name, arguments, **kwargs):
+            def _run_with_client(self, server, timeout, operation):
                 assert current_execution_scope() is None
-                assert "intent" not in arguments
-                return {"success": True, "message": "external result", "structured_content": {"ok": True}}
+
+                def request(method, params):
+                    assert method == "tools/call"
+                    assert params["arguments"] == {"x": 1}
+                    calls.append(server["id"])
+                    return {"structuredContent": {"ok": True}}
+
+                return operation(SimpleNamespace(request=request)), {}
 
             def close_all_clients(self):
+                super().close_all_clients()
                 self.closed = True
 
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary).resolve()
-            parent = SimpleNamespace(mcp_tools_enabled=True, mcp_server_registry=object(), disabled_tools=set(),
-                                     mcp_tool_alias_map={"mcp__external__allowed": binding})
+            registry = MCPServerRegistry(str(root / "mcp_servers.json"), enabled=True)
+            registry.upsert_server({"id": "external", "transport": "stdio", "command": "unused", "exclude_tools": ["hidden"]})
+            registry.update_tools_cache("external", tools=[{"name": "allowed"}, {"name": "hidden"}])
+            registry.save_access("main", [])
+            registry.save_access("sub", {"inherit": False, "server_ids": ["external"]}, "workspace")
+            parent = SimpleNamespace(mcp_tools_enabled=True, mcp_server_registry=registry,
+                                     workspace_id="workspace", mcp_tool_alias_map={})
             manager = SimpleNamespace(terminal=parent, project_path=root, data_dir=root, container_session=None)
             children = []
             with patch("modules.mcp_client_manager.MCPClientManager", Client):
@@ -112,9 +122,12 @@ class PluginTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual([client.scope.actor_id for client in created], ["one", "two"])
                 result = await children[0]._execute_mcp_tool("mcp__external__allowed", {"intent": "test", "x": 1})
                 self.assertTrue(result["success"])
-                parent.disabled_tools.add("mcp__external__allowed")
+                self.assertEqual(calls, ["external"])
+                registry.save_access("sub", {"inherit": False, "server_ids": []}, "workspace")
                 denied = await children[0]._execute_mcp_tool("mcp__external__allowed", {})
                 self.assertFalse(denied["success"])
+                self.assertEqual(calls, ["external"])
+                self.assertEqual(await children[0]._build_sub_mcp_tools(), [])
                 await children[0]._build_runtime_tools()
                 self.assertTrue(created[0].closed)
 

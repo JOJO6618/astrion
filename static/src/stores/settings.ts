@@ -27,6 +27,7 @@ export type SettingsSection =
   | 'workspace'
   | 'search'
   | 'tools'
+  | 'mcp'
   | 'context'
   | 'files'
   | 'browser'
@@ -67,10 +68,6 @@ export const useSettingsStore = defineStore('settings', {
     /** Host-only 主仓：设置页始终按本机 Host 模式展示。 */
     isHostMode(): boolean {
       return true;
-    },
-    /** MCP 配置入口可见性（管理员） */
-    showMcpConfigEntry(): boolean {
-      return this.isAdmin;
     }
   },
   actions: {

@@ -1,4 +1,4 @@
-"""Host 管理页与管理员 API（策略 / 自定义工具 / MCP）。
+"""Host 管理页与管理员 API（策略 / 自定义工具）。
 
 已移除随 Docker 多用户版移出的租户管理面：`/admin/monitor`、`/admin/api`、
 `/api/admin/dashboard`、`/api/admin/invites`、`/api/admin/users/<username>/reset-password`、
@@ -17,15 +17,10 @@ from flask import Blueprint, jsonify, request, session
 from werkzeug.security import check_password_hash
 
 from .auth_helpers import login_required, admin_required, admin_api_required, api_login_required, resolve_admin_policy
-from .context import with_terminal
 from .entry_assets import serve_entry_html
 from .security import rate_limited
 from . import state  # 使用动态 state，确保与入口实例保持一致
-from .state import (
-    custom_tool_registry,
-    mcp_server_registry,
-    mcp_client_manager,
-)
+from .state import custom_tool_registry
 from modules import admin_policy_manager
 from config import ADMIN_SECONDARY_PASSWORD_HASH, ADMIN_SECONDARY_PASSWORD, ADMIN_SECONDARY_TTL_SECONDS
 from modules.i18n import tr
@@ -213,72 +208,6 @@ def admin_custom_tools_reload_api():
         custom_tool_registry.reload()
         return jsonify({"success": True})
     except Exception as exc:
-        return jsonify({"success": False, "error": str(exc)}), 500
-
-
-@admin_bp.route('/api/admin/mcp-servers', methods=['GET', 'POST', 'DELETE'])
-@api_login_required
-@admin_api_required
-def admin_mcp_servers_api():
-    """MCP 服务配置管理（仅全局管理员）。"""
-    guard = _secondary_required()
-    if guard:
-        return guard
-    try:
-        if request.method == 'GET':
-            mcp_server_registry.reload()
-            return jsonify({"success": True, "data": mcp_server_registry.list_servers()})
-        if request.method == 'POST':
-            payload = request.get_json() or {}
-            saved = mcp_server_registry.upsert_server(payload)
-            return jsonify({"success": True, "data": saved})
-
-        # DELETE
-        server_id = request.args.get("id") or (request.get_json() or {}).get("id")
-        if not server_id:
-            return jsonify({"success": False, "error": tr("admin.missing_id")}), 400
-        removed = mcp_server_registry.delete_server(server_id)
-        if removed:
-            return jsonify({"success": True, "data": {"deleted": server_id}})
-        return jsonify({"success": False, "error": tr("admin.server_not_found")}), 404
-    except ValueError as exc:
-        return jsonify({"success": False, "error": str(exc)}), 400
-    except Exception as exc:
-        logging.exception("mcp-servers API error")
-        return jsonify({"success": False, "error": str(exc)}), 500
-
-
-@admin_bp.route('/api/admin/mcp-servers/reload', methods=['POST'])
-@api_login_required
-@admin_api_required
-def admin_mcp_servers_reload_api():
-    guard = _secondary_required()
-    if guard:
-        return guard
-    try:
-        servers = mcp_server_registry.reload()
-        return jsonify({"success": True, "data": {"count": len(servers)}})
-    except Exception as exc:
-        return jsonify({"success": False, "error": str(exc)}), 500
-
-
-@admin_bp.route('/api/admin/mcp-servers/sync', methods=['POST'])
-@api_login_required
-@admin_api_required
-@with_terminal
-def admin_mcp_servers_sync_api(terminal, workspace, username):
-    """同步 MCP 服务工具缓存（tools/list）。"""
-    guard = _secondary_required()
-    if guard:
-        return guard
-    payload = request.get_json() or {}
-    target_id = (payload.get("id") or "").strip() or None
-    manager = getattr(terminal, "mcp_client_manager", None) or mcp_client_manager
-    try:
-        result = manager.sync_servers(server_id=target_id)
-        return jsonify({"success": bool(result.get("success", True)), "data": result})
-    except Exception as exc:
-        logging.exception("mcp-servers sync API error")
         return jsonify({"success": False, "error": str(exc)}), 500
 
 

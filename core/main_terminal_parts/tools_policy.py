@@ -448,6 +448,13 @@ class MainTerminalToolsPolicyMixin:
 
     def set_tool_category_enabled(self, category: str, enabled: bool) -> None:
                 """设置工具类别的启用状态 / Toggle tool category enablement."""
+                from modules.mcp_access import is_mcp_category
+
+                if is_mcp_category(category):
+                    if not any(row["id"] == category for row in self._mcp_settings_snapshot()):
+                        raise ValueError(tr("tools_policy.unknown_tool_category", category=category))
+                    self._ensure_runtime_tool_overrides()[category] = bool(enabled)
+                    return
                 categories = self.tool_categories_map
                 if category not in categories:
                     raise ValueError(tr("tools_policy.unknown_tool_category", category=category))
@@ -505,11 +512,34 @@ class MainTerminalToolsPolicyMixin:
                 self._apply_runtime_tool_overrides()
                 self._refresh_disabled_tools()
 
+    def _mcp_settings_snapshot(self) -> List[Dict[str, object]]:
+                from modules.mcp_access import available_mcp_servers
+                from modules.mcp_server_registry import MCPServerRegistry
+
+                servers = available_mcp_servers(self, conversation=False)
+                if not servers:
+                    return []
+                overrides = self._ensure_runtime_tool_overrides()
+                registry = self.mcp_server_registry
+                rows = [("mcp", build_default_mcp_category()["label"], ["list_mcp_servers"])]
+                rows.extend((
+                    MCPServerRegistry.make_server_category_id(server["id"]),
+                    MCPServerRegistry.make_server_category_label(server),
+                    registry.build_cached_alias_list(server["id"]),
+                ) for server in servers)
+                return [{"id": key, "label": label, "enabled": overrides.get(key, True),
+                         "tools": tools, "locked": False, "locked_state": None}
+                        for key, label, tools in rows]
+
     def get_tool_settings_snapshot(self) -> List[Dict[str, object]]:
                 """获取工具类别状态快照 / Return tool category states snapshot."""
+                from modules.mcp_access import is_mcp_category
+
                 snapshot: List[Dict[str, object]] = []
                 categories = self.tool_categories_map
                 for key, category in categories.items():
+                    if is_mcp_category(key):
+                        continue
                     forced = self.admin_forced_category_states.get(key)
                     enabled = self.tool_category_states.get(key, category.default_enabled)
                     if isinstance(forced, bool):
@@ -522,7 +552,7 @@ class MainTerminalToolsPolicyMixin:
                         "locked": isinstance(forced, bool),
                         "locked_state": forced if isinstance(forced, bool) else None,
                     })
-                return snapshot
+                return snapshot + self._mcp_settings_snapshot()
 
     def _refresh_disabled_tools(self) -> None:
                 """刷新禁用工具列表 / Refresh disabled tool set."""

@@ -27,7 +27,7 @@ import { useSubAgentSettings } from './useSubAgentSettings';
  *   设置页传 settings store 的 activeSection），用于 tab 懒加载触发。
  * - hostVisible：宿主是否可见（Drawer 传 visible；设置页由 App.vue v-if 挂载，传常量 true ref）。
  *
- * 管理员/host 判定统一收敛到 stores/settings.ts（isAdmin/isHostMode/showMcpConfigEntry），
+ * 管理员和 Host 判定统一由 stores/settings.ts 提供。
  * 两个宿主共享同一份会话状态（fetchSessionStatus 内部去重）。
  */
 export interface PersonalizationContextOptions {
@@ -86,7 +86,6 @@ export function usePersonalizationContext(options: PersonalizationContextOptions
 
   // ---- 管理员判定（统一走 settings store） ----
   const isAdmin = computed(() => settingsStore.isAdmin);
-  const showMcpConfigEntry = computed(() => settingsStore.showMcpConfigEntry);
 
   // ── 自定义下拉浮层定位 ──
   const activeDropdown = ref<string | null>(null);
@@ -894,11 +893,6 @@ export function usePersonalizationContext(options: PersonalizationContextOptions
     personalization.closeDrawer();
   };
 
-  const openMcpConfig = () => {
-    window.open('/admin/policy', '_blank', 'noopener');
-    personalization.closeDrawer();
-  };
-
   // ===== 主题切换 =====
   const { setTheme, loadTheme } = useTheme();
   const themeOptions: Array<{
@@ -1029,7 +1023,6 @@ export function usePersonalizationContext(options: PersonalizationContextOptions
     localeOptions,
     minimalExpandHeightLimited,
     openCustomTools,
-    openMcpConfig,
     permissionModeLabel,
     personalization,
     projectMemoryInjectLimitMin,
@@ -1056,7 +1049,6 @@ export function usePersonalizationContext(options: PersonalizationContextOptions
     selectLocaleOption,
     selectThemeOption,
     selectVersioningBackupMode,
-    showMcpConfigEntry,
     skillsCatalog,
     stackedHideBorders,
     startTutorial,

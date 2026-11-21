@@ -55,8 +55,6 @@ from modules.skills_manager import (
 )
 from modules.custom_tool_registry import CustomToolRegistry, build_default_tool_category
 from modules.custom_tool_executor import CustomToolExecutor
-from modules.mcp_server_registry import MCPServerRegistry, build_default_mcp_category
-
 
 from core.tool_config import TOOL_CATEGORIES
 from utils.api_client import APIClient
@@ -126,140 +124,17 @@ class ToolsDefinitionCustomMcpMixin:
                 return tools
 
     def _build_mcp_tools(self) -> List[Dict]:
-                if not getattr(self, "mcp_tools_enabled", False):
-                    if hasattr(self, "tool_categories_map") and "mcp" in self.tool_categories_map:
-                        self.tool_categories_map["mcp"].tools = ["list_mcp_servers"]
-                    stale_keys = [
-                        key for key in list(getattr(self, "tool_categories_map", {}).keys())
-                        if isinstance(key, str) and key.startswith("mcp_server__")
-                    ]
-                    for key in stale_keys:
-                        self.tool_categories_map.pop(key, None)
-                        self.tool_category_states.pop(key, None)
-                    self._refresh_disabled_tools()
-                    self.mcp_tool_alias_map = {}
-                    return []
-                # 类别层面的禁用优先生效（即使策略里尚未填充具体工具列表）
-                mcp_cat = getattr(self, "tool_categories_map", {}).get("mcp")
-                if mcp_cat is not None:
-                    mcp_enabled = self.tool_category_states.get("mcp", getattr(mcp_cat, "default_enabled", True))
-                    forced = getattr(self, "admin_forced_category_states", {}).get("mcp")
-                    if isinstance(forced, bool):
-                        mcp_enabled = forced
-                    if not mcp_enabled:
-                        self.mcp_tool_alias_map = {}
-                        self.tool_categories_map["mcp"].tools = ["list_mcp_servers"]
-                        stale_keys = [
-                            key for key in list(getattr(self, "tool_categories_map", {}).keys())
-                            if isinstance(key, str) and key.startswith("mcp_server__")
-                        ]
-                        for key in stale_keys:
-                            self.tool_categories_map.pop(key, None)
-                            self.tool_category_states.pop(key, None)
-                        self._refresh_disabled_tools()
-                        return []
+                from modules.mcp_access import list_mcp_tool
+
+                self.mcp_tool_alias_map = {}
                 manager = getattr(self, "mcp_client_manager", None)
-                if manager is None:
-                    self.mcp_tool_alias_map = {}
+                if manager is None or not manager.available_servers():
                     return []
                 try:
-                    tool_defs, alias_map = manager.build_llm_tools(
-                        ensure_discovery=True,
-                        discovery_timeout_seconds=10,
-                    )
+                    tools, self.mcp_tool_alias_map = manager.build_llm_tools(discovery_timeout_seconds=10)
                 except Exception as exc:
                     logger.warning("构建 MCP 工具列表失败: %s", exc)
-                    tool_defs, alias_map = [], {}
-
-                # 保存映射，供执行层按 alias 分发到具体 server/tool
-                alias_map = alias_map or {}
-                if "mcp" in self.tool_categories_map:
-                    self.tool_categories_map["mcp"].tools = ["list_mcp_servers"]
-                elif getattr(self, "mcp_tools_enabled", False):
-                    default_mcp_cat = build_default_mcp_category()
-                    self.tool_categories_map["mcp"] = type(next(iter(TOOL_CATEGORIES.values())))(
-                        label=default_mcp_cat["label"],
-                        tools=["list_mcp_servers"],
-                        default_enabled=True,
-                        silent_when_disabled=False,
-                    )
-                server_aliases: Dict[str, List[str]] = {}
-                for alias, binding in alias_map.items():
-                    sid = str(getattr(binding, "server_id", "") or "").strip()
-                    if not sid:
-                        continue
-                    server_aliases.setdefault(sid, []).append(alias)
-
-                enabled_servers = []
-                try:
-                    enabled_servers = list(self.mcp_server_registry.list_enabled_servers())
-                except Exception:
-                    enabled_servers = []
-
-                active_server_category_ids = set()
-                for server in enabled_servers:
-                    sid = str(server.get("id") or "").strip()
-                    if not sid:
-                        continue
-                    cat_id = MCPServerRegistry.make_server_category_id(sid)
-                    active_server_category_ids.add(cat_id)
-                    aliases = list(server_aliases.get(sid, []))
-                    existing = self.tool_categories_map.get(cat_id)
-                    label = MCPServerRegistry.make_server_category_label(server)
-                    if existing is not None:
-                        existing.label = label
-                        existing.tools = aliases
-                    else:
-                        self.tool_categories_map[cat_id] = type(next(iter(TOOL_CATEGORIES.values())))(
-                            label=label,
-                            tools=aliases,
-                            default_enabled=True,
-                            silent_when_disabled=False,
-                        )
-                    if cat_id not in self.tool_category_states:
-                        self.tool_category_states[cat_id] = True
-
-                stale_keys = [
-                    key for key in list(self.tool_categories_map.keys())
-                    if isinstance(key, str)
-                    and key.startswith("mcp_server__")
-                    and key not in active_server_category_ids
-                ]
-                for key in stale_keys:
-                    self.tool_categories_map.pop(key, None)
-                    self.tool_category_states.pop(key, None)
-
-                if hasattr(self, "_prune_runtime_tool_overrides"):
-                    self._prune_runtime_tool_overrides()
-                if hasattr(self, "_apply_runtime_tool_overrides"):
-                    self._apply_runtime_tool_overrides()
-
-                filtered_tools: List[Dict[str, Any]] = []
-                filtered_alias_map: Dict[str, Any] = {}
-                for tool_def in tool_defs:
-                    alias = str(((tool_def or {}).get("function") or {}).get("name") or "").strip()
-                    if not alias:
-                        continue
-                    binding = alias_map.get(alias)
-                    if binding is None:
-                        continue
-                    sid = str(getattr(binding, "server_id", "") or "").strip()
-                    if not sid:
-                        continue
-                    cat_id = MCPServerRegistry.make_server_category_id(sid)
-                    cat = self.tool_categories_map.get(cat_id)
-                    cat_enabled = self.tool_category_states.get(
-                        cat_id,
-                        getattr(cat, "default_enabled", True) if cat is not None else True,
-                    )
-                    forced = getattr(self, "admin_forced_category_states", {}).get(cat_id)
-                    if isinstance(forced, bool):
-                        cat_enabled = forced
-                    if not cat_enabled:
-                        continue
-                    filtered_tools.append(tool_def)
-                    filtered_alias_map[alias] = binding
-
-                self.mcp_tool_alias_map = filtered_alias_map
-                self._refresh_disabled_tools()
-                return filtered_tools
+                    tools = []
+                if manager.available_servers():
+                    tools.append(list_mcp_tool(self._inject_intent))
+                return tools

@@ -82,6 +82,17 @@ DISABLE_LENGTH_CHECK = True
 
 
 class ToolsDefinitionMainMixin:
+    def refresh_mcp_tools(self, tools: List[Dict]) -> List[Dict]:
+                from modules.mcp_access import replace_mcp_tools
+
+                mcp_tools = self._build_mcp_tools()
+                state = get_tool_loading_state(self.context_manager.conversation_metadata)
+                if state:
+                    deferred = set(state["deferred_set"])
+                    mcp_tools = [build_tool_stub(tool) if tool["function"]["name"] in deferred else tool
+                                 for tool in mcp_tools]
+                return replace_mcp_tools(tools, mcp_tools)
+
     def define_tools(self, include_deferred: bool = False) -> List[Dict]:
                 """定义可用工具（添加确认工具）
 
@@ -155,15 +166,12 @@ class ToolsDefinitionMainMixin:
                 custom_tools = self._build_custom_tools()
                 if custom_tools:
                     tools.extend(custom_tools)
-                # 附加 MCP 工具（由管理员统一配置）
-                mcp_tools = self._build_mcp_tools()
-                if mcp_tools:
-                    tools.extend(mcp_tools)
                 if self.disabled_tools:
                     tools = [
                         tool for tool in tools
                         if tool.get("function", {}).get("name") not in self.disabled_tools
                     ]
+                tools.extend(self._build_mcp_tools())
 
                 # 工具动态加载：按对话快照过滤延迟工具。快照创建即钉死，
                 # tools 数组对话级稳定（不破坏前缀缓存）；老对话无字段=全量。

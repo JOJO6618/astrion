@@ -10,7 +10,6 @@ from config import PROJECT_MAX_STORAGE_BYTES, PROJECT_MAX_STORAGE_MB, WEB_SERVER
 from core.web_terminal import WebTerminal
 from modules.custom_tool_registry import CustomToolRegistry
 from modules.mcp_server_registry import MCPServerRegistry
-from modules.mcp_client_manager import MCPClientManager
 from modules.tool_approval_manager import ToolApprovalManager
 from modules.user_question_manager import UserQuestionManager
 from modules.plan_approval_manager import PlanApprovalManager
@@ -18,7 +17,6 @@ from modules.plan_approval_manager import PlanApprovalManager
 # 全局实例
 custom_tool_registry = CustomToolRegistry()
 mcp_server_registry = MCPServerRegistry()
-mcp_client_manager = MCPClientManager(mcp_server_registry)
 user_terminals: Dict[str, WebTerminal] = {}
 terminal_rooms: Dict[str, set] = {}
 connection_users: Dict[str, str] = {}
@@ -71,7 +69,6 @@ PROJECT_MAX_STORAGE_MB = PROJECT_MAX_STORAGE_MB
 __all__ = [
     "custom_tool_registry",
     "mcp_server_registry",
-    "mcp_client_manager",
     "user_terminals",
     "terminal_rooms",
     "connection_users",

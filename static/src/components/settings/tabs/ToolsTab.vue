@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { inject, unref } from 'vue';
+import { computed, inject, unref } from 'vue';
 import UiSwitch from '@/components/ui/UiSwitch.vue';
 
 defineOptions({ name: 'ToolsTab' });
@@ -14,10 +14,16 @@ const {
   personalization,
   skillsCatalog,
   toggleCategory,
-  toolCategories,
+  toolCategories: allToolCategories,
   toolLoadingRegistry,
   wsDescKey
 } = ctx;
+
+const toolCategories = computed(() =>
+  (unref(allToolCategories) as { id: string; label: string }[]).filter(
+    ({ id }) => id !== 'mcp' && !id.startsWith('mcp_server__')
+  )
+);
 
 /**
  * 当前勾选为延迟加载的工具名列表。

@@ -45,7 +45,7 @@
           <span>{{ $t('adminPolicy.catForced') }}</span>
           <span>{{ $t('adminPolicy.tableActions') }}</span>
         </div>
-        <div class="category-row" v-for="cat in categoryList" :key="cat.id">
+        <div class="category-row" v-for="cat in visibleCategories" :key="cat.id">
           <input v-model="cat.id" class="id-input" />
           <input v-model="cat.label" />
           <div class="tool-select" :class="{ open: openToolMenu === cat.id }">
@@ -155,145 +155,13 @@
 
     <section class="panel">
       <div class="panel-title">
-        <h2>{{ $t('adminPolicy.mcpSection') }}</h2>
-        <div class="header-actions">
-          <button type="button" class="ghost-btn" :disabled="mcpLoading" @click="fetchMcpServers">
-            {{ mcpLoading ? $t('common.refreshing') : $t('adminPolicy.refresh') }}
-          </button>
-          <button type="button" class="ghost-btn" :disabled="mcpSyncing" @click="syncAllMcpServers">
-            {{ mcpSyncing ? $t('adminPolicy.syncing') : $t('adminPolicy.syncAll') }}
-          </button>
-          <button type="button" @click="addMcpServer">{{ $t('adminPolicy.addMcpServer') }}</button>
-        </div>
-      </div>
-      <div v-if="!mcpServers.length" class="muted">{{ $t('adminPolicy.emptyMcpServers') }}</div>
-      <div class="mcp-list" v-else>
-        <div class="mcp-item" v-for="(server, idx) in mcpServers" :key="server.id || `new-${idx}`">
-          <div class="mcp-grid">
-            <label>
-              <span>{{ $t('adminPolicy.mcpId') }}</span>
-              <input v-model="server.id" :placeholder="$t('adminPolicy.mcpIdPlaceholder')" />
-            </label>
-            <label>
-              <span>{{ $t('adminPolicy.mcpName') }}</span>
-              <input v-model="server.name" :placeholder="$t('adminPolicy.mcpNamePlaceholder')" />
-            </label>
-            <label>
-              <span>Transport</span>
-              <select v-model="server.transport">
-                <option value="stdio">stdio</option>
-                <option value="streamable_http">streamable_http</option>
-              </select>
-            </label>
-            <label>
-              <span>{{ $t('adminPolicy.mcpEnabled') }}</span>
-              <select v-model="server.enabledText">
-                <option value="true">true</option>
-                <option value="false">false</option>
-              </select>
-            </label>
-            <label v-if="server.transport === 'stdio'" class="wide">
-              <span>command</span>
-              <input
-                v-model="server.command"
-                :placeholder="$t('adminPolicy.mcpCommandPlaceholder')"
-              />
-            </label>
-            <label v-if="server.transport === 'stdio'" class="wide">
-              <span>{{ $t('adminPolicy.mcpArgs') }}</span>
-              <textarea
-                v-model="server.argsText"
-                rows="3"
-                :placeholder="$t('adminPolicy.mcpArgsPlaceholder')"
-              ></textarea>
-            </label>
-            <label v-if="server.transport === 'stdio'" class="wide">
-              <span>{{ $t('adminPolicy.mcpCwd') }}</span>
-              <input v-model="server.cwd" :placeholder="$t('adminPolicy.mcpCwdPlaceholder')" />
-            </label>
-            <label v-if="server.transport === 'streamable_http'" class="wide">
-              <span>url</span>
-              <input v-model="server.url" :placeholder="$t('adminPolicy.mcpUrlPlaceholder')" />
-            </label>
-            <label class="wide">
-              <span>{{ $t('adminPolicy.mcpHeaders') }}</span>
-              <textarea
-                v-model="server.headersText"
-                rows="2"
-                :placeholder="$t('adminPolicy.mcpHeadersPlaceholder')"
-              ></textarea>
-            </label>
-            <label class="wide">
-              <span>{{ $t('adminPolicy.mcpEnv') }}</span>
-              <textarea
-                v-model="server.envText"
-                rows="2"
-                :placeholder="$t('adminPolicy.mcpEnvPlaceholder')"
-              ></textarea>
-            </label>
-            <label>
-              <span>timeout(s)</span>
-              <input v-model="server.timeoutText" placeholder="25" />
-            </label>
-            <label class="wide">
-              <span>{{ $t('adminPolicy.mcpIncludeTools') }}</span>
-              <input
-                v-model="server.includeToolsText"
-                :placeholder="$t('adminPolicy.mcpIncludeToolsPlaceholder')"
-              />
-            </label>
-            <label class="wide">
-              <span>{{ $t('adminPolicy.mcpExcludeTools') }}</span>
-              <input
-                v-model="server.excludeToolsText"
-                :placeholder="$t('adminPolicy.mcpExcludeToolsPlaceholder')"
-              />
-            </label>
-            <label class="wide">
-              <span>{{ $t('adminPolicy.mcpDescription') }}</span>
-              <input
-                v-model="server.description"
-                :placeholder="$t('adminPolicy.mcpDescriptionPlaceholder')"
-              />
-            </label>
-          </div>
-          <div class="mcp-meta">
-            <span>
-              {{
-                $t('adminPolicy.mcpLastSync', {
-                  time: server.tools_cache_updated_at || $t('adminPolicy.mcpNotSynced')
-                })
-              }}
-            </span>
-            <span v-if="server.last_error" class="error-text">{{
-              $t('adminPolicy.mcpError', { message: server.last_error })
-            }}</span>
-            <span>{{ $t('adminPolicy.mcpCacheCount', { count: server.tools_cache_count }) }}</span>
-          </div>
-          <div class="mcp-actions">
-            <button type="button" class="primary" @click="saveMcpServer(server)">
-              {{ $t('common.save') }}
-            </button>
-            <button type="button" class="ghost-btn" @click="syncMcpServer(server.id)">
-              {{ $t('adminPolicy.syncTools') }}
-            </button>
-            <button type="button" class="link danger" @click="deleteMcpServer(server.id, idx)">
-              {{ $t('common.delete') }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="panel">
-      <div class="panel-title">
         <h2>{{ $t('adminPolicy.removedCategories') }}</h2>
       </div>
       <div class="chips">
-        <span v-if="!form.config.remove_categories.length" class="muted">{{
+        <span v-if="!visibleRemovedCategories.length" class="muted">{{
           $t('adminPolicy.none')
         }}</span>
-        <span v-for="cid in form.config.remove_categories" :key="cid" class="chip">
+        <span v-for="cid in visibleRemovedCategories" :key="cid" class="chip">
           {{ cid }}
           <button type="button" @click="undoRemove(cid)">×</button>
         </span>
@@ -332,26 +200,6 @@ interface CategoryFormItem {
   forced: boolean | null;
 }
 
-interface MCPServerFormItem {
-  id: string;
-  name: string;
-  description: string;
-  transport: 'stdio' | 'streamable_http';
-  enabledText: 'true' | 'false';
-  command: string;
-  argsText: string;
-  cwd: string;
-  url: string;
-  headersText: string;
-  envText: string;
-  timeoutText: string;
-  includeToolsText: string;
-  excludeToolsText: string;
-  tools_cache_updated_at: string;
-  last_error: string;
-  tools_cache_count: number;
-}
-
 const defaults = reactive({
   categories: {} as Record<string, any>,
   models: [] as string[],
@@ -380,10 +228,6 @@ const form = reactive({
 const lastUpdated = ref<string | null>(null);
 const saving = ref(false);
 const policyCache = ref<RawPolicy | null>(null);
-const mcpServers = ref<MCPServerFormItem[]>([]);
-const mcpLoading = ref(false);
-const mcpSyncing = ref(false);
-
 const openForceMenu = ref<string | null>(null);
 const openToolMenu = ref<string | null>(null);
 const toolSearch = ref('');
@@ -394,12 +238,14 @@ const toolOptionsSet = computed<Set<string>>(() => {
   const set = new Set<string>();
   const addList = (list: any) => {
     if (!Array.isArray(list)) return;
-    list.forEach((t) => {
-      if (typeof t === 'string' && t.trim()) set.add(t.trim());
+    list.forEach((tool) => {
+      if (typeof tool !== 'string') return;
+      const name = tool.trim();
+      if (name && name !== 'list_mcp_servers' && !name.startsWith('mcp__')) set.add(name);
     });
   };
   Object.values(defaults.categories || {}).forEach((cat: any) => addList(cat?.tools));
-  categoryList.value.forEach((cat) => addList(cat.tools));
+  visibleCategories.value.forEach((cat) => addList(cat.tools));
   return set;
 });
 
@@ -507,6 +353,14 @@ const categoryList = computed<CategoryFormItem[]>(() => {
   }));
 });
 
+const isNormalCategory = (id: string) => id !== 'mcp' && !id.startsWith('mcp_server__');
+const visibleCategories = computed(() =>
+  categoryList.value.filter((cat) => isNormalCategory(cat.id))
+);
+const visibleRemovedCategories = computed(() =>
+  form.config.remove_categories.filter(isNormalCategory)
+);
+
 const getCategoryDefault = (id: string): boolean => {
   const map = form.config.category_overrides || {};
   if (map[id] && typeof map[id].default_enabled !== 'undefined') {
@@ -603,207 +457,6 @@ function rebuildCategoryOverrides() {
   form.config.category_overrides = map;
 }
 
-function splitCsv(value: string): string[] {
-  return (value || '')
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
-function linesToList(value: string): string[] {
-  return (value || '')
-    .split('\n')
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
-function parseJsonDict(label: string, raw: string): Record<string, string> {
-  const text = (raw || '').trim();
-  if (!text) return {};
-  let parsed: any;
-  try {
-    parsed = JSON.parse(text);
-  } catch (error: any) {
-    throw new Error(t('adminPolicy.jsonInvalid', { label, message: error?.message || error }));
-  }
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    throw new Error(t('adminPolicy.jsonMustBeObject', { label }));
-  }
-  const output: Record<string, string> = {};
-  Object.entries(parsed).forEach(([k, v]) => {
-    const key = String(k || '').trim();
-    if (!key) return;
-    output[key] = String(v ?? '');
-  });
-  return output;
-}
-
-function mapMcpServer(raw: any): MCPServerFormItem {
-  const transport = raw?.transport === 'streamable_http' ? 'streamable_http' : 'stdio';
-  const args = Array.isArray(raw?.args) ? raw.args.filter((x: any) => typeof x === 'string') : [];
-  const toolsCache = Array.isArray(raw?.tools_cache) ? raw.tools_cache : [];
-  return {
-    id: String(raw?.id || ''),
-    name: String(raw?.name || raw?.id || ''),
-    description: String(raw?.description || ''),
-    transport,
-    enabledText: raw?.enabled === false ? 'false' : 'true',
-    command: String(raw?.command || ''),
-    argsText: args.join('\n'),
-    cwd: String(raw?.cwd || ''),
-    url: String(raw?.url || ''),
-    headersText:
-      raw?.headers && typeof raw.headers === 'object' ? JSON.stringify(raw.headers, null, 2) : '',
-    envText: raw?.env && typeof raw.env === 'object' ? JSON.stringify(raw.env, null, 2) : '',
-    timeoutText: String(raw?.timeout_seconds ?? 25),
-    includeToolsText: Array.isArray(raw?.include_tools) ? raw.include_tools.join(',') : '',
-    excludeToolsText: Array.isArray(raw?.exclude_tools) ? raw.exclude_tools.join(',') : '',
-    tools_cache_updated_at: String(raw?.tools_cache_updated_at || ''),
-    last_error: String(raw?.last_error || ''),
-    tools_cache_count: toolsCache.length
-  };
-}
-
-function normalizeMcpPayload(server: MCPServerFormItem) {
-  const id = server.id.trim();
-  if (!id) throw new Error(t('adminPolicy.mcpIdRequired'));
-  return {
-    id,
-    name: server.name.trim() || id,
-    description: server.description.trim(),
-    transport: server.transport,
-    enabled: server.enabledText === 'true',
-    command: server.command.trim(),
-    args: linesToList(server.argsText),
-    cwd: server.cwd.trim(),
-    url: server.url.trim(),
-    headers: parseJsonDict('headers', server.headersText),
-    env: parseJsonDict('env', server.envText),
-    timeout_seconds: Number(server.timeoutText || 25),
-    include_tools: splitCsv(server.includeToolsText),
-    exclude_tools: splitCsv(server.excludeToolsText)
-  };
-}
-
-async function fetchMcpServers() {
-  if (!secondaryVerified.value) return;
-  mcpLoading.value = true;
-  try {
-    const resp = await fetch('/api/admin/mcp-servers', { credentials: 'same-origin' });
-    const data = await resp.json();
-    if (!resp.ok || !data.success) {
-      throw new Error(data.error || t('adminPolicy.loadMcpFailed'));
-    }
-    mcpServers.value = (data.data || []).map((item: any) => mapMcpServer(item));
-  } catch (error: any) {
-    banner.message = error?.message || t('adminPolicy.loadMcpFailed');
-    banner.type = 'error';
-  } finally {
-    mcpLoading.value = false;
-  }
-}
-
-function addMcpServer() {
-  mcpServers.value.unshift(
-    mapMcpServer({
-      id: '',
-      name: '',
-      transport: 'stdio',
-      enabled: true,
-      timeout_seconds: 25
-    })
-  );
-}
-
-async function saveMcpServer(server: MCPServerFormItem) {
-  if (!secondaryVerified.value) return;
-  try {
-    const payload = normalizeMcpPayload(server);
-    const resp = await fetch('/api/admin/mcp-servers', {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    const data = await resp.json();
-    if (!resp.ok || !data.success) {
-      throw new Error(data.error || t('adminPolicy.saveMcpFailed'));
-    }
-    banner.message = t('adminPolicy.mcpSaved', { id: payload.id });
-    banner.type = 'success';
-    await syncMcpServer(payload.id, true);
-  } catch (error: any) {
-    banner.message = error?.message || t('adminPolicy.saveMcpFailed');
-    banner.type = 'error';
-  }
-}
-
-async function deleteMcpServer(id: string, idx: number) {
-  if (!secondaryVerified.value) return;
-  const target = String(id || '').trim();
-  if (!target) {
-    mcpServers.value.splice(idx, 1);
-    return;
-  }
-  try {
-    const resp = await fetch(`/api/admin/mcp-servers?id=${encodeURIComponent(target)}`, {
-      method: 'DELETE',
-      credentials: 'same-origin'
-    });
-    const data = await resp.json();
-    if (!resp.ok || !data.success) {
-      throw new Error(data.error || t('adminPolicy.deleteMcpFailed'));
-    }
-    banner.message = t('adminPolicy.mcpDeleted', { id: target });
-    banner.type = 'success';
-    await fetchMcpServers();
-    await fetchDefaults();
-  } catch (error: any) {
-    banner.message = error?.message || t('adminPolicy.deleteMcpFailed');
-    banner.type = 'error';
-  }
-}
-
-async function syncMcpServer(id?: string, silent = false) {
-  if (!secondaryVerified.value) return;
-  const target = String(id || '').trim();
-  if (typeof id !== 'undefined' && !target) {
-    banner.message = t('adminPolicy.syncRequiresSave');
-    banner.type = 'error';
-    return;
-  }
-  if (!silent) mcpSyncing.value = true;
-  try {
-    const resp = await fetch('/api/admin/mcp-servers/sync', {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(target ? { id: target } : {})
-    });
-    const data = await resp.json();
-    if (!resp.ok || !data.success) {
-      throw new Error(data.error || t('adminPolicy.syncMcpFailed'));
-    }
-    if (!silent) {
-      banner.message = target
-        ? t('adminPolicy.mcpSyncedWith', { id: target })
-        : t('adminPolicy.mcpSyncedAll');
-      banner.type = 'success';
-    }
-    await fetchMcpServers();
-    await fetchDefaults();
-  } catch (error: any) {
-    banner.message = error?.message || t('adminPolicy.syncMcpFailed');
-    banner.type = 'error';
-  } finally {
-    if (!silent) mcpSyncing.value = false;
-  }
-}
-
-async function syncAllMcpServers() {
-  await syncMcpServer();
-}
-
 async function fetchDefaults() {
   if (!secondaryVerified.value) return;
   const resp = await fetch('/api/admin/policy', { credentials: 'same-origin' });
@@ -888,7 +541,7 @@ async function savePolicy() {
 const handleVerifySecondary = async (password: string) => {
   await verifySecondary(password);
   if (secondaryVerified.value) {
-    Promise.all([fetchDefaults(), fetchMcpServers()]).catch((err) => {
+    fetchDefaults().catch((err) => {
       console.error(err);
       banner.message = err?.message || t('adminPolicy.loadPolicyFailed');
       banner.type = 'error';
@@ -900,7 +553,7 @@ onMounted(async () => {
   document.addEventListener('click', handleDocClick);
   await checkSecondary();
   if (secondaryVerified.value) {
-    Promise.all([fetchDefaults(), fetchMcpServers()]).catch((err) => {
+    fetchDefaults().catch((err) => {
       console.error(err);
       banner.message = err?.message || t('adminPolicy.loadPolicyFailed');
       banner.type = 'error';
@@ -910,7 +563,7 @@ onMounted(async () => {
 
 watch(secondaryVerified, (val) => {
   if (val) {
-    Promise.all([fetchDefaults(), fetchMcpServers()]).catch((err) => {
+    fetchDefaults().catch((err) => {
       console.error(err);
       banner.message = err?.message || t('adminPolicy.loadPolicyFailed');
       banner.type = 'error';
@@ -1041,63 +694,6 @@ onBeforeUnmount(() => {
   border-radius: 16px;
   padding: 16px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
-}
-
-.mcp-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.mcp-item {
-  border: 1px solid rgba(118, 103, 84, 0.2);
-  border-radius: 14px;
-  padding: 12px;
-  background: rgba(255, 255, 255, 0.92);
-}
-
-.mcp-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 10px;
-}
-
-.mcp-grid label {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  color: #5b4d3b;
-  font-size: 13px;
-}
-
-.mcp-grid label.wide {
-  grid-column: 1 / -1;
-}
-
-.mcp-grid textarea,
-.mcp-grid input,
-.mcp-grid select {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 8px 10px;
-  border-radius: 10px;
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  background: #fff;
-}
-
-.mcp-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 8px;
-  color: #8a7a62;
-  font-size: 12px;
-}
-
-.mcp-actions {
-  margin-top: 8px;
-  display: flex;
-  gap: 8px;
 }
 
 .error-text {

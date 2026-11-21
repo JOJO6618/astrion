@@ -85,30 +85,38 @@ class SubAgentRuntimeMixin:
 
     async def _build_runtime_tools(self) -> list:
         from modules.sub_agent.toolkit import SUB_AGENT_TOOLS
-        from modules.sub_agent.definitions import build_sub_tools, tool
+        from modules.sub_agent.definitions import build_sub_tools
+        from modules.mcp_access import available_mcp_servers
+        from modules.mcp_client_manager import MCPClientManager
+        from modules.mcp_client_manager.runtime_scope import MCPRuntimeScope
+
         tools = list(SUB_AGENT_TOOLS) + build_sub_tools()
         parent = self.manager.terminal
         if not getattr(parent, "mcp_tools_enabled", False):
             return tools
         if self._mcp_manager is not None:
             await asyncio.to_thread(self._mcp_manager.close_all_clients)
-        from modules.mcp_client_manager import MCPClientManager
-        from modules.mcp_client_manager.runtime_scope import MCPRuntimeScope
         self._mcp_manager = MCPClientManager(
             parent.mcp_server_registry, container_session=self.manager.container_session,
+            available_servers_resolver=lambda: available_mcp_servers(parent, "sub"),
             runtime_scope_resolver=lambda: MCPRuntimeScope(
                 workspace_path=str(self.manager.project_path), data_dir=str(self.manager.data_dir),
                 conversation_id=self.task_record["conversation_id"], actor_id=self.task_id,
                 working_dir=str(self.task_record.get("working_dir") or self.manager.project_path),
             ),
         )
-        definitions, aliases = await asyncio.to_thread(self._mcp_manager.build_llm_tools)
-        visible = set(getattr(parent, "mcp_tool_alias_map", {}))
-        disabled = set(getattr(parent, "disabled_tools", set()))
-        self._mcp_aliases = {name: binding for name, binding in aliases.items()
-                             if name in visible and name not in disabled}
-        tools.extend(item for item in definitions if item["function"]["name"] in self._mcp_aliases)
-        tools.append(tool("list_mcp_servers", "列出本子智能体可用的MCP服务及工具；不包含凭据。", {}))
+        return tools + await self._build_sub_mcp_tools()
+
+    async def _build_sub_mcp_tools(self) -> list:
+        from modules.mcp_access import list_mcp_tool
+
+        self._mcp_aliases = {}
+        manager = self._mcp_manager
+        if manager is None or not manager.available_servers():
+            return []
+        tools, self._mcp_aliases = await asyncio.to_thread(manager.build_llm_tools)
+        if manager.available_servers():
+            tools.append(list_mcp_tool())
         return tools
 
     async def _execute_mcp_tool(self, name: str, arguments: dict):
@@ -116,17 +124,9 @@ class SubAgentRuntimeMixin:
             return None
         if self._mcp_manager is None:
             return {"success": False, "error": "本子智能体没有启用MCP。"}
-        parent = self.manager.terminal
-        if not getattr(parent, "mcp_tools_enabled", False):
-            return {"success": False, "error": "MCP已禁用。"}
         if name == "list_mcp_servers":
-            groups = {}
-            for alias, binding in self._mcp_aliases.items():
-                groups.setdefault(binding.server_id, []).append(alias)
-            return {"success": True, "servers": [
-                {"id": server_id, "tool_aliases": aliases} for server_id, aliases in groups.items()]}
-        if name not in self._mcp_aliases or name in set(getattr(parent, "disabled_tools", set())):
-            return {"success": False, "error": "该MCP工具不在此子智能体的可用映射中。"}
+            from modules.execution_plane.integrations import describe_mcp_servers
+            return await asyncio.to_thread(describe_mcp_servers, self._mcp_manager, arguments)
         # External plugins deliberately do not inherit the native tool execution scope.
         clean = {key: value for key, value in arguments.items() if key != "intent"}
         return await asyncio.to_thread(self._mcp_manager.call_tool_by_alias, name, clean,

@@ -173,10 +173,13 @@ class MainTerminal(MainTerminalCommandMixin, MainTerminalContextMixin, MainTermi
                         default_enabled=True,
                         silent_when_disabled=False,
                     )
+            from modules.mcp_access import available_mcp_servers
+
             self.mcp_tools_enabled = bool(MCP_TOOLS_ENABLED)
             self.mcp_server_registry = MCPServerRegistry()
             self.mcp_client_manager = MCPClientManager(
                 self.mcp_server_registry,
+                available_servers_resolver=lambda: available_mcp_servers(self),
                 runtime_scope_resolver=lambda: MCPRuntimeScope(
                     workspace_path=self.project_path,
                     data_dir=str(self.data_dir),

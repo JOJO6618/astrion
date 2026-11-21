@@ -8,20 +8,12 @@ defineOptions({ name: 'AdminTab' });
  * 解构出的名称与主文件 script 顶层绑定一致，模板可直接引用。
  */
 const ctx = inject<Record<string, any>>('personalizationDrawer')!;
-const { openCustomTools, openMcpConfig, showMcpConfigEntry } = ctx;
+const { openCustomTools } = ctx;
 </script>
 
 <template>
   <section class="stg-page admin-monitor-page">
     <div class="stg-card">
-      <div class="stg-action-row" v-if="showMcpConfigEntry">
-        <span class="stg-row-copy"
-          ><span class="stg-row-title">{{ $t('personalization.mcpConfigTitle') }}</span
-          ><span class="stg-row-desc">{{ $t('personalization.mcpConfigDesc') }}</span></span
-        ><button type="button" class="stg-secondary-button" @click="openMcpConfig">
-          {{ $t('personalization.open') }}
-        </button>
-      </div>
       <div class="stg-action-row">
         <span class="stg-row-copy"
           ><span class="stg-row-title">{{ $t('personalization.customToolsAdminTitle') }}</span

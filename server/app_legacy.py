@@ -30,6 +30,7 @@ from server.host_password import host_password_bp
 from server.crosspet_settings import crosspet_settings_bp
 from server.files import files_bp
 from server.admin import admin_bp
+from server.mcp_settings import mcp_settings_bp
 from server.conversation import conversation_bp
 from server.chat import chat_bp
 from server.chat_mode import chat_mode_bp
@@ -303,6 +304,7 @@ app.register_blueprint(host_password_bp)
 app.register_blueprint(crosspet_settings_bp)
 app.register_blueprint(files_bp)
 app.register_blueprint(admin_bp)
+app.register_blueprint(mcp_settings_bp)
 app.register_blueprint(conversation_bp)
 app.register_blueprint(chat_bp)
 app.register_blueprint(chat_mode_bp)

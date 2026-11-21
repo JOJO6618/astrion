@@ -273,7 +273,7 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 - **持久化**：`persistence.py` 按工作区 data_dir 共享注册表，查询不得覆盖活动记录；新状态只写 `sub_agent_runtime.json`（version=1），上下文在 `sub_agent_tasks/<task_id>/conversation.json`，**不读旧 sub_agents.json**。保存 pending_work、pending_master_messages、work_paused；stop 暂停排队消费，新消息再解除。恢复校验原模型、固定权限、项目身份与工作目录，**不隐式重跑旧任务**。
 - **通知与单写者**：中间输出留子记录，每轮只把最终回复作为 user 消息通知主；子子通信同时报告主。生产端只入队；主运行中在完整工具批次后按序消费，主空闲时 poll 预占门闸并经 RuntimeService 移交 token。**有消息立即消费，不等 running 全部退出**（避免 ask_master 互锁）。目标暂停策略不被自动通知解除。
 - **显示契约**：`auto_message_type=multi_agent_*`、`visibility=chat`、`starts_work=false` 是协作消息协议；持久化与事件共用 message_id，恢复只走显示快照；传输字段 `has_running_multi_agent` 不是对话类型。
-- **MCP 与权限**：每子实例独立 MCPClientManager，复用父注册表及可见映射、不共享活动客户端；默认 Playwright profile 加稳定 actor_id；MCP 不套内置目录写权限沙箱；四档权限见 §18。
+- **MCP 与权限**：每子实例独立 MCPClientManager，复用全局服务注册表，按子智能体名单独立注入和调用。默认 Playwright profile 加稳定 actor_id；MCP 不套内置目录写权限沙箱；四档权限见 §18。
 - **显示与工具同步**：主 formatter 在 `agent_context.py`、子 formatter 在 `toolkit.py`；前端 `toolRenderers.ts` 委派 `subAgentResults.ts`；meta 只参数、content 只结果；新增工具同步 tool_config 类别、工具系列/只读清单与动态加载注册；快捷面板与详情时间线文案统一在 `components/chat/quickdock/subAgentToolText.ts`（「动作＋关键参数」，新增子工具补一条）。⋯ 菜单「停止」仅 running 可点 → `POST /api/sub_agents/<task_id>/stop`，软停止后 idle、保留实例/名额/上下文，与「强制关闭」（terminate）区分，结果以「被用户取消」通知主。
 - 回归：`test/2026-10-22_子智能体统一/`；真实模型、UI 与各原生平台另需实机验收。
 
@@ -359,6 +359,7 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 - **路由前后端双登记**（曾因只登前端导致整页 404）：`server/auth.py` 注册 `/settings` 与 `/settings/<path:section>`，前端 `route.ts` 登记 `settings`、`settings/*`。**进出都是整页跳转**，不做 SPA pushState（pinia 每次重建，`activeSection` 从 `general` 起）。
 - **挂载在 App.vue 的 Agent 加载门槛之前**，以 `settingsRoute` 独立互斥显示，组件在 `app/components.ts` 异步注册；设置页**不启动 Agent 连接、工作区运行态或轮询**。URL 深链由 SettingsShell onMounted 解析（先 `fetchSessionStatus()` 确保管理员判定就绪），非法分区回默认。
 - **SettingsShell 与 PersonalizationDrawer 禁止同时可见**；**新增分区三处同步**：`settingsNav.ts` 的 NAV_GROUPS + SECTION_TITLE_KEYS（含搜索索引）、SettingsShell 的 SECTION_COMPONENTS、`stores/settings.ts` 的 `SettingsSection`；样式在 `settings/settings.scss`（`stg-` 前缀）。管理员分区 = codex/admin/providers。
+- **MCP 设置**：`/settings/mcp` 使用已认证的 Host 会话。全局服务启停优先于主、子智能体各自的全局名单和工作区覆盖。工具发现、注入、列表和调用统一按有效名单校验。契约见 `AD/mcp_runtime_scope.md`。
 
 **提供商体系**：
 
