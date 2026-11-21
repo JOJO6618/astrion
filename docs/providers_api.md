@@ -177,8 +177,8 @@ ChatGPT 订阅连接行额外带 `account_hash`，`auth="codex_oauth"`。
 
 - `GET /api/codex/accounts` → `{success, accounts:[{id, hash, display_name, connected, state, credential_missing, is_legacy, is_primary, created_at, last_login_at, models}], primary_account_id}`（**不返回 token / ChatGPT account_id 原文**）。`state=credential_missing` 表示凭证文件暂不可用：登记身份/哈希保留、可诊断，但不参与请求；正常读取不会把暂缺当登出，恢复后用同一连接 id（只有显式 logout 才删登记）。
 - `GET /api/codex/status?account_id=` → 该账号连接状态 + 模型摘要，响应回带 `account_id`/`account_hash`/`account_name`/`is_primary`，前端据此丢弃晚到的旧账号响应；无任何账号时返回 200 `{connected:false, account_id:null}`
-- `POST /api/codex/login/start` / `POST /api/codex/login/device/start` → 启动登录；已有 pending 流程时返回 409 `login_in_progress`（不取消/覆盖既有流程）。登录完成由账号身份决定更新原账号还是新建；poll 完成时返回 `connection_id`/`account_hash`
-- `POST /api/codex/login/poll` / `cancel` → 同上（poll 完成后台刷新该次登录落到的账号模型）。取消与凭证落盘互斥：取消先到则不写凭证；提交临界区已开始时取消等待并保留已完成的登录结果，不产生“取消后仍写凭证”的中间态。
+- `POST /api/codex/login/start` / `POST /api/codex/login/device/start` → 启动登录；有进行中的流程时返回 409 `login_in_progress`。传 `account_id` 时重连指定连接，授权身份须匹配原账号，否则返回 `reconnect_account_mismatch`。省略时由授权身份决定更新已有连接或创建新连接。
+- `GET /api/codex/login/poll` → 只读登录状态。凭证落盘后进入 `pending / refreshing_models`，后台刷新一次本次连接的模型目录，再返回 `completed`、`connection_id`、`account_hash` 及 `models_refresh_failed`。`POST /api/codex/login/cancel` 与凭证落盘互斥，落盘后返回真实刷新进度或完成结果。
 - `POST /api/codex/logout`（body/query `account_id`）→ 删除该账号凭证+索引条目，并清理该账号模型缓存（主账号只清模型段，保留全局 proxy/client_version）；返回新的 `primary_account_id` 与 `models_cache_cleared`。凭证删除失败（权限/占用）返回 500 `{success:false,error:"logout_failed",account_id,detail}`，登记与凭证保持原样；只有显式 logout 才删除登记，不做删除墓碑。
 - `POST /api/codex/models/refresh?account_id=` → 刷新该账号模型缓存
 - `GET /api/codex/usage?account_id=` / `GET /api/codex/reset-credits?account_id=` / `POST /api/codex/reset-credits/consume`（body 必带 `account_id` + `credit_id`）→ 均绑定所选账号；未知账号 404 `account_not_found`，绝不静默回落到其它账号

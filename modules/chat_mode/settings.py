@@ -22,10 +22,8 @@ def sanitize_chat_settings(payload, fallback, allowed_models):
         value = payload.get(key, fallback.get(key, default))
         if key == "chat_default_model":
             value = value.strip() if isinstance(value, str) else ""
-            if value and value not in allowed_models:
-                if key in payload:
-                    raise ValueError("Unknown Chat default model")
-                value = ""
+            if value and value not in allowed_models and value != fallback.get(key):
+                raise ValueError("Unknown Chat default model")
         elif key in {"chat_default_thinking_mode", "chat_network_enabled"}:
             if not isinstance(value, bool):
                 raise ValueError(f"{key} must be a boolean")

@@ -786,12 +786,10 @@ class TaskManager(ChatModeTaskMixin, CompressionRequestMixin, TaskViewMixin):
             stop_hint = bool(stop_flags.get(rec.task_id, {}).get("stop"))
 
             def _apply_requested_model_mode():
-                # API 传入的模型/模式配置
-                if rec.model_key:
-                    try:
-                        terminal.set_model(rec.model_key)
-                    except Exception as exc:
-                        debug_log(f"[Task] 设置模型失败 {rec.model_key}: {exc}")
+                # 显式选择和存档选择均须在运行时仍可用。
+                model_key = rec.model_key or terminal.model_key
+                if model_key:
+                    terminal.set_model(model_key)
                 if rec.run_mode:
                     try:
                         terminal.set_run_mode(rec.run_mode)
@@ -803,7 +801,6 @@ class TaskManager(ChatModeTaskMixin, CompressionRequestMixin, TaskViewMixin):
                     except Exception as exc:
                         debug_log(f"[Task] 设置思考模式失败: {exc}")
 
-            _apply_requested_model_mode()
             if rec.max_iterations:
                 try:
                     terminal.max_iterations_override = int(rec.max_iterations)
@@ -828,7 +825,7 @@ class TaskManager(ChatModeTaskMixin, CompressionRequestMixin, TaskViewMixin):
             except Exception as exc:
                 raise RuntimeError(tr("tasks.conversation_load_failed", error=exc)) from exc
 
-            # 对话加载会按会话元数据恢复历史模型/模式，这里再覆盖一次用户本次请求参数
+            # 先恢复存档选择，再应用本次显式请求。
             _apply_requested_model_mode()
             try:
                 from server.crosspet import bind_task

@@ -66,7 +66,8 @@ const selectedLabel = computed(
   () =>
     props.options.find((item) => item.key === props.modelValue)?.label ||
     props.extraOptions.find((item) => item.key === props.modelValue)?.label ||
-    ''
+    modelStore.allModels.find((item) => item.key === props.modelValue)?.label ||
+    props.modelValue
 );
 
 const isCollapsed = (id: string) => !searching.value && collapsed.value.includes(id);

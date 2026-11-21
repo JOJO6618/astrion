@@ -3,6 +3,7 @@ import { ref } from 'vue';
 import { useProvidersStore } from '@/stores/providers';
 import type { ProviderCatalogEntry } from '@/stores/providers';
 import { useModelStore } from '@/stores/model';
+import { notifyModelCatalogChanged } from '@/composables/useModelCatalogAutoRefresh';
 import SettingsModal from './SettingsModal.vue';
 import ProviderIcon from './ProviderIcon.vue';
 import { useCodexLogin } from './useCodexLogin';
@@ -13,9 +14,11 @@ import { useCodexLogin } from './useCodexLogin';
  * （走 /api/codex/login/* 链路，逻辑在 useCodexLogin）；
  * Codex 分区（CodexTab.vue）不再内联登录 / 断开 / 刷新模型。
  */
-defineProps<{
+const props = defineProps<{
   entry: ProviderCatalogEntry;
 }>();
+const reconnectId =
+  props.entry.entry_kind === 'connection' || props.entry.connection ? props.entry.id : undefined;
 
 const emit = defineEmits<{ (e: 'close'): void }>();
 
@@ -29,6 +32,8 @@ const {
   devicePending,
   deviceStarting,
   exchanging,
+  refreshingModels,
+  modelsRefreshFailed,
   errorText,
   userCode,
   verificationUri,
@@ -38,13 +43,11 @@ const {
   openDevicePage,
   copyUserCode
 } = useCodexLogin({
-  onCompleted: () => {
+  reconnectId,
+  onCompleted: async () => {
+    notifyModelCatalogChanged();
+    await Promise.allSettled([providersStore.fetchCatalog(true), modelStore.fetchModels()]);
     completed.value = true;
-    // 登录成功：刷新目录连接状态；模型列表后台已刷新，稍等后同步前端选择器
-    void providersStore.fetchCatalog(true);
-    setTimeout(() => {
-      modelStore.fetchModels().catch(() => {});
-    }, 1500);
   }
 });
 </script>
@@ -52,7 +55,9 @@ const {
 <template>
   <SettingsModal
     :title="
-      $t('settings.connectDialogTitle', { name: `${entry.name} · ${entry.badge || 'OAuth'}` })
+      reconnectId
+        ? $t('settings.providerReconnect')
+        : $t('settings.connectDialogTitle', { name: `${entry.name} · ${entry.badge || 'OAuth'}` })
     "
     @close="emit('close')"
   >
@@ -67,6 +72,9 @@ const {
 
     <template v-if="completed">
       <p class="provider-form-note">{{ $t('settings.codexConnectSuccess') }}</p>
+      <div v-if="modelsRefreshFailed" class="provider-form-error">
+        {{ $t('settings.codexModelsRefreshFailed') }}
+      </div>
       <div class="provider-form-actions">
         <button type="button" class="provider-form-btn primary" @click="emit('close')">
           {{ $t('common.ok') }}
@@ -125,7 +133,8 @@ const {
 
     <template v-else>
       <!-- 授权进行中：浏览器流等待提示 / 设备码面板（文案复用 personalization.codex*） -->
-      <p v-if="exchanging" class="provider-form-note">
+      <p v-if="refreshingModels" class="provider-form-note">{{ $t('common.refreshing') }}</p>
+      <p v-else-if="exchanging" class="provider-form-note">
         {{ $t('personalization.codexLoginExchanging') }}
       </p>
       <div v-else-if="devicePending" class="codex-device-panel">
@@ -158,7 +167,7 @@ const {
       <p v-else class="provider-form-note">{{ $t('personalization.codexLoginPending') }}</p>
 
       <div v-if="errorText" class="provider-form-error">{{ errorText }}</div>
-      <div class="provider-form-actions">
+      <div v-if="!refreshingModels" class="provider-form-actions">
         <button type="button" class="provider-form-btn" @click="cancelLogin">
           {{ $t('common.cancel') }}
         </button>

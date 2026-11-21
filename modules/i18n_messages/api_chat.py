@@ -244,10 +244,6 @@ MESSAGES = {
         "zh-CN": "该模型已被管理员禁用",
         "en-US": "This model has been disabled by the admin",
     },
-    "chat_settings.protocol_switch_locked": {
-        "zh-CN": "Responses 协议模型与 Chat 模型不可在同一对话内互相切换，请新建对话使用",
-        "en-US": "Responses-protocol models and Chat models cannot be switched within the same conversation. Please start a new conversation.",
-    },
     "chat_settings.admin_forced_disabled": {
         "zh-CN": "被管理员强制禁用",
         "en-US": "Force-disabled by admin",

@@ -286,18 +286,12 @@ class CodexModelsManager:
             }
             result: Dict[str, Any] = {"refreshed": False}
             try:
-                tokens = self._auth._get_cached().get("tokens") or {}
-                access = tokens.get("access_token")
+                access = self._auth.get_access_token_sync()
                 if not access:
                     result["error"] = "no_credentials"
                     return self._fallback(current, result)
-                if self._auth._is_fresh(access) is False:
-                    # 刷新是同步持锁操作，这里直接复用
-                    self._auth._refresh_sync()
-                    tokens = self._auth._get_cached().get("tokens") or {}
-                    access = tokens.get("access_token")
                 headers["Authorization"] = f"Bearer {access}"
-                account_id = tokens.get("account_id")
+                account_id = self._auth.get_account_id()
                 if account_id:
                     headers["chatgpt-account-id"] = account_id
 

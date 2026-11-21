@@ -109,8 +109,13 @@ def prepare_draft_settings(terminal: Any, workspace: Any, previous_id: str | Non
     context.has_images = False
     context.has_videos = False
     model_key = defaults["model_key"]
-    if model_key:
-        terminal.set_model(model_key)
+    try:
+        if model_key:
+            terminal.set_model(model_key)
+    except ValueError:
+        terminal.model_key = model_key
+        terminal.model_profile = None
+        terminal.api_client.model_key = model_key
     profile = getattr(terminal, "model_profile", None) or {}
     run_mode = defaults["run_mode"]
     if profile.get("thinking_only"):

@@ -23,6 +23,7 @@
 
 from __future__ import annotations
 
+from contextlib import nullcontext
 import hashlib
 import json
 import os
@@ -360,8 +361,9 @@ class CodexAccountStore:
         refresh_token: str,
         id_token: str = "",
         account_id: Optional[str] = None,
+        reconnect_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """登录完成写凭证：同身份更新原账号，否则新建账号（原子、幂等）。"""
+        """登录完成写凭证；重连须命中原连接身份。"""
         material = codex_account_identity(id_token, account_id)
         identity_hash = identity_hash_from_material(material)
         with self._lock:
@@ -373,6 +375,8 @@ class CodexAccountStore:
                     if str(rec.get("identity_hash") or "") == identity_hash:
                         target = aid
                         break
+            if reconnect_id and target != reconnect_id:
+                raise ValueError("reconnect_account_mismatch")
             now = _now_iso()
             if target is None:
                 target = self._new_connection_id_locked(accounts)
@@ -401,13 +405,14 @@ class CodexAccountStore:
                 },
                 "last_refresh": now,
             }
-            _write_private_json(self._credential_path(target), payload)
+            manager = self._legacy_manager if target == LEGACY_CODEX_ACCOUNT_ID else self._managers.get(target)
+            # 与该账号正在执行的 token 轮换串行，避免旧轮换结果覆盖重新授权。
+            with manager._lock if manager is not None else nullcontext():
+                _write_private_json(self._credential_path(target), payload)
+                if manager is not None:
+                    manager._cached = None
+                    manager._cached_stat = None
             self._save_index_locked(index)
-            # 强制下次读取感知新文件（CodexAuthManager 自身也有文件签名检测）
-            manager = self._managers.get(target)
-            if manager is not None:
-                manager._cached = None
-                manager._cached_stat = None
             return self._public_record(target, accounts[target])
 
     def _new_connection_id_locked(self, accounts: Dict[str, Any]) -> str:

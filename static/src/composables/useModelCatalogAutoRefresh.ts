@@ -20,6 +20,11 @@ let intervalTimer: number | null = null;
 let initialTimer: number | null = null;
 let retryTimer: number | null = null;
 let running = false;
+let catalogChannel: BroadcastChannel | null = null;
+
+export function notifyModelCatalogChanged(): void {
+  catalogChannel?.postMessage('changed');
+}
 
 const pullModels = () =>
   useModelStore()
@@ -49,6 +54,10 @@ async function refreshOnce(): Promise<void> {
 
 export function startModelCatalogAutoRefresh(): void {
   if (intervalTimer !== null) return;
+  if (typeof BroadcastChannel !== 'undefined') {
+    catalogChannel = new BroadcastChannel('astrion-model-catalog');
+    catalogChannel.onmessage = () => void pullModels();
+  }
   initialTimer = window.setTimeout(() => {
     initialTimer = null;
     void refreshOnce();
@@ -57,6 +66,8 @@ export function startModelCatalogAutoRefresh(): void {
 }
 
 export function stopModelCatalogAutoRefresh(): void {
+  catalogChannel?.close();
+  catalogChannel = null;
   if (initialTimer !== null) {
     clearTimeout(initialTimer);
     initialTimer = null;

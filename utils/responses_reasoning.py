@@ -32,6 +32,8 @@ def same_responses_provider(source_model_key: str, current_model_key: str) -> bo
         profiles = get_registered_model_profiles()
         src_profile = profiles.get(source_model_key) or {}
         cur_profile = profiles.get(current_model_key) or {}
+        if any(profile.get("api_protocol") != "responses" for profile in (src_profile, cur_profile)):
+            return False
         src = src_profile.get("provider_id")
         cur = cur_profile.get("provider_id")
         if not src or not cur or src != cur:

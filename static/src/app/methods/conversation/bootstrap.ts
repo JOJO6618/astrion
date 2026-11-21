@@ -156,7 +156,7 @@ export const bootstrapMethods = {
         this.thinkingMode =
           typeof meta.thinking_mode === 'boolean' ? meta.thinking_mode : this.runMode !== 'fast';
       }
-      if (meta.model_key) this.modelSet(meta.model_key);
+      this.modelSet(meta.model_key || '');
       if (meta.work_mode) this.currentWorkMode = meta.work_mode;
       if (meta.permission_mode) this.currentPermissionMode = meta.permission_mode;
       if (meta.execution_mode) this.currentExecutionMode = meta.execution_mode;

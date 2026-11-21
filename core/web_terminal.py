@@ -441,7 +441,10 @@ class WebTerminal(MainTerminal):
                         if saved_model_key:
                             try:
                                 self.set_model(saved_model_key)
-                            except Exception as exc:
+                            except ValueError as exc:
+                                self.model_key = saved_model_key
+                                self.model_profile = None
+                                self.api_client.model_key = saved_model_key
                                 logger.warning("加载对话模型 %s 失败: %s", saved_model_key, exc)
                     self.pending_permission_mode = str(meta.get("pending_permission_mode") or "").strip().lower() or None
                     self.pending_execution_mode = str(meta.get("pending_execution_mode") or "").strip().lower() or None

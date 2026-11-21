@@ -164,21 +164,10 @@ export const computed = {
   },
   modelOptions() {
     const disabledSet = this.adminDisabledModels || new Set();
-    const options = this.models || [];
-    // 协议级互切锁定（2026-09-25 泛化）：对话创建后 chat_completions ↔ responses
-    // 禁切（/new 页不受限，首个任务落盘时模型即对话绑定）；同协议内互切放行
-    const lockActive = !!this.currentConversationId;
-    const curProto =
-      (options.find((o) => o.key === this.currentModelKey) as any)?.apiProtocol ||
-      'chat_completions';
-    return options.map((opt) => {
-      const locked =
-        lockActive && String((opt as any).apiProtocol || 'chat_completions') !== curProto;
-      return {
-        ...opt,
-        disabled: disabledSet.has(opt.key) || locked
-      };
-    });
+    return (this.models || []).map((option) => ({
+      ...option,
+      disabled: disabledSet.has(option.key)
+    }));
   },
   // 模型菜单分组（opencode 式）：可见模型按提供商分组，组顺序=注册表首次出现顺序。
   // 分组键规则：provider 同步模型用 providerId/providerName（openai-codex 归 OpenAI 组）；
