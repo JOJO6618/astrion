@@ -47,8 +47,9 @@ echo "==> 发布版本: $VERSION"
 [ -d "$DESKTOP_DIR/node_modules/electron" ] || { echo "!! 未安装依赖，先运行: cd desktop-electron && npm install"; exit 1; }
 
 # ── 1) 前端构建（壳加载的是后端 serve 的 static/dist） ──
+# 桌面打包会复制整个 static/dist，用 Vite 的清理选项排除历次构建的旧哈希文件。
 echo "==> 构建 Web 前端"
-(cd "$REPO_ROOT" && npm run build --silent 2>&1 | tail -n 5)
+(cd "$REPO_ROOT" && npm run build --silent -- --emptyOutDir 2>&1 | tail -n 5)
 
 # ── 2) 桌面端构建（prepare_backend + electron-builder） ──
 echo "==> 构建桌面端（electron-builder）"
