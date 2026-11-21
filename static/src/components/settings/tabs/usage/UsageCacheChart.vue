@@ -146,7 +146,6 @@ function onMove(event: MouseEvent) {
           $t('usageStats.today')
         }}</text>
       </svg>
-      <p class="usage-note">{{ $t('usageStats.cacheNote', { pct: average }) }}</p>
     </template>
     <p v-else class="usage-note">{{ $t('usageStats.cacheEmpty') }}</p>
     <UsageTooltip :state="tip" />

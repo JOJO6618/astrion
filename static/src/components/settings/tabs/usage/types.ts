@@ -3,6 +3,8 @@
 export type UsageMetric = 'tokens' | 'work' | 'cost' | 'requests';
 export type UsageGranularity = 'day' | 'week' | 'cum';
 export type UsageRange = '7' | '30' | 'all';
+/** 模型分布的行维度：name = 只按模型名称合并（默认）；provider = 按提供商 + 模型 */
+export type UsageModelGroup = 'name' | 'provider';
 
 export interface UsageDay {
   date: string;
@@ -77,6 +79,8 @@ export interface UsageReport {
   prior: { tokens: number; work_tokens: number; cost_usd: string; requests: number };
   ranges: Record<UsageRange, UsageBreakdown>;
   selected: string;
+  /** 后端实际使用的模型分组（未知值回落 name） */
+  model_group?: UsageModelGroup;
   timezone: string;
   sources: UsageSource[];
   exchange_rate?: { usd_cny?: number; rate_date?: string; stale?: boolean };

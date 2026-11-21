@@ -14,6 +14,16 @@ from .rollup import COST, empty_bucket, merge_bucket
 
 HEATMAP_DAYS = 371  # 53 周
 RANGES = (("7", 7), ("30", 30), ("all", None))
+# 模型分布的行维度：name 只按模型名称合并（默认，同名的不同提供商账号算一行）；provider 保留提供商前缀
+MODEL_GROUPS = ("name", "provider")
+
+
+def group_model_key(key: str, group: str) -> str:
+    """账本里的 model_key 形如 ``<provider>/<model>``；name 分组只保留模型名称。"""
+    if group == "provider":
+        return key
+    _, sep, name = key.partition("/")
+    return name if sep and name else key
 
 
 @dataclass
@@ -65,7 +75,15 @@ def _finish_breakdown(raw: dict) -> dict:
             "sources": sources, "punch": raw["punch"]}
 
 
-def build_report(sources: Iterable[SourceBuckets], *, tz: tzinfo, today: Optional[date] = None) -> dict:
+def build_report(
+    sources: Iterable[SourceBuckets],
+    *,
+    tz: tzinfo,
+    today: Optional[date] = None,
+    model_group: str = "name",
+) -> dict:
+    if model_group not in MODEL_GROUPS:
+        model_group = "name"
     localize = _Localizer(tz)
     today = today or datetime.now(tz).date()
     window_start = today - timedelta(days=HEATMAP_DAYS - 1)
@@ -83,6 +101,7 @@ def build_report(sources: Iterable[SourceBuckets], *, tz: tzinfo, today: Optiona
                     hour = int(hour_text)
                 except ValueError:
                     continue
+                model = group_model_key(model, model_group)
                 local_day, weekday, local_hour = localize(hour)
                 if local_day > today:  # 时钟回拨/未来记录不进入统计
                     continue

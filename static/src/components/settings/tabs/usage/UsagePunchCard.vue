@@ -14,22 +14,6 @@ const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
 
 const levelOf = computed(() => quantileLevels(props.punch.flat()));
 
-const peak = computed(() => {
-  let best = { day: -1, hour: -1, value: 0 };
-  props.punch.forEach((row, day) =>
-    row.forEach((value, hour) => {
-      if (value > best.value) best = { day, hour, value };
-    })
-  );
-  return best.day < 0
-    ? ''
-    : t('usageStats.punchPeak', {
-        day: weekdayName(best.day),
-        from: `${best.hour}:00`,
-        to: `${best.hour + 1}:00`
-      });
-});
-
 function onOver(event: Event) {
   const target = (event.target as HTMLElement)?.closest('[data-day]');
   if (!target) return;
@@ -63,9 +47,6 @@ function onOver(event: Event) {
         ></span>
       </template>
     </div>
-    <p class="usage-note">
-      <span v-if="peak">{{ peak }} · </span>{{ $t('usageStats.punchNote', { tz: timezone }) }}
-    </p>
     <UsageTooltip :state="tip" />
   </div>
 </template>
@@ -116,11 +97,5 @@ function onOver(event: Event) {
 
 .usage-punch-cell.l4 {
   background: var(--heat-4);
-}
-
-.usage-note {
-  margin: 10px 0 0;
-  font-size: 12px;
-  color: var(--text-tertiary);
 }
 </style>

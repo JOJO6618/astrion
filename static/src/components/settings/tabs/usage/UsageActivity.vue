@@ -374,11 +374,6 @@ watch(
         </div>
       </div>
       <div class="usage-activity-foot">
-        <span>{{
-          report.first_date
-            ? $t('usageStats.noteDaily', { date: formatDate(parseDay(report.first_date)) })
-            : $t('usageStats.noteDailyEmpty')
-        }}</span>
         <span class="usage-legend" aria-hidden="true">
           <span class="usage-cell is-void"></span>{{ $t('usageStats.legendNone') }}
           <span class="usage-legend-gap"></span>{{ $t('usageStats.legendLess') }}
@@ -588,6 +583,7 @@ watch(
 }
 
 .usage-legend {
+  margin-left: auto;
   display: inline-flex;
   align-items: center;
   gap: 4px;

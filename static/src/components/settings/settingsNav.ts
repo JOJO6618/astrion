@@ -41,6 +41,11 @@ export const NAV_GROUPS: NavGroup[] = [
     ]
   },
   {
+    id: 'interface',
+    titleKey: 'settings.groupInterface',
+    items: [{ id: 'appearance', labelKey: 'settings.navAppearance', icon: 'appearance' }]
+  },
+  {
     id: 'system',
     titleKey: 'settings.groupSystem',
     items: [
@@ -63,11 +68,6 @@ export const NAV_GROUPS: NavGroup[] = [
       { id: 'sub-agents', labelKey: 'settings.navSubAgents', icon: 'sub-agents' },
       { id: 'review-agents', labelKey: 'settings.navReviewAgents', icon: 'review-agents' }
     ]
-  },
-  {
-    id: 'interface',
-    titleKey: 'settings.groupInterface',
-    items: [{ id: 'appearance', labelKey: 'settings.navAppearance', icon: 'appearance' }]
   },
   {
     id: 'admin',

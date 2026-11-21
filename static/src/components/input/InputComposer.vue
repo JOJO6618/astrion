@@ -2483,6 +2483,10 @@ const editorJsonToMessage = (json?: JSONContent | null) => {
 
 const sendShortcut = computed(() => normalizeSendShortcut(personalizationStore.form.send_shortcut));
 const placeholderKey = ref(pickComposerPlaceholderKey());
+/** 已建对话固定提示语；只有空页面（尚未创建对话）才随机抽取 */
+const placeholderText = computed(() =>
+  props.currentConversationId ? t('input.placeholderAskAstrion') : t(placeholderKey.value)
+);
 // 发送后等输入框被清空再换一句；手动删空不换，避免边打边删时文字跳动
 let placeholderRefreshPending = false;
 
@@ -2525,7 +2529,7 @@ const editor = useEditor({
     }),
     Placeholder.configure({
       // 函数形式：每次装饰重算时求值，配合 refreshPlaceholder 支持换句与切换语言
-      placeholder: () => t(placeholderKey.value)
+      placeholder: () => placeholderText.value
     }),
     Mention.configure({
       HTMLAttributes: {

@@ -505,7 +505,7 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 - **入口**：设置页「账户 → 用量统计」（`/settings/usage`，内容列 1040px），个人空间「账户」卡片加跳转按钮；前端 `settings/tabs/UsageStatsTab.vue` + `tabs/usage/`，文案 `usageStats`，图表色用 `--heat-*`／`--series-*`（三主题＋首屏回退已补齐）。
 - **唯一数据源 = 对话费用账本**（`<data_dir>/api_costs/`，只读）；`modules/usage_stats/` 维护可重建派生缓存 `usage_stats_rollup.json`（按账本 mtime/size 增量，UTC 小时 × 模型 × 执行者）。**禁止**另写用量计数或改写账本；未计价请求单列，不当免费。
 - **来源归集**：工作区与 Chat 目录经可信身份解析，查询**不创建执行实例、不选择工作区**；host 共享 `DATA_DIR/api_costs` 时按各工作区 `conv_*.json` 归属，归属不到进「其它对话」。
-- **接口** `GET /api/usage-stats`（source / tz / tz_offset），时区换算后端出报表时完成；粒度、指标、范围前端切换。
+- **接口** `GET /api/usage-stats`（source / model_group / tz / tz_offset）；`model_group=name`（默认）按模型名称合并、`provider` 保留提供商前缀（`report.py::group_model_key`，账本与缓存不拆分）。时区换算后端出报表时完成；粒度、指标、范围前端切换，统计范围与模型分组变化才重新请求。
 
 ## 27) 对话级 Git worktree
 

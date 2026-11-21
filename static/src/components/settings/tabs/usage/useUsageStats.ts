@@ -1,7 +1,13 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { t } from '@/locales';
 import { usePersonalizationStore } from '@/stores/personalization';
-import type { UsageGranularity, UsageMetric, UsageRange, UsageReport } from './types';
+import type {
+  UsageGranularity,
+  UsageMetric,
+  UsageModelGroup,
+  UsageRange,
+  UsageReport
+} from './types';
 
 const VIEW_KEY = 'astrion_usage_stats_view';
 
@@ -9,9 +15,15 @@ interface ViewPrefs {
   granularity: UsageGranularity;
   metric: UsageMetric;
   range: UsageRange;
+  modelGroup: UsageModelGroup;
 }
 
-const DEFAULT_VIEW: ViewPrefs = { granularity: 'day', metric: 'tokens', range: '30' };
+const DEFAULT_VIEW: ViewPrefs = {
+  granularity: 'day',
+  metric: 'tokens',
+  range: '30',
+  modelGroup: 'name'
+};
 
 /** 视图偏好仅是本机便利项：读写失败（隐私模式等）静默回落默认值 */
 function readView(): ViewPrefs {
@@ -20,7 +32,10 @@ function readView(): ViewPrefs {
     return {
       granularity: ['day', 'week', 'cum'].includes(raw.granularity) ? raw.granularity : DEFAULT_VIEW.granularity,
       metric: ['tokens', 'work', 'cost', 'requests'].includes(raw.metric) ? raw.metric : DEFAULT_VIEW.metric,
-      range: ['7', '30', 'all'].includes(raw.range) ? raw.range : DEFAULT_VIEW.range
+      range: ['7', '30', 'all'].includes(raw.range) ? raw.range : DEFAULT_VIEW.range,
+      modelGroup: ['name', 'provider'].includes(raw.modelGroup)
+        ? raw.modelGroup
+        : DEFAULT_VIEW.modelGroup
     };
   } catch {
     return { ...DEFAULT_VIEW };
@@ -43,13 +58,19 @@ export function useUsageStats() {
   const granularity = ref<UsageGranularity>(view.granularity);
   const metric = ref<UsageMetric>(view.metric);
   const range = ref<UsageRange>(view.range);
+  const modelGroup = ref<UsageModelGroup>(view.modelGroup);
   let generation = 0;
 
-  watch([granularity, metric, range], () => {
+  watch([granularity, metric, range, modelGroup], () => {
     try {
       localStorage.setItem(
         VIEW_KEY,
-        JSON.stringify({ granularity: granularity.value, metric: metric.value, range: range.value })
+        JSON.stringify({
+          granularity: granularity.value,
+          metric: metric.value,
+          range: range.value,
+          modelGroup: modelGroup.value
+        })
       );
     } catch {
       /* 本机偏好写入失败不影响页面 */
@@ -71,6 +92,7 @@ export function useUsageStats() {
     try {
       const params = new URLSearchParams({
         source: source.value,
+        model_group: modelGroup.value,
         tz: Intl.DateTimeFormat().resolvedOptions().timeZone || '',
         tz_offset: String(-new Date().getTimezoneOffset())
       });
@@ -91,10 +113,24 @@ export function useUsageStats() {
   }
 
   watch(source, () => void load());
+  watch(modelGroup, () => void load());
   onMounted(() => void load());
   onBeforeUnmount(() => {
     generation += 1;
   });
 
-  return { report, loading, error, updatedAt, source, granularity, metric, range, currency, rate, load };
+  return {
+    report,
+    loading,
+    error,
+    updatedAt,
+    source,
+    granularity,
+    metric,
+    range,
+    modelGroup,
+    currency,
+    rate,
+    load
+  };
 }

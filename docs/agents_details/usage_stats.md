@@ -31,7 +31,7 @@
 
 ## 接口
 
-`GET /api/usage-stats?source=all|ws:<id>|ws:__unassigned__|chat&tz=<IANA>&tz_offset=<分钟>`（`@api_login_required`，仅 Web 主应用注册）。返回：`today`、`window_start`（53 周热力图起点）、`first_date`、`overview`（总量、花费、活跃天数、当前/最长连续、单日最高）、`days`（窗口内有用量的日期行，含当日主要模型）、`prior`（窗口前合计，供累计起点）、`ranges.{7,30,all}`（模型、kind、模式、来源、7×24 时段）、`sources`（全部来源及是否有数据）、`timezone`、`exchange_rate`。粒度、指标、时间范围切换均在前端完成，只有统计范围变化才重新请求；请求按代次判定归属，过期响应不写状态。
+`GET /api/usage-stats?source=all|ws:<id>|ws:__unassigned__|chat&model_group=name|provider&tz=<IANA>&tz_offset=<分钟>`（`@api_login_required`，仅 Web 主应用注册）。返回：`today`、`window_start`（53 周热力图起点）、`first_date`、`overview`（总量、花费、活跃天数、当前/最长连续、单日最高）、`days`（窗口内有用量的日期行，含当日主要模型）、`prior`（窗口前合计，供累计起点）、`ranges.{7,30,all}`（模型、kind、模式、来源、7×24 时段）、`sources`（全部来源及是否有数据）、`model_group`（实际生效值，未知值回落 name）、`timezone`、`exchange_rate`。`model_group=name`（默认）把同名的不同提供商账号并成一行，`provider` 保留 `<provider>/<model>` 维度；汇总在 `report.py::group_model_key` 完成，账本与派生缓存不拆分。粒度、指标、时间范围切换均在前端完成，统计范围与模型分组变化才重新请求；请求按代次判定归属，过期响应不写状态。
 
 ## 回归与验收
 

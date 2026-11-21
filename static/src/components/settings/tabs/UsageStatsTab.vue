@@ -16,7 +16,7 @@ import {
   sourceLabel
 } from './usage/format';
 import { useUsageStats } from './usage/useUsageStats';
-import type { UsageGranularity, UsageMetric, UsageRange } from './usage/types';
+import type { UsageGranularity, UsageMetric, UsageModelGroup, UsageRange } from './usage/types';
 
 defineOptions({ name: 'UsageStatsTab' });
 
@@ -29,6 +29,7 @@ const {
   granularity,
   metric,
   range,
+  modelGroup,
   currency,
   rate,
   load
@@ -50,31 +51,19 @@ const RANGES: { id: UsageRange; key: string }[] = [
   { id: '30', key: 'usageStats.range30' },
   { id: 'all', key: 'usageStats.rangeAll' }
 ];
+const MODEL_GROUPS: { id: UsageModelGroup; key: string }[] = [
+  { id: 'name', key: 'usageStats.modelGroupName' },
+  { id: 'provider', key: 'usageStats.modelGroupProvider' }
+];
 
-const sourceOptions = computed(() => {
+/** 下拉只显示名称：单行模板不塞次文字（工作区名 + 类型两行会挤压行高） */
+const sourceItems = computed(() => {
   const list = report.value?.sources || [];
   return [
-    { id: 'all', label: t('usageStats.allSources'), meta: t('usageStats.allSourcesMeta') },
-    ...list.map((item) => ({
-      id: item.id,
-      label: sourceLabel(item),
-      meta: !item.has_data
-        ? t('usageStats.noDataMeta')
-        : item.id === 'chat'
-          ? t('usageStats.chatMeta')
-          : item.id === 'ws:__unassigned__'
-            ? t('usageStats.unassignedMeta')
-            : t('usageStats.workspaceMeta')
-    }))
+    { value: 'all', label: t('usageStats.allSources') },
+    ...list.map((item) => ({ value: item.id, label: sourceLabel(item) }))
   ];
 });
-const sourceItems = computed(() =>
-  sourceOptions.value.map((item) => ({
-    value: item.id,
-    label: item.label,
-    description: item.meta
-  }))
-);
 
 function pickSource(id: string) {
   source.value = id;
@@ -245,7 +234,6 @@ const updatedText = computed(() =>
       <div class="usage-details-head">
         <div>
           <h3>{{ $t('usageStats.detailsTitle') }}</h3>
-          <p>{{ $t('usageStats.detailsDesc') }}</p>
         </div>
         <div class="usage-tabs" role="tablist" :aria-label="$t('usageStats.rangeAria')">
           <button
@@ -267,8 +255,22 @@ const updatedText = computed(() =>
           <span class="stg-section-divider__label">{{ $t('usageStats.modelsTitle') }}</span>
         </div>
         <div class="stg-card usage-block">
+          <div class="usage-block-head">
+            <div class="usage-tabs" role="tablist" :aria-label="$t('usageStats.modelGroupAria')">
+              <button
+                v-for="item in MODEL_GROUPS"
+                :key="item.id"
+                type="button"
+                role="tab"
+                class="usage-tab"
+                :aria-selected="modelGroup === item.id"
+                @click="modelGroup = item.id"
+              >
+                {{ $t(item.key) }}
+              </button>
+            </div>
+          </div>
           <UsageModelTable :models="breakdown.models" :currency="currency" :rate="rate" />
-          <p class="usage-note">{{ $t('usageStats.modelsNote') }}</p>
         </div>
 
         <div class="usage-columns">
@@ -408,12 +410,6 @@ const updatedText = computed(() =>
   padding: 28px 16px 8px;
 }
 
-.usage-details-head p {
-  margin: 2px 0 0;
-  font-size: 12px;
-  color: var(--text-tertiary);
-}
-
 .usage-tabs {
   display: flex;
   gap: 2px;
@@ -479,12 +475,6 @@ const updatedText = computed(() =>
 
 .usage-column {
   min-width: 0;
-}
-
-.usage-note {
-  margin: 10px 0 0;
-  font-size: 12px;
-  color: var(--text-tertiary);
 }
 
 @media (max-width: 900px) {

@@ -139,14 +139,13 @@ function submit() {
         <span class="ui-dialog-label">{{ $t('settings.mcp.name') }}</span>
         <input v-model="draft.name" class="ui-dialog-input" :disabled="busy" />
       </label>
-      <div class="ui-dialog-switch-row">
+      <div class="ui-dialog-field">
         <span class="ui-dialog-label">{{ $t('settings.mcp.transport') }}</span>
         <UiSelect
           :model-value="draft.transport"
           :options="transports"
           :label="$t('settings.mcp.transport')"
           :disabled="busy"
-          align-end
           @update:model-value="draft.transport = $event as McpTransport"
         />
       </div>

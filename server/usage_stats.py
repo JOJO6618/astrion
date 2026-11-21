@@ -93,6 +93,7 @@ def get_usage_stats():
         return jsonify({"success": False, "error": "unauthorized"}), 401
     tz, tz_label = _resolve_timezone()
     selected = str(request.args.get("source") or "all").strip() or "all"
+    model_group = str(request.args.get("model_group") or "name").strip() or "name"
     try:
         refs, shared = _workspace_refs(username, request_identity())
         sources = gather_sources(refs, _chat_root(), shared_ledger=shared)
@@ -109,9 +110,10 @@ def get_usage_stats():
     chosen = sources if selected == "all" else [item for item in sources if item.id == selected]
     if selected != "all" and not chosen:
         return jsonify({"success": False, "error": "unknown source"}), 400
-    report = build_report(chosen, tz=tz)
+    report = build_report(chosen, tz=tz, model_group=model_group)
     report.update({
         "selected": selected,
+        "model_group": "provider" if model_group == "provider" else "name",
         "timezone": tz_label,
         "sources": [{"id": item.id, "label": item.label, "mode": item.mode,
                      "has_data": bool(item.conversations)} for item in sources],
