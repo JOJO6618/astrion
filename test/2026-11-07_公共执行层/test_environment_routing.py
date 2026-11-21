@@ -4,10 +4,8 @@
 1. 深树（maxlevel=5）经执行后端 ``list_files``，内存 backend 在本机不存在项目目录时仍输出；
 2. 环境说明以 ``get_environment`` 为唯一事实源：Windows/Linux 目标按后端上报显示；
 3. 元数据缺失（空 dict）时明确“未知”，不拿控制端 OS/路径兜底；
-4. docker 目标 ``container.os=unknown`` 明确未知；
-5. 本地 backend 的宿主机文本继续复用 ``_host_runtime_cache``；
-6. ``_build_workspace_system_message`` 的 runtime_environment / resource_limit /
-   container_path 走同一份后端事实，不用控制端挂载路径。
+4. 本地 backend 的宿主机文本继续复用 ``_host_runtime_cache``；
+5. 工作区系统消息使用同一份运行环境与资源说明。
 
 只使用内存替身与临时运行目录，不读真实 .env/settings.json，不启动服务。
 """
@@ -138,18 +136,6 @@ class ExecutorEnvironmentDisplayTest(unittest.TestCase):
         "container": None,
     }
 
-    DOCKER_ENV = {
-        "backend": "remote-docker",
-        "is_local": False,
-        "platform": "linux",
-        "execution_target": "docker",
-        "execution_mode": "sandbox",
-        "network_permission": "restricted",
-        "workspace_root": "/srv/executor/ws",
-        "cwd": "/workspace",
-        "container": {"mount_path": "/workspace", "os": "unknown"},
-    }
-
     def _display(self, environment, **kwargs):
         return EnvironmentDisplayStub(environment, **kwargs)._resolve_runtime_display()
 
@@ -165,7 +151,6 @@ class ExecutorEnvironmentDisplayTest(unittest.TestCase):
             "  工作区: C:\\executor\\ws",
         )
         self.assertEqual(display["resource_limit"], "由执行后端决定（未上报资源配额）")
-        self.assertEqual(display["container_path"], "C:\\executor\\ws")
 
     def test_linux_target_display_uses_backend_facts(self):
         display = self._display(self.LINUX_ENV)
@@ -177,7 +162,6 @@ class ExecutorEnvironmentDisplayTest(unittest.TestCase):
             "  执行模式: sandbox | 网络: restricted\n"
             "  工作区: /srv/executor/ws",
         )
-        self.assertEqual(display["container_path"], "/srv/executor/ws")
 
     def test_local_backend_reuses_host_cache(self):
         env = {
@@ -203,7 +187,6 @@ class ExecutorEnvironmentDisplayTest(unittest.TestCase):
         self.assertIn("CACHED-OS", display["runtime_environment"])
         self.assertIn("CACHED-NODE", display["runtime_environment"])
         self.assertEqual(display["resource_limit"], "宿主机模式无限制")
-        self.assertEqual(display["container_path"], "/ws")
 
     # -- 缺失即未知 ----------------------------------------------------
     def test_missing_metadata_does_not_fabricate_platform(self):
@@ -241,17 +224,6 @@ class ExecutorEnvironmentDisplayTest(unittest.TestCase):
 
         self.assertEqual(tree, "📁 （执行后端未上报工作区路径）/\n(空项目)")
 
-    def test_docker_unknown_os_is_explicit(self):
-        display = self._display(self.DOCKER_ENV)
-
-        self.assertEqual(
-            display["runtime_environment"],
-            "隔离容器中（挂载目录 /workspace，后端 remote-docker）\n"
-            "  OS: 未知（容器内系统未探测）",
-        )
-        self.assertEqual(display["resource_limit"], "由执行后端决定（未上报资源配额）")
-        self.assertEqual(display["container_path"], "/workspace")
-
     # -- 工作区系统消息接线 -------------------------------------------
     def test_workspace_message_uses_backend_environment(self):
         stub = WorkspaceMessageStub(self.WINDOWS_ENV)
@@ -265,18 +237,6 @@ class ExecutorEnvironmentDisplayTest(unittest.TestCase):
         self.assertIn("由执行后端决定（未上报资源配额）", content)
         self.assertNotIn(CONTROLLER_PATH, content)
         self.assertIn("src/", content)
-
-    def test_workspace_message_docker_ignores_controller_mount(self):
-        stub = WorkspaceMessageStub(self.DOCKER_ENV, container_mount_path="/controller-mount")
-
-        content = stub._build_workspace_system_message(
-            {"project_info": {"file_tree": ""}}
-        )
-
-        self.assertIn("container_path=/workspace", content)
-        self.assertNotIn("/controller-mount", content)
-        self.assertIn("未知（容器内系统未探测）", content)
-        self.assertNotIn("macOS", content)
 
 
 if __name__ == "__main__":

@@ -6,11 +6,7 @@
 """
 
 MESSAGES = {
-    # ── MCP / 权限 ──
-    "tools_exec.mcp_disabled_docker_mode": {
-        "zh-CN": "当前为docker模式，MCP仅支持宿主机模式",
-        "en-US": "MCP is only supported in host mode; currently in docker mode",
-    },
+    # ── 权限 ──
     "tools_exec.readonly_denied": {
         "zh-CN": "当前处于只读模式，已拒绝会修改工作区或执行高风险操作的工具调用。",
         "en-US": "Read-only mode: tool calls that modify the workspace or perform high-risk operations have been denied.",

@@ -26,9 +26,6 @@
           <a class="ghost" href="/static/custom_tools/guide.html" target="_blank" rel="noopener">{{
             $t('adminCustomTools.main.viewGuide')
           }}</a>
-          <a class="ghost" href="/admin/monitor" target="_blank" rel="noopener">{{
-            $t('adminCustomTools.main.backToMonitor')
-          }}</a>
           <a class="ghost" href="/admin/policy" target="_blank" rel="noopener">{{
             $t('adminCustomTools.main.policyConfig')
           }}</a>

@@ -7,7 +7,6 @@ from server.app import (
     app,
     run_server,
     parse_arguments,
-    resource_busy_page,
     DEFAULT_PORT,
 )
 
@@ -15,7 +14,6 @@ __all__ = [
     "app",
     "run_server",
     "parse_arguments",
-    "resource_busy_page",
     "DEFAULT_PORT",
 ]
 

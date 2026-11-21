@@ -15,7 +15,6 @@ import ToolsTab from './tabs/ToolsTab.vue';
 import SearchTab from './tabs/SearchTab.vue';
 import ContextTab from './tabs/ContextTab.vue';
 import FilesTab from './tabs/FilesTab.vue';
-import VoiceTab from './tabs/VoiceTab.vue';
 import BrowserTab from './tabs/BrowserTab.vue';
 import SubAgentsTab from './tabs/SubAgentsTab.vue';
 import ReviewAgentsTab from './tabs/ReviewAgentsTab.vue';
@@ -70,8 +69,7 @@ const canShowSection = (section: SettingsSection) =>
   (section !== 'quick-chat' || quickChatSupported) &&
   (!SETTINGS_ADMIN_SECTIONS.has(section) || isAdmin.value);
 
-const navLabelKey = (id: SettingsSection, labelKey: string) =>
-  id === 'workspace' && !settingsStore.isHostMode ? 'settings.navWorkspaceProject' : labelKey;
+const navLabelKey = (_id: SettingsSection, labelKey: string) => labelKey;
 
 /** 过滤管理员项后的可见导航（整组为空时隐藏组标题） */
 const visibleNavGroups = computed(() =>
@@ -114,7 +112,6 @@ const SECTION_COMPONENTS: Record<SettingsSection, Component> = {
   tools: ToolsTab,
   context: ContextTab,
   files: FilesTab,
-  voice: VoiceTab,
   browser: BrowserTab,
   'sub-agents': SubAgentsTab,
   'review-agents': ReviewAgentsTab,
@@ -122,10 +119,8 @@ const SECTION_COMPONENTS: Record<SettingsSection, Component> = {
   admin: AdminTab
 };
 
-const activeTitleKey = computed(() =>
-  activeSection.value === 'workspace' && !settingsStore.isHostMode
-    ? 'settings.workspaceTitleProject'
-    : SECTION_TITLE_KEYS[activeSection.value] || SECTION_TITLE_KEYS.general
+const activeTitleKey = computed(
+  () => SECTION_TITLE_KEYS[activeSection.value] || SECTION_TITLE_KEYS.general
 );
 const activeComponent = computed(
   () => SECTION_COMPONENTS[activeSection.value] || SECTION_COMPONENTS.general
@@ -173,17 +168,7 @@ const focusIndex = ref(-1);
 const activeResultKey = ref('');
 const searching = computed(() => query.value.trim().length > 0);
 const results = computed<SearchResult[]>(() =>
-  searching.value
-    ? searchSettings(query.value, sectionLabel, canShowSection, (key) => {
-        if (key === 'settings.memoryMigration.hostEntry') return settingsStore.sessionHostMode;
-        if (key === 'settings.memoryMigration.dockerEntry') {
-          return (
-            settingsStore.sessionStatusLoaded && !settingsStore.sessionHostMode && isAdmin.value
-          );
-        }
-        return true;
-      })
-    : []
+  searching.value ? searchSettings(query.value, sectionLabel, canShowSection) : []
 );
 const resultButtons = ref<HTMLElement[]>([]);
 

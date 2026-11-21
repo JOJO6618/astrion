@@ -12,10 +12,6 @@ try:
         READ_TOOL_MAX_CONTEXT_BEFORE, READ_TOOL_MAX_CONTEXT_AFTER,
         READ_TOOL_DEFAULT_MAX_MATCHES, READ_TOOL_MAX_MATCHES,
         READ_TOOL_MAX_FILE_SIZE,
-        TERMINAL_SANDBOX_MOUNT_PATH,
-        TERMINAL_SANDBOX_MODE,
-        TERMINAL_SANDBOX_CPUS,
-        TERMINAL_SANDBOX_MEMORY,
         PROJECT_MAX_STORAGE_MB,
         CUSTOM_TOOLS_ENABLED,
     )
@@ -32,10 +28,6 @@ except ImportError:
         READ_TOOL_MAX_CONTEXT_BEFORE, READ_TOOL_MAX_CONTEXT_AFTER,
         READ_TOOL_DEFAULT_MAX_MATCHES, READ_TOOL_MAX_MATCHES,
         READ_TOOL_MAX_FILE_SIZE,
-        TERMINAL_SANDBOX_MOUNT_PATH,
-        TERMINAL_SANDBOX_MODE,
-        TERMINAL_SANDBOX_CPUS,
-        TERMINAL_SANDBOX_MEMORY,
         PROJECT_MAX_STORAGE_MB,
         CUSTOM_TOOLS_ENABLED,
     )
@@ -68,7 +60,6 @@ from modules.custom_tool_registry import CustomToolRegistry, build_default_tool_
 from modules.custom_tool_executor import CustomToolExecutor
 
 
-from modules.container_monitor import collect_stats, inspect_state
 from core.tool_config import TOOL_CATEGORIES
 from utils.api_client import APIClient
 from utils.context_manager import ContextManager, AUTO_SHALLOW_PLACEHOLDER
@@ -151,10 +142,6 @@ class ModeMixin:
 
         mode = self.get_permission_mode()
 
-        # docker 运行时（终端会话为只读身份，需要补充引导）
-        _session = getattr(self, "container_session", None)
-        docker_runtime = bool(_session and getattr(_session, "mode", None) == "docker")
-
         direct = getattr(self, "get_execution_mode", lambda: "sandbox")() == "direct"
         # 沙箱分支保持现有执行方式；完全访问在执行前审核。
         if direct and mode in {"approval", "auto_approval"}:
@@ -171,19 +158,18 @@ class ModeMixin:
                 "- run_command：支持任意命令，包括管道、重定向、子shell等\n"
                 "- 文件操作：read_file / write_file / edit_file 可直接使用；其他文件管理请通过 run_command 执行；需要 Python 时先探测并选择合适解释器"
             )
-            if not docker_runtime:
-                # 权限模式只管工作区内读写；宿主机沙箱的读边界与只读模式同一白名单
-                detailed_rules += (
-                    "\n- 可读范围：宿主机沙箱执行时同样受限（仅系统目录/工作区/路径授权可读）；"
-                    "读取授权范围外的文件会被系统拒绝，需用户在「路径授权」中添加，属预期边界，不要尝试绕过"
-                )
+            # 权限模式只管工作区内读写；宿主沙箱的读边界与只读模式同一白名单
+            detailed_rules += (
+                "\n- 可读范围：宿主机沙箱执行时同样受限（仅系统目录/工作区/路径授权可读）；"
+                "读取授权范围外的文件会被系统拒绝，需用户在「路径授权」中添加，属预期边界，不要尝试绕过"
+            )
         elif mode == "readonly":
             detailed_rules = (
                 "- run_command：统一在系统只读沙箱中执行，写入会被系统直接拒绝\n"
-                "- 可读范围同样受限（宿主机 macOS：仅系统目录/工作区/路径授权可读；docker：受文件属主权限限制，600 等属主保护文件不可读）；读不到属预期边界，不要尝试绕过\n"
+                "- 可读范围同样受限（宿主机 macOS：仅系统目录/工作区/路径授权可读）；读不到属预期边界，不要尝试绕过\n"
                 "- 文件操作：仅允许 read_file、view_image、view_video 等读取类工具\n"
                 "- 禁止：write_file、edit_file 及会修改工作区的命令操作\n"
-                "- 终端会话（terminal_*）：可自由创建与输入，但终端以只读身份运行（docker 非特权 uid / 宿主机只读沙箱 profile），写入会被系统拒绝，属预期边界"
+                "- 终端会话（terminal_*）：可自由创建与输入，但终端以只读身份运行（宿主机只读沙箱 profile），写入会被系统拒绝，属预期边界"
             )
         elif mode == "approval":
             detailed_rules = (
@@ -192,7 +178,7 @@ class ModeMixin:
                 "- 读取授权范围外的路径：审批无法放行，需用户在「路径授权」中添加\n"
                 "- 需要用户批准：write_file、edit_file、save_webpage 及其他会修改工作区的操作\n"
                 "- 被拒绝或超时：本次操作不会执行写入\n"
-                "- 终端会话（terminal_*）可直接创建与输入（无需批准），但以只读身份运行（docker 非特权 uid / 宿主机只读沙箱 profile）：终端里的写入会被系统拒绝，需要写入的命令请用 run_command（审批通过后以可写身份重跑），属预期边界"
+                "- 终端会话（terminal_*）可直接创建与输入（无需批准），但以只读身份运行（宿主机只读沙箱 profile）：终端里的写入会被系统拒绝，需要写入的命令请用 run_command（审批通过后以可写身份重跑），属预期边界"
             )
         elif mode == "auto_approval":
             detailed_rules = (
@@ -203,7 +189,7 @@ class ModeMixin:
                 "- 自动审批拒绝：本次工具调用会返回“拒绝+理由”，主循环继续；人工拒绝可随时接管\n"
                 "- 普通自动审批支持人工接管：用户在审批面板提交人工决定后，停止自动审批并以人工决策为准\n"
                 "- 单次完全访问默认需要自动审核与人工审批均通过；用户开启允许自动审核通过单次完全访问请求后，自动审核通过即执行，无需人工批准；任一拒绝均不得规避\n"
-                "- 终端会话（terminal_*）以只读身份运行（docker 非特权 uid / 宿主机只读沙箱 profile）：终端里的写入会被系统拒绝，需要写入的命令请用 run_command（审批通过后以可写身份重跑），属预期边界"
+                "- 终端会话（terminal_*）以只读身份运行（宿主机只读沙箱 profile）：终端里的写入会被系统拒绝，需要写入的命令请用 run_command（审批通过后以可写身份重跑），属预期边界"
             )
         else:
             detailed_rules = ""
@@ -263,12 +249,6 @@ class ModeMixin:
 
     def _build_execution_mode_message(self) -> Optional[str]:
         """根据当前执行环境模式构建提示消息。"""
-        # 仅宿主机模式注入；Docker 模式不需要该提示。
-        try:
-            if not getattr(self, "_is_host_mode", lambda: False)():
-                return None
-        except Exception:
-            return None
         state = {}
         if hasattr(self, "get_execution_mode_state"):
             try:

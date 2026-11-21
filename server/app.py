@@ -6,7 +6,6 @@ from .app_legacy import (
     run_server as _run_server,
     parse_arguments as _parse_arguments,
     initialize_system,
-    resource_busy_page,
     DEFAULT_PORT,
 )
 
@@ -36,7 +35,6 @@ __all__ = [
     "run_server",
     "parse_arguments",
     "initialize_system",
-    "resource_busy_page",
     "main",
     "DEFAULT_PORT",
 ]

@@ -10,8 +10,6 @@
 - tools_policy.  core/main_terminal_parts/tools_policy.py 的 raise ValueError
 - commands_raise. core/main_terminal_parts/commands.py 斜杠命令报错 raise
                  （与 commands.py 既有结果文本 key 前缀 commands. 区分）
-- api_v1_raise.  server/api_v1.py 路由层 raise（被 except 包成 API 错误返回；
-                 与 api_v1.py 既有业务错误 key 前缀 api_v1. 区分）
 
 说明：
 - 复用既有 key：tool_loop.cancelled_by_user / tool_loop.deep_compression_failed
@@ -160,16 +158,5 @@ MESSAGES = {
     "commands_raise.model_no_video": {
         "zh-CN": "当前对话包含视频，目标模型不支持视频输入",
         "en-US": "The conversation contains videos, but the target model does not support video input",
-    },
-
-    # ── server/api_v1.py（路由层 raise，被 except 包成 API 错误返回；
-    #    前缀 api_v1_raise. 与既有业务错误 api_v1. 区分） ──
-    "api_v1_raise.invalid_path": {
-        "zh-CN": "非法路径",
-        "en-US": "Invalid path",
-    },
-    "api_v1_raise.workspace_id_empty": {
-        "zh-CN": "workspace_id 不能为空",
-        "en-US": "workspace_id must not be empty",
     },
 }

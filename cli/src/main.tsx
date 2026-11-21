@@ -3,7 +3,7 @@
 import { createCliRenderer } from '@opentui/core';
 import { createRoot, useRenderer } from '@opentui/react';
 import { useState } from 'react';
-import { App } from './app';
+import { App } from './App';
 import { BootFlow, type BootResult } from './boot';
 
 function Root() {

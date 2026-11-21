@@ -54,12 +54,8 @@ def directory_for(workspace, metadata):
 
 
 def _display_path(raw, root):
-    # Git stores execution-device paths. Querying its admin records does not need
-    # a container/runtime; translate only known mounts, never arbitrary paths.
-    from config import TERMINAL_SANDBOX_MODE, TERMINAL_SANDBOX_MOUNT_PATH
-    mount = str(TERMINAL_SANDBOX_MOUNT_PATH or '/workspace').rstrip('/')
-    if TERMINAL_SANDBOX_MODE == 'docker' and (raw == mount or raw.startswith(mount + '/')):
-        return root / raw[len(mount) + 1:] if raw != mount else root
+    # Git stores execution-device paths. Querying its admin records never allocates
+    # a runtime; only the known WSL drive form is translated, never arbitrary paths.
     if root.drive:
         match = re.fullmatch(r'/mnt/([A-Za-z])(?:/(.*))?', raw)
         if match:

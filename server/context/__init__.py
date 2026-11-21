@@ -10,12 +10,9 @@ _SYMBOL_MODULE = {
     # identity
     "NoWorkspaceError": "server.context.identity",
     "RuntimeIdentity": "server.context.identity",
-    "_resolve_user_role": "server.context.identity",
     # broadcast
     # personalization
     "_apply_workspace_personalization_preferences": "server.context.personalization",
-    # usage
-    "get_or_create_usage_tracker": "server.context.usage",
     # upload
     "get_gui_manager": "server.context.upload",
     "get_upload_guard": "server.context.upload",
@@ -55,7 +52,6 @@ __all__ = [
     "ensure_conversation_loaded",
     "apply_conversation_overrides",
     "reset_system_state",
-    "get_or_create_usage_tracker",
     "reap_idle_conversation_terminals",
     "start_conversation_terminal_reaper",
 ]

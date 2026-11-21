@@ -1,5 +1,4 @@
 import { defineStore } from 'pinia';
-import { useResourceStore } from './resource';
 
 /**
  * 设置页（全屏）状态：当前分区 + 管理员可见性判定。
@@ -30,7 +29,6 @@ export type SettingsSection =
   | 'tools'
   | 'context'
   | 'files'
-  | 'voice'
   | 'browser'
   // 智能体
   | 'sub-agents'
@@ -51,8 +49,6 @@ interface SettingsState {
   activeSection: SettingsSection;
   /** /api/session-status 快照：登录角色（'' = 未知/未登录） */
   sessionRole: string;
-  /** /api/session-status 快照：host 模式 */
-  sessionHostMode: boolean;
   /** 会话状态是否已成功拉取（去重，避免每个宿主组件重复请求） */
   sessionStatusLoaded: boolean;
 }
@@ -61,29 +57,20 @@ export const useSettingsStore = defineStore('settings', {
   state: (): SettingsState => ({
     activeSection: 'general',
     sessionRole: '',
-    sessionHostMode: false,
     sessionStatusLoaded: false
   }),
   getters: {
-    /** 管理员判定（沿用原 PersonalizationDrawer.vue 逻辑） */
+    /** 管理员判定：Host 登录会话的角色（Host 密码登录为 admin）。 */
     isAdmin(state): boolean {
-      const resourceStore = useResourceStore();
-      const quotaRole = (resourceStore.usageQuota.role || '').toLowerCase();
-      const loginRole = (state.sessionRole || '').toLowerCase();
-      return quotaRole === 'admin' || loginRole === 'admin';
+      return (state.sessionRole || '').toLowerCase() === 'admin';
     },
-    /** host 模式判定（沿用原 PersonalizationDrawer.vue 逻辑） */
-    isHostMode(state): boolean {
-      const resourceStore = useResourceStore();
-      const mode = (resourceStore.containerStatus?.mode || '').toLowerCase();
-      if (mode) {
-        return mode === 'host';
-      }
-      return state.sessionHostMode;
+    /** Host-only 主仓：设置页始终按本机 Host 模式展示。 */
+    isHostMode(): boolean {
+      return true;
     },
-    /** MCP 配置入口可见性（管理员 + host 模式） */
+    /** MCP 配置入口可见性（管理员） */
     showMcpConfigEntry(): boolean {
-      return this.isAdmin && this.isHostMode;
+      return this.isAdmin;
     }
   },
   actions: {
@@ -101,7 +88,6 @@ export const useSettingsStore = defineStore('settings', {
         const payload = await resp.json();
         const snapshot = payload?.session || {};
         this.sessionRole = String(snapshot.role || '');
-        this.sessionHostMode = !!snapshot.host_mode;
         this.sessionStatusLoaded = true;
       } catch {
         this.sessionRole = '';

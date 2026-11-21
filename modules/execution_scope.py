@@ -107,12 +107,20 @@ def bind_execution_scope(scope: Optional[ExecutionScope]) -> Iterator[None]:
 
 
 def uses_docker(terminal: Any) -> bool:
+    """Detect a legacy container session so callers can fail closed.
+
+    Host-only 版本不提供容器执行路径；这里仅保留识别能力，用于拒绝遗留
+    Docker 会话（记忆位置、完整访问、子实例资源等），不用于分流产品行为。
+    """
     session = getattr(terminal, "container_session", None)
     mode = getattr(session, "mode", None)
     if mode is not None:
-        return mode == "docker"
-    from config import TERMINAL_SANDBOX_MODE
-    return TERMINAL_SANDBOX_MODE == "docker"
+        return str(mode).lower() == "docker"
+    try:
+        from config import TERMINAL_SANDBOX_MODE
+    except ImportError:  # Host-only builds may drop the legacy mode switch.
+        return False
+    return str(TERMINAL_SANDBOX_MODE or "").lower() == "docker"
 
 
 def validate_child_access(terminal: Any, access_level: Any) -> str:

@@ -95,14 +95,6 @@ def scoped_write_access(requested=True, scope=None):
     return True if scope and scope.is_sub_agent else bool(requested)
 
 
-def require_scoped_docker_support(scope=None):
-    scope = scope if scope is not None else current_execution_scope()
-    if scope is not None and scope.access_level == "full_access":
-        raise ScopedExecutionError("Docker 工具箱不支持宿主机完全访问。")
-    # workspace_write requires the mandatory scoped launcher. sandbox_write
-    # retains the existing container boundary; host fallback is forbidden.
-
-
 def same_scope_authority(left, right):
     if left is None or right is None:
         return left is right

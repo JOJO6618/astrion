@@ -6,47 +6,40 @@ from server.context.identity import RuntimeIdentity
 from server.context.workspace import resolve_workspace
 
 
+def _require_host(principal) -> None:
+    """Only an authenticated Host identity may select an execution workspace."""
+    if principal.is_api_user or not principal.host_mode or principal.username != "host":
+        raise PermissionError("Host identity required")
+
+
 def identity_for(principal, workspace_id=None):
-    return RuntimeIdentity(host_mode=principal.host_mode, host_workspace_id=workspace_id,
-                           is_api_user=principal.is_api_user, role=principal.role)
+    _require_host(principal)
+    return RuntimeIdentity(host_mode=True, host_workspace_id=workspace_id,
+                           is_api_user=False, role=principal.role or "admin")
 
 
 def projects(principal):
-    from server import state
-    if principal.host_mode:
-        from modules.host_workspace_manager import load_host_workspace_catalog
-        return [{"id": item["workspace_id"], "label": item.get("label") or item["workspace_id"]}
-                for item in load_host_workspace_catalog().get("workspaces", [])]
-    manager = state.api_user_manager if principal.is_api_user else state.user_manager
-    rows = (manager.list_workspaces(principal.username) if principal.is_api_user else
-            manager.list_user_workspaces(principal.username, prepare=False))
-    return [{"id": key, "label": value.get("label") or key} for key, value in rows.items()]
+    _require_host(principal)
+    from modules.host_workspace_manager import load_host_workspace_catalog
+    return [{"id": item["workspace_id"], "label": item.get("label") or item["workspace_id"]}
+            for item in load_host_workspace_catalog().get("workspaces", [])]
 
 
 _DEFAULT_LOCK = RLock()
-# 项目模式（docker/web）下固定落到用户已有的默认项目，绝不新建：
-# user_manager.list_user_workspaces() 保证 "default" 项目始终存在（label「默认项目」）。
-_DEFAULT_WORKSPACE_ID = "default"
 
 
 def default_target(principal):
-    """Resolve the handoff target without changing the user's project selection."""
+    """Resolve the Host default workspace without changing the user's project selection."""
+    _require_host(principal)
     with _DEFAULT_LOCK:
-        if principal.host_mode:
-            from modules.host_workspace_manager import create_host_workspace, default_workspace_path
-            from modules.i18n import tr
+        from modules.host_workspace_manager import create_host_workspace, default_workspace_path
+        from modules.i18n import tr
 
-            # 与首次启动自动创建的默认工作区同源，避免出现两个「默认工作区」。
-            workspace_id = create_host_workspace(
-                str(default_workspace_path()),
-                label=tr("host_ws.default_workspace_label"),
-            )["workspace"]["workspace_id"]
-        else:
-            workspace_id = _DEFAULT_WORKSPACE_ID
-            if principal.is_api_user:
-                # API 用户没有 user_manager 的 default 兜底，需先把 default 项目建出来（可见）
-                from server import state
-                state.api_user_manager.ensure_workspace(principal.username, workspace_id)
+        # 与首次启动自动创建的默认工作区同源，避免出现两个「默认工作区」。
+        workspace_id = create_host_workspace(
+            str(default_workspace_path()),
+            label=tr("host_ws.default_workspace_label"),
+        )["workspace"]["workspace_id"]
         return resolve_target(principal, {"workspace_id": workspace_id})
 
 

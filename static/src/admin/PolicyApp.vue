@@ -15,30 +15,6 @@
         <p>{{ $t('adminPolicy.subtitle', { time: lastUpdated || '—' }) }}</p>
       </div>
       <div class="header-actions">
-        <div class="dropdown" :class="{ open: targetMenuOpen }">
-          <button type="button" class="ghost-btn" @click="toggleTargetMenu">
-            <span>{{ targetTypeLabel }}</span>
-            <span class="caret">▾</span>
-          </button>
-          <div class="dropdown-menu" v-if="targetMenuOpen">
-            <button
-              v-for="opt in targetOptions()"
-              :key="opt.value"
-              type="button"
-              @click="pickTargetType(opt.value)"
-            >
-              {{ opt.label }}
-            </button>
-          </div>
-        </div>
-        <div v-if="form.target_type !== 'global'" class="text-field">
-          <input
-            v-model="form.target_value"
-            :placeholder="targetPlaceholder"
-            class="target-input"
-            type="text"
-          />
-        </div>
         <button type="button" class="ghost-btn" @click="loadScope">
           {{ $t('adminPolicy.load') }}
         </button>
@@ -341,16 +317,11 @@ import { useSecondaryPass } from './useSecondaryPass';
 import SecondaryGate from './SecondaryGate.vue';
 import FancyCheck from '@/components/common/FancyCheck.vue';
 import CloseButton from '@/components/common/CloseButton.vue';
-import { t, currentLocale } from '@/locales';
-
-type TargetType = 'global' | 'role' | 'user' | 'invite';
+import { t } from '@/locales';
 
 interface RawPolicy {
   updated_at?: string;
   global?: any;
-  roles?: Record<string, any>;
-  users?: Record<string, any>;
-  invites?: Record<string, any>;
 }
 
 interface CategoryFormItem {
@@ -397,8 +368,6 @@ const {
 } = useSecondaryPass();
 
 const form = reactive({
-  target_type: 'global' as TargetType,
-  target_value: '',
   config: {
     category_overrides: {} as Record<string, any>,
     remove_categories: [] as string[],
@@ -415,29 +384,6 @@ const mcpServers = ref<MCPServerFormItem[]>([]);
 const mcpLoading = ref(false);
 const mcpSyncing = ref(false);
 
-const targetPlaceholder = computed(() => {
-  void currentLocale.value;
-  if (form.target_type === 'role') return t('adminPolicy.placeholderRole');
-  if (form.target_type === 'invite') return t('adminPolicy.placeholderInvite');
-  if (form.target_type === 'user') return t('adminPolicy.placeholderUsername');
-  return '';
-});
-
-const targetOptions = () =>
-  [
-    { value: 'global', label: t('adminPolicy.scopeGlobal') },
-    { value: 'role', label: t('adminPolicy.scopeRole') },
-    { value: 'user', label: t('adminPolicy.scopeUser') },
-    { value: 'invite', label: t('adminPolicy.scopeInvite') }
-  ] as const;
-
-const targetTypeLabel = computed(() => {
-  void currentLocale.value;
-  return (
-    targetOptions().find((o) => o.value === form.target_type)?.label || t('adminPolicy.scopeGlobal')
-  );
-});
-const targetMenuOpen = ref(false);
 const openForceMenu = ref<string | null>(null);
 const openToolMenu = ref<string | null>(null);
 const toolSearch = ref('');
@@ -483,19 +429,6 @@ const filteredToolOptions = (cat: CategoryFormItem) => {
   const base = optionsForCategory(cat);
   if (!q) return base;
   return base.filter((item) => item.toLowerCase().includes(q));
-};
-
-const toggleTargetMenu = () => {
-  targetMenuOpen.value = !targetMenuOpen.value;
-};
-
-const pickTargetType = (value: TargetType) => {
-  form.target_type = value;
-  if (value === 'global') form.target_value = '';
-  targetMenuOpen.value = false;
-  openForceMenu.value = null;
-  openToolMenu.value = null;
-  applyScopeConfig();
 };
 
 const toggleForceMenu = (id: string) => {
@@ -887,13 +820,7 @@ async function fetchDefaults() {
 }
 
 function scopeConfig(): any {
-  const p = policyCache.value;
-  if (!p) return null;
-  if (form.target_type === 'global') return p.global || {};
-  if (form.target_type === 'role') return (p.roles || {})[form.target_value] || {};
-  if (form.target_type === 'user') return (p.users || {})[form.target_value] || {};
-  if (form.target_type === 'invite') return (p.invites || {})[form.target_value] || {};
-  return null;
+  return policyCache.value?.global || {};
 }
 
 function applyScopeConfig() {
@@ -937,8 +864,8 @@ async function savePolicy() {
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        target_type: form.target_type,
-        target_value: form.target_type === 'global' ? 'global' : form.target_value,
+        target_type: 'global',
+        target_value: 'global',
         config: form.config
       })
     });

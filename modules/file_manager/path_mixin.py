@@ -15,9 +15,6 @@ try:
         FORBIDDEN_ROOT_PATHS,
         OUTPUT_FORMATS,
         READ_TOOL_MAX_FILE_SIZE,
-        PROJECT_MAX_STORAGE_BYTES,
-        TERMINAL_SANDBOX_MODE,
-        LINUX_SAFETY,
     )
 except ImportError:  # 兼容全局环境中存在同名包的情况
     import sys
@@ -31,11 +28,7 @@ except ImportError:  # 兼容全局环境中存在同名包的情况
         FORBIDDEN_ROOT_PATHS,
         OUTPUT_FORMATS,
         READ_TOOL_MAX_FILE_SIZE,
-        PROJECT_MAX_STORAGE_BYTES,
-        TERMINAL_SANDBOX_MODE,
-        LINUX_SAFETY,
     )
-from modules.container_file_proxy import ContainerFileProxy
 from modules.host_sandbox_policy import (
     get_macos_writable_paths,
     get_macos_readable_paths,
@@ -45,10 +38,7 @@ from modules.host_sandbox_policy import (
 from modules.host_sandbox_runner import MACOS_MINIMAL_READABLE_PATHS, LINUX_MINIMAL_READABLE_PATHS
 from modules.i18n import tr
 from modules.execution_scope import current_execution_scope
-from modules.scoped_execution_policy import fixed_workspace_root, require_scoped_docker_support
-
-if TYPE_CHECKING:
-    from modules.user_container_manager import ContainerHandle
+from modules.scoped_execution_policy import fixed_workspace_root
 
 # 临时禁用长度检查
 DISABLE_LENGTH_CHECK = True
@@ -56,45 +46,16 @@ DISABLE_LENGTH_CHECK = True
 class PathMixin:
     """FileManager path mixin 能力 mixin。"""
 
-    def _topic_mount(self):
-        from config import WORKSPACE_MEMORY_DIRNAME
-
-        source = getattr(self.container_session, "topic_memory_directory", None)
-        if not source:
-            return None
-        return Path(self.project_path) / WORKSPACE_MEMORY_DIRNAME, Path(source)
-
-    def _quota_file_size(self, path: Path) -> int:
-        mount = self._topic_mount()
-        if mount and path.is_relative_to(mount[0]):
-            path = mount[1] / path.relative_to(mount[0])
-        try:
-            return path.stat().st_size
-        except FileNotFoundError:
-            return 0
-
-    def _get_project_size(self) -> int:
-        """Count the project contents as seen by the container's workspace bind."""
-        if not self._is_docker_mode() or not self.project_path.exists():
-            return 0
-        mount = self._topic_mount()
-        total = 0
-        for root in (self.project_path, mount[1]) if mount else (self.project_path,):
-            for path in root.rglob('*'):
-                if mount and root == self.project_path and path.is_relative_to(mount[0]):
-                    continue
-                if path.is_file():
-                    total += self._quota_file_size(path)
-        return total
-
     def _validate_path(self, path: str) -> Tuple[bool, str, Path]:
         """
-        验证路径安全性
-        
+        验证并解析目标路径（Host 原生执行）。
+
+        绝对路径（含 Windows 盘符）直接解析；相对路径落当前执行根；
+        授权/禁读/沙箱约束由 ``_ensure_host_access`` 与实际文件操作把关。
+
         Returns:
             (是否有效, 错误信息, 完整路径)
         """
-        original_path = path
         if getattr(self, 'execution_binding_error', None) and not Path(path or '.').is_absolute():
             return False, self.execution_binding_error, None
         scope = current_execution_scope()
@@ -105,71 +66,23 @@ class PathMixin:
         if scope is None and project_root != self.project_path:
             self.project_path = project_root
 
-        if self._is_docker_mode():
-            mount = str(getattr(self.container_session, "mount_path", None) or "/workspace").rstrip("/")
-            for prefix in (mount, "/workspace"):
-                if path == prefix or (path or "").startswith(prefix + "/"):
-                    path = str(project_root) + path[len(prefix):]
-                    break
-
-        if (scope is not None and scope.is_sub_agent) or self._is_host_mode():
-            from modules.scoped_execution_policy import fixed_execution_root
-            base = fixed_execution_root(scope) if scope and scope.is_sub_agent else Path(getattr(self, 'execution_root', project_root))
-            normalized = (path or "").strip()
-            if normalized == "/workspace":
-                return True, "", project_root
-            elif normalized.startswith("/workspace/"):
-                normalized = str(project_root / normalized.split("/workspace/", 1)[1])
-            if not normalized:
-                return True, "", base
-            try:
-                if Path(normalized).is_absolute() or (len(normalized) > 1 and normalized[1] == ":"):
-                    full_path = Path(normalized).expanduser().resolve()
-                else:
-                    full_path = (base / normalized).resolve()
-            except (OSError, RuntimeError) as exc:
-                return False, str(exc), None
-            return True, "", full_path
-        
-        base = Path(getattr(self, 'execution_root', project_root))
-        # 不允许绝对路径（除非是在项目内的绝对路径）
-        if path.startswith('/') or path.startswith('\\') or (len(path) > 1 and path[1] == ':'):
-            # 如果是绝对路径，检查是否指向项目内
-            try:
-                test_path = Path(path).resolve()
-                test_path.relative_to(project_root)
-                # 如果成功，说明绝对路径在项目内，转换为相对路径
-                path = str(test_path.relative_to(project_root))
-                base = project_root
-            except ValueError:
-                if str(original_path).replace("\\", "/").startswith("/workspace"):
-                    return False, tr("file_manager.path_outside_workspace_detailed"), None
-                return False, tr("file_manager.path_outside_project"), None
-        
-        # 检查是否包含向上遍历
-        if ".." in path:
-            return False, tr("file_manager.path_traversal_blocked"), None
-        
-        # 构建完整路径
-        full_path = (base / path).resolve()
-        
-        # 检查是否在项目目录内
+        from modules.scoped_execution_policy import fixed_execution_root
+        base = fixed_execution_root(scope) if scope and scope.is_sub_agent else Path(getattr(self, 'execution_root', project_root))
+        normalized = (path or "").strip()
+        # 历史对话可能仍带旧的 /workspace 别名（原容器挂载根），按工作区根解释。
+        if normalized == "/workspace":
+            return True, "", project_root
+        elif normalized.startswith("/workspace/"):
+            normalized = str(project_root / normalized.split("/workspace/", 1)[1])
+        if not normalized:
+            return True, "", base
         try:
-            full_path.relative_to(project_root)
-        except ValueError:
-            return False, tr("file_manager.path_outside_project"), None
-        
-        # 检查禁止的路径
-        path_str = str(full_path)
-        
-        for forbidden_root in FORBIDDEN_ROOT_PATHS:
-            if path_str == forbidden_root:
-                return False, tr("file_manager.path_forbidden_root", path=forbidden_root), None
-        
-        for forbidden in FORBIDDEN_PATHS:
-            if path_str.startswith(forbidden + os.sep) or path_str == forbidden:
-                return False, tr("file_manager.path_forbidden_system", path=forbidden), None
-        
+            if Path(normalized).is_absolute() or (len(normalized) > 1 and normalized[1] == ":"):
+                full_path = Path(normalized).expanduser().resolve()
+            else:
+                full_path = (base / normalized).resolve()
+        except (OSError, RuntimeError) as exc:
+            return False, str(exc), None
         return True, "", full_path
 
     def _relative_path(self, full_path: Path) -> str:
@@ -255,13 +168,6 @@ class PathMixin:
 
     def _ensure_host_access(self, full_path: Path, access: str) -> Tuple[bool, str]:
         scope = current_execution_scope()
-        if scope and self._is_docker_mode():
-            try:
-                require_scoped_docker_support(scope)
-            except ValueError as exc:
-                return False, str(exc)
-        if not self._is_host_mode() and (scope is None or not scope.is_sub_agent):
-            return True, ""
         # 执行环境为 direct（完全访问权限）时，run_command 不套沙箱、可读写任意路径；
         # read_file/write_file/edit_file 为进程内文件操作，本就不走 OS 沙箱，此处与
         # run_command 语义对齐，直接放行。sandbox 模式下保持授权范围检查不变。

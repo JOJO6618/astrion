@@ -124,12 +124,6 @@ export const sendMethods = {
       return false;
     }
 
-    const quotaType = this.thinkingMode ? 'thinking' : 'fast';
-    if (this.isQuotaExceeded(quotaType)) {
-      this.showQuotaToast({ type: quotaType });
-      return false;
-    }
-
     const modelStore = useModelStore();
     const currentModel = modelStore.models.find((m) => m.key === this.currentModelKey);
     if (hasImages && !currentModel?.supportsImage) {
@@ -194,7 +188,6 @@ export const sendMethods = {
       try {
         const personalizationStore = usePersonalizationStore();
         const shouldShowBackupToast =
-          this.versioningHostMode &&
           personalizationStore.form.versioning_enabled_by_default &&
           personalizationStore.form.versioning_backup_mode === 'full';
         if (shouldShowBackupToast) {

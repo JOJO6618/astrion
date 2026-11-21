@@ -12,7 +12,7 @@ import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, TYPE_CHECKING
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
 import httpx
 
@@ -20,9 +20,6 @@ from config import MCP_PROTOCOL_VERSION, MCP_DEFAULT_TIMEOUT_SECONDS
 from modules.mcp_server_registry import MCPServerRegistry
 
 from modules.i18n import tr
-
-if TYPE_CHECKING:
-    from modules.user_container_manager import ContainerHandle
 
 
 class _StreamableHTTPMCPClient:

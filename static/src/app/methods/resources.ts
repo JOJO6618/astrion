@@ -1,77 +1,9 @@
 // @ts-nocheck
-import {
-  formatTokenCount,
-  formatBytes,
-  formatPercentage,
-  formatRate,
-  formatResetTime,
-  formatQuotaValue,
-  quotaTypeLabel,
-  buildQuotaResetSummary,
-  isQuotaExceeded as isQuotaExceededUtil,
-  buildQuotaToastMessage
-} from '../../utils/formatters';
+import { formatTokenCount } from '../../utils/formatters';
 import { t, currentLocale } from '@/locales';
 import { downloadWorkspaceFile } from '@/utils/downloadFile';
 
 export const resourceMethods = {
-  hasContainerStats() {
-    return !!(
-      this.containerStatus &&
-      this.containerStatus.mode === 'docker' &&
-      this.containerStatus.stats
-    );
-  },
-
-  containerStatusClass() {
-    if (!this.containerStatus) {
-      return 'status-pill--host';
-    }
-    if (this.containerStatus.mode !== 'docker') {
-      return 'status-pill--host';
-    }
-    const rawStatus =
-      (this.containerStatus.state &&
-        (this.containerStatus.state.status || this.containerStatus.state.Status)) ||
-      '';
-    const status = String(rawStatus).toLowerCase();
-    if (status.includes('running')) {
-      return 'status-pill--running';
-    }
-    if (status.includes('paused')) {
-      return 'status-pill--stopped';
-    }
-    if (status.includes('exited') || status.includes('dead')) {
-      return 'status-pill--stopped';
-    }
-    return 'status-pill--running';
-  },
-
-  containerStatusText() {
-    void currentLocale.value;
-    if (!this.containerStatus) {
-      return t('appTasks.unknown');
-    }
-    if (this.containerStatus.mode !== 'docker') {
-      return t('appTasks.hostMode');
-    }
-    const rawStatus =
-      (this.containerStatus.state &&
-        (this.containerStatus.state.status || this.containerStatus.state.Status)) ||
-      '';
-    const status = String(rawStatus).toLowerCase();
-    if (status.includes('running')) {
-      return t('common.running');
-    }
-    if (status.includes('paused')) {
-      return t('appTasks.paused');
-    }
-    if (status.includes('exited') || status.includes('dead')) {
-      return t('appTasks.stopped');
-    }
-    return rawStatus || t('appTasks.containerMode');
-  },
-
   formatTime(value) {
     void currentLocale.value;
     if (!value) {
@@ -131,7 +63,6 @@ export const resourceMethods = {
   },
 
   applyStatusSnapshot(status) {
-    this.resourceApplyStatusSnapshot(status);
     // Existing conversations restore model settings from bootstrap; /new owns its
     // prepared settings locally. Status polling must not replace either source.
     const convId = this.currentConversationId;
@@ -224,46 +155,6 @@ export const resourceMethods = {
     }
   },
 
-  updateContainerStatus(status) {
-    this.resourceUpdateContainerStatus(status);
-  },
-
-  pollContainerStats() {
-    return this.resourcePollContainerStats();
-  },
-
-  startContainerStatsPolling() {
-    this.resourceStartContainerStatsPolling();
-  },
-
-  stopContainerStatsPolling() {
-    this.resourceStopContainerStatsPolling();
-  },
-
-  pollProjectStorage() {
-    return this.resourcePollProjectStorage();
-  },
-
-  startProjectStoragePolling() {
-    this.resourceStartProjectStoragePolling();
-  },
-
-  stopProjectStoragePolling() {
-    this.resourceStopProjectStoragePolling();
-  },
-
-  fetchUsageQuota() {
-    return this.resourceFetchUsageQuota();
-  },
-
-  startUsageQuotaPolling() {
-    this.resourceStartUsageQuotaPolling();
-  },
-
-  stopUsageQuotaPolling() {
-    this.resourceStopUsageQuotaPolling();
-  },
-
   async downloadFile(path) {
     if (!path) {
       this.fileHideContextMenu();
@@ -282,7 +173,7 @@ export const resourceMethods = {
     await this.downloadWorkspacePath(path, 'folder', `${folderName}.zip`);
   },
 
-  // 统一入口：桌面壳走宿主原生保存对话框，Android 走原生桥，浏览器走 blob 下载
+  // 统一入口：桌面壳走宿主原生保存对话框，浏览器走 blob 下载
   async downloadWorkspacePath(path, kind = 'file', filename = '') {
     const outcome = await downloadWorkspaceFile({
       path,
@@ -307,28 +198,5 @@ export const resourceMethods = {
     await this.downloadWorkspacePath(path, kind, filename);
   },
 
-  formatTokenCount,
-  formatBytes,
-  formatPercentage,
-  formatRate,
-  formatResetTime,
-  formatQuotaValue,
-  quotaTypeLabel,
-
-  quotaResetSummary() {
-    return buildQuotaResetSummary(this.usageQuota);
-  },
-
-  isQuotaExceeded(type) {
-    return isQuotaExceededUtil(this.usageQuota, type);
-  },
-
-  showQuotaToast(payload) {
-    if (!payload) {
-      return;
-    }
-    const type = payload.type || 'fast';
-    const message = buildQuotaToastMessage(type, this.usageQuota, payload.reset_at);
-    this.uiShowQuotaToastMessage(message, type);
-  }
+  formatTokenCount
 };

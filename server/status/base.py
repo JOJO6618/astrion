@@ -20,10 +20,8 @@ from server.state import (
     PROJECT_STORAGE_CACHE,
     PROJECT_STORAGE_CACHE_TTL_SECONDS,
     PROJECT_MAX_STORAGE_MB,
-    container_manager,
-    user_manager,
 )
-from config import AGENT_VERSION, TERMINAL_SANDBOX_MODE, TERMINAL_SANDBOX_MOUNT_PATH
+from config import AGENT_VERSION, TERMINAL_SANDBOX_MODE
 from modules.host_workspace_manager import (
     create_host_workspace,
     delete_host_workspace,
@@ -52,9 +50,6 @@ def _close_terminal_for_key(term_key: str):
 
 def _is_host_mode_request() -> bool:
     return bool(session.get("host_mode")) and (TERMINAL_SANDBOX_MODE or "").lower() == "host"
-
-def _is_docker_project_request() -> bool:
-    return bool(session.get("username")) and not bool(session.get("host_mode")) and not bool(session.get("is_api_user"))
 
 def _active_task_counts(username: str) -> dict:
     running_by_workspace = {}
@@ -152,33 +147,19 @@ def get_status(data_context, workspace, username):
     except Exception as exc:
         log_conn_diag(f"status conversation-meta-failed user={username} error={exc}")
     timings["conversation_meta_ms"] = (time.perf_counter() - phase_started_at) * 1000
-    # docker/web 多用户模式下，宿主绝对路径会泄露服务器目录布局与系统用户名，
-    # 对用户无实际意义（操作均在容器 /workspace 内），脱敏为容器视角路径。
-    if _is_host_mode_request():
-        status['project_path'] = str(workspace.project_path)
-    else:
-        status['project_path'] = TERMINAL_SANDBOX_MOUNT_PATH
+    # Host 单机形态：始终返回真实工作区路径（容器 /workspace 视角已随 Docker 版移出）
+    status['project_path'] = str(workspace.project_path)
     phase_started_at = time.perf_counter()
-    try:
-        # 首屏状态只需要容器是否存在/运行等轻量信息；Docker stats 很慢，
-        # 由 /api/container-status 在用量面板需要时单独拉取。
-        workspace_id = getattr(workspace, 'workspace_id', None) or session.get('workspace_id') or 'default'
-        container_key = (
-            f"host::{workspace_id}"
-            if bool(session.get("host_mode")) or username == "host"
-            else f"{username}::{workspace_id}"
-        )
-        status['container'] = container_manager.get_container_status(container_key, include_stats=False)
-        status['container'].setdefault('mode', 'host' if data_context.identity.host_mode else 'docker')
-        status['workspace_id'] = data_context.workspace_id
-    except Exception as exc:
-        status['container'] = {"success": False, "error": str(exc)}
-        log_conn_diag(f"status container-status-failed user={username} error={exc}")
+    # 主仓为 Host 单机形态：不再查询 Docker 运行时，container 字段仅保留
+    # `mode: "host"` 这一旧形状，供尚未迁移的消费者区分 Host 与容器模式。
+    workspace_id = getattr(workspace, 'workspace_id', None) or session.get('workspace_id') or 'default'
+    status['container'] = {"success": True, "mode": "host", "workspace_id": workspace_id}
+    status['workspace_id'] = data_context.workspace_id
     timings["container_ms"] = (time.perf_counter() - phase_started_at) * 1000
     status['version'] = AGENT_VERSION
     phase_started_at = time.perf_counter()
     try:
-        policy = resolve_admin_policy(user_manager.get_user(username))
+        policy = resolve_admin_policy()
         status['admin_policy'] = {
             "ui_blocks": policy.get("ui_blocks") or {},
             "disabled_models": policy.get("disabled_models") or [],
@@ -202,21 +183,6 @@ def get_status(data_context, workspace, username):
             f"container_ms={timings['container_ms']:.1f} policy_ms={timings['policy_ms']:.1f}"
         )
     return jsonify(status)
-
-@status_bp.route('/api/container-status')
-@api_login_required
-@with_workspace_data
-def get_container_status_api(data_context, workspace, username):
-    try:
-        container_key = (
-            f"host::{getattr(workspace, 'workspace_id', None) or session.get('workspace_id') or 'default'}"
-            if bool(session.get("host_mode")) or username == "host"
-            else f"{username}::{getattr(workspace, 'workspace_id', None) or session.get('workspace_id') or 'default'}"
-        )
-        status = container_manager.get_container_status(container_key)
-        return jsonify({"success": True, "data": status})
-    except Exception as exc:
-        return jsonify({"success": False, "error": str(exc)}), 500
 
 @status_bp.route('/api/project-storage')
 @api_login_required

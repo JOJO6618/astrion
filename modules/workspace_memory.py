@@ -1,8 +1,8 @@
-"""Private workspace memory locations and implicit Host sandbox roots.
+"""Private Host workspace memory locations.
 
 Only trusted resource construction registers a binding. Policy reads never create
-files or grant access to the shared data root. Docker exposes a dedicated bind
-under the project; its backing directory is never part of the code tree.
+files or grant access to the shared data root. Host memory lives in the workspace
+data directory; this product has no container bind mount or in-repository copy.
 """
 from __future__ import annotations
 
@@ -27,19 +27,15 @@ _LOCK = threading.RLock()
 class MemoryLocation:
     directory: Path
     tool_path: str
-    docker: bool = False
 
     @property
     def file(self) -> Path:
         return self.directory / "MEMORY.md"
 
 
-def location(project_path: str, data_dir: str, *, docker: bool = False) -> MemoryLocation:
+def location(project_path: str, data_dir: str) -> MemoryLocation:
     project = Path(project_path).expanduser().resolve()
     data = Path(data_dir).expanduser().resolve()
-    if docker:
-        directory = data / "memory"
-        return MemoryLocation(directory, RELATIVE_FILE, True)
     identity = os.path.normcase(str(project))
     digest = hashlib.sha256(identity.encode("utf-8")).hexdigest()[:16]
     slug = re.sub(r"[^\w.-]+", "-", project.name, flags=re.UNICODE).strip(".-")[:48] or "workspace"
@@ -70,8 +66,7 @@ def host_memory_roots(workspace_path: str | None) -> list[str]:
 def prepare_directory(target: MemoryLocation) -> None:
     """Prepare only the memory namespace; reject links within that namespace."""
     # DATA_DIR is a trusted resolved root; descendants must not redirect it.
-    namespace = target.directory if target.docker else target.directory.parent
-    for directory in dict.fromkeys((namespace, target.directory)):
+    for directory in dict.fromkeys((target.directory.parent, target.directory)):
         if directory.is_symlink():
             raise PermissionError(f"记忆目录不能是符号链接：{directory}")
         directory.mkdir(mode=0o755, parents=True, exist_ok=True)
@@ -79,20 +74,6 @@ def prepare_directory(target: MemoryLocation) -> None:
             raise PermissionError(f"记忆路径不是目录：{directory}")
     if target.file.is_symlink():
         raise PermissionError("MEMORY.md 不能是符号链接")
-    if target.docker:
-        # The container sees this directory inside the repository. A private
-        # ignore file travels with the bind, without editing public .gitignore.
-        ignore = target.directory / ".gitignore"
-        if ignore.is_symlink():
-            raise PermissionError("记忆目录的 .gitignore 不能是符号链接")
-        try:
-            fd = os.open(ignore, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
-        except FileExistsError:
-            if ignore.read_text(encoding="utf-8") != "*\n":
-                raise PermissionError("记忆目录的 .gitignore 必须保持忽略全部内容")
-        else:
-            with os.fdopen(fd, "w", encoding="utf-8") as stream:
-                stream.write("*\n")
 
 
 def content_version(content: str) -> str:

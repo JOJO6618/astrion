@@ -13,6 +13,8 @@
   若没有有效 CSRF 头会先得到 403（CSRF validation failed），而不是 401；
   只有携带有效 CSRF（会话内 token）但未登录时才到 401。
 - host Bearer 通道是唯一免 CSRF 的 API 认证方式（host 模式 + 回环地址 + token）。
+- 主仓只保留 Host 身份：本文件用 Host 合成会话；旧普通用户/API 用户主体只用于
+  断言被拒绝，不再作为可操作的计划所有者。
 """
 from __future__ import annotations
 
@@ -131,7 +133,7 @@ class ScheduleApiCase(unittest.TestCase):
     # ------------------------------------------------------------------
     # helpers
     # ------------------------------------------------------------------
-    def login(self, username="alice", role="user", *, host=False, host_workspace="default"):
+    def login(self, username="host", role="admin", *, host=True, host_workspace="ws-1"):
         nonce = uuid.uuid4().hex
         with self.client.session_transaction() as sess:
             sess["logged_in"] = True
@@ -146,6 +148,16 @@ class ScheduleApiCase(unittest.TestCase):
         state.active_login_nonces.setdefault(username, set()).add(nonce)
         return nonce
 
+    def login_legacy(self, username="alice", client=None):
+        """旧普通用户合成会话：只用于断言新认证会拒绝它。"""
+        client = client or self.client
+        nonce = uuid.uuid4().hex
+        with client.session_transaction() as sess:
+            sess.update(username=username, role="user", login_nonce=nonce,
+                        _csrf_token=CSRF, host_mode=False, logged_in=True)
+        state.active_login_nonces.setdefault(username, set()).add(nonce)
+        return client
+
     def post(self, url, body=None, *, csrf=True, headers=None):
         merged = {"Content-Type": "application/json"}
         if csrf:
@@ -154,7 +166,7 @@ class ScheduleApiCase(unittest.TestCase):
         data = None if body is None else json.dumps(body)
         return self.client.post(url, data=data, headers=merged)
 
-    def create_plan(self, definition=None, username="alice", *, csrf=True):
+    def create_plan(self, definition=None, username="host", *, csrf=True):
         self.login(username)
         response = self.post(
             "/api/schedules",
@@ -209,25 +221,15 @@ class ScheduleApiCase(unittest.TestCase):
         # 先验证“已登录会话 + 无效 Bearer”不会被回退成 Cookie 身份。
         session_client = APP.test_client()
         self.client = session_client
-        self.login("alice")
-        with mock.patch.multiple(
-            "server.gateway_auth",
-            TERMINAL_SANDBOX_MODE="host",
-            LINUX_SAFETY=False,
-            get_or_create_host_api_token=lambda: "host-secret",
-        ):
+        self.login()
+        with mock.patch("server.gateway_auth.get_or_create_host_api_token", return_value="host-secret"):
             bad = session_client.get("/api/schedules", headers={"Authorization": "Bearer wrong"})
             self.assertEqual(bad.status_code, 401)
             self.assertFalse(self.data(bad)["success"])
 
         # 全新的 client 走 Bearer 通道：免 CSRF、不落 Cookie、身份为 host。
         bearer_client = APP.test_client()
-        with mock.patch.multiple(
-            "server.gateway_auth",
-            TERMINAL_SANDBOX_MODE="host",
-            LINUX_SAFETY=False,
-            get_or_create_host_api_token=lambda: "host-secret",
-        ):
+        with mock.patch("server.gateway_auth.get_or_create_host_api_token", return_value="host-secret"):
             ok = bearer_client.get("/api/schedules", headers={"Authorization": "Bearer host-secret"})
             self.assertEqual(ok.status_code, 200)
             self.assertTrue(self.data(ok)["success"])
@@ -245,34 +247,32 @@ class ScheduleApiCase(unittest.TestCase):
         anonymous = bearer_client.get("/api/schedules")
         self.assertEqual(anonymous.status_code, 401)
 
-    def test_host_bearer_disabled_outside_host_mode(self):
+    def test_host_bearer_rejects_missing_or_invalid_token(self):
         client = APP.test_client()
-        with mock.patch.multiple(
-            "server.gateway_auth",
-            TERMINAL_SANDBOX_MODE="sandbox",
-            LINUX_SAFETY=False,
-            get_or_create_host_api_token=lambda: "host-secret",
-        ):
-            response = client.get("/api/schedules", headers={"Authorization": "Bearer host-secret"})
-        self.assertEqual(response.status_code, 401)
+        with mock.patch("server.gateway_auth.get_or_create_host_api_token", return_value="host-secret"):
+            for header in ("Bearer ", "Bearer wrong"):
+                response = client.get("/api/schedules", headers={"Authorization": header})
+                self.assertEqual(response.status_code, 401, header)
 
     # ------------------------------------------------------------------
     # options 只读，不创建终端 / 不调用 service
     # ------------------------------------------------------------------
     def test_options_is_read_only_and_never_touches_service_or_terminal(self):
-        self.login("alice")
-        with mock.patch("modules.execution_plane.get_execution_backend") as backend:
+        self.login()
+        catalog = {"workspaces": [{"workspace_id": "ws-1", "path": self._tmp.name, "label": "Workspace"}]}
+        with mock.patch("modules.host_workspace_manager.load_host_workspace_catalog", return_value=catalog), \
+             mock.patch("modules.execution_plane.get_execution_backend") as backend:
             response = self.client.get("/api/schedules/options")
         self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
         data = self.data(response)["data"]
         self.assertEqual(set(data), {"workspaces", "models", "timezones", "host_admin"})
-        self.assertFalse(data["host_admin"])
-        self.assertTrue(any(item["id"] == "default" for item in data["workspaces"]))
+        self.assertTrue(data["host_admin"])
+        self.assertEqual([item["id"] for item in data["workspaces"]], ["ws-1"])
         self.assertIsInstance(data["models"], list)
         self.assertIn("UTC", data["timezones"])
         backend.assert_not_called()
         self.get_service.assert_not_called()
-        self.assertEqual(self.store.list("alice"), [])
+        self.assertEqual(self.store.list("host"), [])
 
     def test_options_host_admin_reports_catalog_workspaces(self):
         self.login("host", "admin", host=True)
@@ -289,7 +289,7 @@ class ScheduleApiCase(unittest.TestCase):
     # submit / validate
     # ------------------------------------------------------------------
     def test_submit_definition_returns_serialized_plan_and_persists_owner(self):
-        self.login("alice")
+        self.login()
         response = self.post(
             "/api/schedules",
             {"definition": fx.plan_definition(name="库存巡检"), "workspace_id": "ws-1"},
@@ -300,13 +300,13 @@ class ScheduleApiCase(unittest.TestCase):
         self.assertEqual(data["definition"]["revision"], 1)
         self.assertIsNotNone(data["next_at"])
         self.assertIsInstance(data["next_dates"], list)
-        stored = self.store.get("alice", data["definition"]["id"])
-        self.assertEqual(stored["username"], "alice")
+        stored = self.store.get("host", data["definition"]["id"])
+        self.assertEqual(stored["username"], "host")
         self.assertEqual(stored["source"], {"kind": "page"})
-        self.assertEqual(stored["principal"]["username"], "alice")
+        self.assertEqual(stored["principal"]["username"], "host")
 
     def test_submit_yaml_and_validate_do_not_persist(self):
-        self.login("alice")
+        self.login()
         yaml_text = dump_definition(fx.plan_definition(name="YAML 计划"))
         validated = self.post(
             "/api/schedules/validate",
@@ -316,14 +316,14 @@ class ScheduleApiCase(unittest.TestCase):
         body = self.data(validated)["data"]
         self.assertEqual(body["definition"]["name"], "YAML 计划")
         self.assertTrue(body["next_dates"])
-        self.assertEqual(self.store.list("alice"), [])
+        self.assertEqual(self.store.list("host"), [])
 
         submitted = self.post("/api/schedules", {"yaml": yaml_text, "workspace_id": "ws-1"})
         self.assertEqual(submitted.status_code, 200, submitted.get_data(as_text=True))
         self.assertEqual(self.data(submitted)["data"]["definition"]["name"], "YAML 计划")
 
     def test_submit_validation_errors(self):
-        self.login("alice")
+        self.login()
         cases = [
             ({"definition": fx.plan_definition(), "username": "bob"}, "未知请求字段"),
             ({"definition": fx.plan_definition(), "overwrite": "yes"}, "overwrite 必须是布尔值"),
@@ -351,7 +351,7 @@ class ScheduleApiCase(unittest.TestCase):
         self.assertIn("过大", self.data(oversized)["error"])
 
     def test_submit_overwrite_requires_matching_revision(self):
-        self.login("alice")
+        self.login()
         first = fx.plan_definition(name="v1")
         created = self.post("/api/schedules", {"definition": first, "workspace_id": "ws-1"})
         self.assertEqual(created.status_code, 200)
@@ -371,7 +371,7 @@ class ScheduleApiCase(unittest.TestCase):
         self.assertIn("overwrite", self.data(duplicate)["error"])
 
     def test_validate_reports_invalid_definition(self):
-        self.login("alice")
+        self.login()
         response = self.post(
             "/api/schedules/validate",
             {"definition": {**fx.plan_definition(), "enabled": "yes"}, "workspace_id": "ws-1"},
@@ -383,7 +383,7 @@ class ScheduleApiCase(unittest.TestCase):
     # list / detail / yaml / runs / actions
     # ------------------------------------------------------------------
     def test_list_filters_by_workspace_and_enabled(self):
-        self.login("alice")
+        self.login()
         first = self.post("/api/schedules", {"definition": fx.plan_definition(name="A"), "workspace_id": "ws-1"})
         self.post("/api/schedules", {"definition": fx.plan_definition(name="B", workspace="ws-2"), "workspace_id": "ws-2"})
         self.assertEqual(first.status_code, 200)
@@ -475,47 +475,61 @@ class ScheduleApiCase(unittest.TestCase):
         self.assertEqual(self.client.get(f"/api/schedules/{schedule_id}/runs").status_code, 200)
 
     def test_actions_on_missing_plan_return_404(self):
-        self.login("alice")
+        self.login()
         for action in ("enable", "pause", "delete", "run"):
             response = self.post("/api/schedules/schedule_missing/actions", {"action": action})
             self.assertEqual(response.status_code, 404, (action, response.get_data(as_text=True)))
 
     # ------------------------------------------------------------------
-    # 用户隔离
+    # 身份隔离
     # ------------------------------------------------------------------
-    def test_users_cannot_see_or_touch_each_others_plans(self):
-        plan = self.create_plan(fx.plan_definition(name="Alice 私有"), username="alice")
+    def test_unauthenticated_and_legacy_identities_cannot_see_or_touch_plans(self):
+        plan = self.create_plan(fx.plan_definition(name="Host 私有"))
         schedule_id = plan["definition"]["id"]
-        run = self.post(f"/api/schedules/{schedule_id}/actions", {"action": "run", "request_id": "alice-run"})
+        run = self.post(f"/api/schedules/{schedule_id}/actions", {"action": "run", "request_id": "host-run"})
         self.assertEqual(run.status_code, 200)
         run_id = self.data(run)["data"]["id"]
 
-        self.login("bob")
-        self.assertEqual(self.data(self.client.get("/api/schedules"))["data"]["plans"], [])
-        self.assertEqual(self.client.get(f"/api/schedules/{schedule_id}").status_code, 404)
-        self.assertEqual(self.client.get(f"/api/schedules/{schedule_id}/yaml").status_code, 404)
-        self.assertEqual(self.client.get(f"/api/schedules/{schedule_id}/runs").status_code, 404)
-        self.assertEqual(self.post(f"/api/schedules/{schedule_id}/actions", {"action": "pause"}).status_code, 404)
+        # 未登录 client 不能读写任何计划。
+        anonymous = APP.test_client()
+        self.assertEqual(anonymous.get("/api/schedules").status_code, 401)
+        self.assertEqual(anonymous.get(f"/api/schedules/{schedule_id}").status_code, 401)
+        self.assertEqual(anonymous.get(f"/api/schedules/{schedule_id}/yaml").status_code, 401)
+        self.assertEqual(anonymous.get(f"/api/schedules/{schedule_id}/runs").status_code, 401)
+
+        # 旧普通用户会话只保留可识别身份，认证层直接拒绝，不会隐式映射为 Host。
+        legacy = self.login_legacy(client=APP.test_client())
+        self.assertEqual(legacy.get("/api/schedules").status_code, 401)
+        self.assertEqual(legacy.get(f"/api/schedules/{schedule_id}").status_code, 401)
+        self.assertEqual(legacy.get(f"/api/schedules/{schedule_id}/yaml").status_code, 401)
+        self.assertEqual(legacy.get(f"/api/schedules/{schedule_id}/runs").status_code, 401)
+        self.assertEqual(
+            legacy.post(f"/api/schedules/{schedule_id}/actions", data=json.dumps({"action": "pause"}),
+                        headers={"Content-Type": "application/json", "X-CSRF-Token": CSRF}).status_code,
+            401,
+        )
+
+        # 历史租户计划仍留在原存储中，但不会出现在 Host 列表，也不会被 Host 接管。
+        legacy_plan = self.service.submit(
+            "alice", fx.plan_definition(name="旧租户计划"), {"username": "alice", "host_mode": False}, "ws-1"
+        )
+        self.assertEqual(self.store.get("alice", legacy_plan["definition"]["id"])["username"], "alice")
+        host_plans = self.data(self.client.get("/api/schedules"))["data"]["plans"]
+        self.assertEqual({item["definition"]["name"] for item in host_plans}, {"Host 私有"})
+        self.assertEqual(self.client.get(f"/api/schedules/{legacy_plan['definition']['id']}").status_code, 404)
         self.assertEqual(self.data(self.post("/api/schedules/notifications/claim", {}))["data"], [])
         self.assertFalse(
             self.data(self.post(f"/api/schedules/notifications/{run_id}/ack", {"token": "whatever"}))["data"]["acknowledged"]
         )
 
-        # Bob 自己创建同名 ID 也不会覆盖 Alice 的计划。
-        stolen = fx.plan_definition(name="Bob 副本")
-        stolen["id"] = schedule_id
-        stolen["revision"] = 1
-        self.login("bob")
-        bob_created = self.post("/api/schedules", {"definition": stolen, "workspace_id": "ws-1"})
-        self.assertEqual(bob_created.status_code, 200)
-        self.login("alice")
+        # Host 自己的计划仍可正常访问。
         self.assertEqual(self.client.get(f"/api/schedules/{schedule_id}").status_code, 200)
-        self.assertEqual(self.data(self.client.get(f"/api/schedules/{schedule_id}"))["data"]["definition"]["name"], "Alice 私有")
+        self.assertEqual(self.data(self.client.get(f"/api/schedules/{schedule_id}"))["data"]["definition"]["name"], "Host 私有")
 
     # ------------------------------------------------------------------
     # 通知 claim / ack
     # ------------------------------------------------------------------
-    def _make_completed_notification_run(self, username="alice"):
+    def _make_completed_notification_run(self, username="host"):
         definition = fx.plan_definition(name="通知计划")
         definition["notifications"] = {"enabled": True}
         self.login(username)
@@ -559,8 +573,16 @@ class ScheduleApiCase(unittest.TestCase):
         # token 已消费。
         self.assertFalse(self.data(self.post(f"/api/schedules/notifications/{run_id}/ack", {"token": token}))["data"]["acknowledged"])
 
-        self.login("bob")
-        self.assertFalse(self.data(self.post(f"/api/schedules/notifications/{run_id}/ack", {"token": token}))["data"]["acknowledged"])
+        # 未登录 client 不能凭已消费 token 继续回执。
+        anonymous = APP.test_client()
+        with anonymous.session_transaction() as sess:
+            sess["_csrf_token"] = CSRF
+        denied = anonymous.post(
+            f"/api/schedules/notifications/{run_id}/ack",
+            data=json.dumps({"token": token}),
+            headers={"Content-Type": "application/json", "X-CSRF-Token": CSRF},
+        )
+        self.assertEqual(denied.status_code, 401)
 
     def test_notifications_ack_validation_and_error_recording(self):
         _, run_id = self._make_completed_notification_run()
@@ -579,10 +601,10 @@ class ScheduleApiCase(unittest.TestCase):
         )
         self.assertEqual(failed.status_code, 200)
         self.assertTrue(self.data(failed)["data"]["acknowledged"])
-        self.assertTrue(self.store.run(run_id, "alice")["notification_error"].startswith("xxx"))
+        self.assertTrue(self.store.run(run_id, "host")["notification_error"].startswith("xxx"))
 
     def test_notification_routes_require_post(self):
-        self.login("alice")
+        self.login()
         self.assertEqual(self.client.get("/api/schedules/notifications/claim").status_code, 405)
         self.assertEqual(self.client.get("/api/schedules/notifications/run_x/ack").status_code, 405)
 

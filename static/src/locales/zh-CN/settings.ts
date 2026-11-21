@@ -27,7 +27,6 @@ export default {
   navGeneral: '通用',
   navQuickChat: '快捷对话',
   navWorkspace: '工作区',
-  navWorkspaceProject: '项目',
   navSearch: '网络搜索',
   navTools: '工具',
   navContext: '上下文与记忆',
@@ -70,10 +69,8 @@ export default {
   memoryMigration: {
     title: '迁移工作区项目记忆',
     hostEntry: '迁移工作区项目记忆',
-    dockerEntry: '迁移所有用户的项目记忆',
     hostIntro:
       'Astrion 需要将工作区项目记忆迁移到数据目录。已在 {workspaces} 个工作区发现 {memories} 条项目记忆。',
-    dockerIntro: '在 {users} 个用户的 {workspaces} 个工作区中发现 {memories} 条项目记忆。',
     destination: '迁移到',
     showTargets: '查看各工作区的目标路径',
     hideTargets: '收起目标路径',
@@ -117,7 +114,6 @@ export default {
     unknown: '操作失败，请检查目录权限后重试。'
   },
   workspaceTitle: '工作区',
-  workspaceTitleProject: '项目',
   searchTitle: '网络搜索',
   toolsTitle: '工具',
   contextTitle: '上下文与记忆',

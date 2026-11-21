@@ -33,16 +33,15 @@ from server.entry_assets import (
 PAGES_WITH_DIST = [
     "index.html",
     "login.html",
-    "register.html",
     "quick.html",
     "chrome.html",
-    "admin_dashboard/index.html",
+    "browser-window.html",
     "admin_policy/index.html",
     "custom_tools/index.html",
-    "admin_api/index.html",
+    "custom_tools/guide.html",
 ]
 
-PAGES_WITHOUT_DIST = ["terminal.html", "resource_busy.html"]
+PAGES_WITHOUT_DIST = ["terminal.html"]
 
 
 def _app() -> Flask:

@@ -21,7 +21,6 @@ export default {
   loadingGitChanges: 'Loading Git changes...',
   noUncommittedChanges: 'No uncommitted changes',
   openFileWithApp: 'Open file with an app',
-  dockerModeUnavailable: 'Unavailable in Docker mode',
   noAppsDetected: 'No apps detected',
   restore: 'Restore',
   hiddenLines: '{n} unchanged lines',

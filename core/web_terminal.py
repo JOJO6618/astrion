@@ -3,7 +3,7 @@
 import json
 import time
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Callable, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, Callable
 import os
 from core.main_terminal import MainTerminal
 from server.utils_common import debug_log
@@ -23,9 +23,6 @@ except ImportError:
 from modules.terminal_manager import TerminalManager
 
 from modules.i18n import tr
-
-if TYPE_CHECKING:
-    from modules.user_container_manager import ContainerHandle
 
 logger = setup_logger(__name__)
 
@@ -70,8 +67,6 @@ class WebTerminal(MainTerminal):
         run_mode: Optional[str] = None,
         message_callback: Optional[Callable] = None,
         data_dir: Optional[str] = None,
-        container_session: Optional["ContainerHandle"] = None,
-        usage_tracker: Optional[object] = None,
         conversation_id: Optional[str] = None,
     ):
         # 对话级隔离：绑定指定对话（必须在 super().__init__ 之前设置，
@@ -93,8 +88,6 @@ class WebTerminal(MainTerminal):
             thinking_mode,
             run_mode=run_mode,
             data_dir=data_dir,
-            container_session=container_session,
-            usage_tracker=usage_tracker
         )
 
         # 工作区级服务实例标记：不持有/不回写对话消息历史（历史权威在磁盘 + 对话级实例）。
@@ -130,11 +123,9 @@ class WebTerminal(MainTerminal):
                 terminal_buffer_size=TERMINAL_BUFFER_SIZE,
                 terminal_display_size=TERMINAL_DISPLAY_SIZE,
                 broadcast_callback=message_callback,
-                container_session=self.container_session,
                 network_permission_getter=self.get_network_permission,
                 terminal_readonly_getter=self.terminal_readonly_enabled,
             )
-        # 让 run_command 与实时终端共享同一容器环境
         self.terminal_ops.attach_terminal_manager(self.terminal_manager)
         
         debug_log(f"[WebTerminal] 初始化完成，项目路径: {project_path}")

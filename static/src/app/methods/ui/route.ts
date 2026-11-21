@@ -232,7 +232,7 @@ export const routeMethods = {
     const workspaceId = this.currentHostWorkspaceId;
     if (!workspaceId) {
       this.uiPushToast?.({
-        message: this.versioningHostMode ? t('git.workspaceRequired') : t('git.projectRequired'),
+        message: t('git.workspaceRequired'),
         type: 'warning'
       });
       return;

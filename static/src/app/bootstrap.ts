@@ -11,9 +11,7 @@ import {
   closeShowHtmlFullscreen,
   type ShowHtmlFullscreenPayload
 } from '../utils/showHtmlFullscreen';
-import { downloadWorkspaceFile } from '../utils/downloadFile';
 import { openWorkspaceFileResult } from '../utils/openExternal';
-import { useSettingsStore } from '@/stores/settings';
 import { withWorkspaceScope } from './methods/workspaceRequestScope';
 
 let showImageRenderSeq = 0;
@@ -150,22 +148,14 @@ function collectShowImageOrder(root: ParentNode | null = document) {
   return tokens.slice(0, 200);
 }
 
-/* host/docker 模式缓存读取：键名与 app/state.ts 的 WORKSPACE_MODE_STORAGE_KEY 一致。
-   模式是部署级属性几乎不变，socket 连接后会校正回写 localStorage，这里直接读缓存即可。 */
-function getShowImageWorkspaceMode(): 'host' | 'docker' {
-  try {
-    return window.localStorage.getItem('agents_workspace_mode') === 'host' ? 'host' : 'docker';
-  } catch {
-    return 'docker';
-  }
-}
+/* Host-only：show_image 的本地路径按工作区相对路径或任意绝对路径处理
+   （后端 _validate_path host 分支全放行）。 */
 
 /**
  * 归一化 show_image 的 src：
  * - http(s) 网络链接、/user_upload/ 上传文件：原样使用；
- * - 其余一律视为本地文件路径，统一走 /api/file/content 通道（inline 预览，MIME 白名单由服务端控制）：
- *   - docker/web 模式：仅工作区内相对路径，越界（../、项目外绝对路径）由后端 _validate_path 拒绝；
- *   - host 模式：工作区相对路径或任意绝对路径均可（后端 _validate_path host 分支全放行）。
+ * - 其余一律视为本地文件路径，统一走 /api/file/content 通道（inline 预览，MIME 白名单由服务端控制）；
+ *   Host 模式：工作区相对路径或任意绝对路径均可。
  * 无法识别时返回空串，由调用方渲染可见的错误占位（不再静默吞掉）。
  */
 function normalizeShowImageSrc(src: string) {
@@ -206,13 +196,8 @@ function normalizeShowImageSrc(src: string) {
   }
   if (!trimmed) return '';
   if (trimmed.startsWith('/')) {
-    if (getShowImageWorkspaceMode() === 'host') {
-      // host 模式保留绝对路径语义（如 /Users/xxx/img.png），后端全放行
-      return withWorkspaceScope(`/api/file/content?path=${encodeURIComponent(trimmed)}`);
-    }
-    // docker 模式下前导 / 视为工作区根相对路径（真绝对路径会被后端拒绝）
-    trimmed = trimmed.replace(/^\/+/, '');
-    if (!trimmed) return '';
+    // host 模式保留绝对路径语义（如 /Users/xxx/img.png），后端全放行
+    return withWorkspaceScope(`/api/file/content?path=${encodeURIComponent(trimmed)}`);
   }
   return withWorkspaceScope(`/api/file/content?path=${encodeURIComponent(trimmed)}`);
 }
@@ -1458,21 +1443,6 @@ function updateViewportHeightVar() {
 
 // ===== show_file 预览卡片渲染 =====
 
-function dispatchShowFileDownload(path: string) {
-  // 统一入口：桌面壳（Windows WebView2 无下载 UI）走宿主原生保存对话框，
-  // Android 走原生桥，浏览器走 blob 下载
-  void downloadWorkspaceFile({ path }).then((outcome) => {
-    if (outcome.status === 'failed') {
-      console.warn('[show_file] 下载失败:', outcome.error);
-      // 失败不兜底跳转（window.open 会把后端 JSON 错误整页展示），改为错误弹窗提示
-      useUiStore().pushToast({
-        message: outcome.error || t('common.downloadFailed'),
-        type: 'error'
-      });
-    }
-  });
-}
-
 // 跟踪已挂载的 show_file Vue 应用，便于卸载
 const showFileAppMap = new WeakMap<Element, any>();
 
@@ -1514,20 +1484,8 @@ function renderShowFileCard(node: Element) {
 /**
  * 绑定 download:// 链接的点击事件。
  * markdown 里的 [文件](download:///path) 会被渲染为 <a class="md-download-link" href="download://..." data-path="/path">。
- * 点击行为按执行模式分流：host = 用系统默认程序打开真实文件；其余模式（docker/web/Android）= 下载。
+ * Host 主仓：用系统默认程序打开真实文件。
  */
-
-/** host 模式判定（与设置页同一来源）；未拉到会话状态时先补一次，避免启动瞬间误判为下载 */
-function usesHostMode(): boolean {
-  try {
-    const store = useSettingsStore();
-    if (!store.sessionStatusLoaded) void store.fetchSessionStatus();
-    return store.isHostMode;
-  } catch {
-    return false;
-  }
-}
-
 function bindDownloadLinks(root: ParentNode) {
   // 优先用 data-download 属性选择（不被 sanitize 影响），
   // md-download-link class 作为兼容回退
@@ -1541,17 +1499,13 @@ function bindDownloadLinks(root: ParentNode) {
       e.stopPropagation();
       const path = link.getAttribute('data-path') || '';
       if (!path || !allowWorkspaceContent) return;
-      if (usesHostMode()) {
-        void openWorkspaceFileResult(path).then((result) => {
-          if (result.ok) return;
-          useUiStore().pushToast({
-            message: result.error || t('shell.openFileFailed'),
-            type: 'error'
-          });
+      void openWorkspaceFileResult(path).then((result) => {
+        if (result.ok) return;
+        useUiStore().pushToast({
+          message: result.error || t('shell.openFileFailed'),
+          type: 'error'
         });
-        return;
-      }
-      dispatchShowFileDownload(path);
+      });
     });
   });
 }

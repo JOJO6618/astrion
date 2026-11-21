@@ -12,7 +12,7 @@ import time
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence
 
-from config import AGENT_SKILLS_DIR, CUSTOM_SKILLS_DIR, IS_HOST_MODE, PROJECT_AGENTS_SKILLS_DIRNAME, WORKSPACE_SKILLS_DIRNAME
+from config import AGENT_SKILLS_DIR, CUSTOM_SKILLS_DIR, PROJECT_AGENTS_SKILLS_DIRNAME, WORKSPACE_SKILLS_DIRNAME
 from utils.logger import setup_logger
 
 from modules.i18n import tr
@@ -121,55 +121,12 @@ def ensure_workspace_skills_dir(project_path: str | Path) -> Path:
 
 
 def infer_private_skills_dir(data_dir: str | Path | None) -> Optional[Path]:
-    """Infer per-user private skills dir from workspace data_dir.
-
-    host 模式下统一使用运行态根下的 ``agentskills``，不再按用户拆分。
-    """
+    """Resolve the Host skill library for an initialized workspace."""
     if not data_dir:
         return None
     try:
-        if IS_HOST_MODE:
-            return Path(CUSTOM_SKILLS_DIR).expanduser().resolve()
-        data_path = Path(data_dir).expanduser().resolve()
-        if data_path.name == "data" and data_path.parent.parent.name == "workspaces":
-            return (data_path.parent.parent.parent / "agentskills").resolve()
-        # Docker Web 项目化布局：
-        # users/<user>/projects/<project_id>/data -> users/<user>/personal/agentskills
-        if data_path.name == "data" and data_path.parent.parent.name == "projects":
-            user_root = data_path.parent.parent.parent
-            shared_root = (user_root / "personal" / "agentskills").resolve()
-            legacy_root = (data_path.parent / "agentskills").resolve()
-            if legacy_root.exists() and legacy_root.is_dir() and legacy_root != shared_root:
-                shared_root.mkdir(parents=True, exist_ok=True)
-                for item in list(legacy_root.iterdir()):
-                    dest = shared_root / item.name
-                    if not dest.exists():
-                        shutil.move(str(item), str(dest))
-                try:
-                    legacy_root.rmdir()
-                except Exception:
-                    pass
-            return shared_root
-        # 兼容上一轮临时结构：
-        # users/<user>/project/<project_id>/data -> users/<user>/personal/agentskills
-        if data_path.name == "data" and data_path.parent.parent.name == "project":
-            user_root = data_path.parent.parent.parent
-            shared_root = (user_root / "personal" / "agentskills").resolve()
-            temp_shared_root = (data_path.parent.parent / "shared" / "agentskills").resolve()
-            for legacy_root in (temp_shared_root, data_path.parent / "agentskills"):
-                if legacy_root.exists() and legacy_root.is_dir() and legacy_root != shared_root:
-                    shared_root.mkdir(parents=True, exist_ok=True)
-                    for item in list(legacy_root.iterdir()):
-                        dest = shared_root / item.name
-                        if not dest.exists():
-                            shutil.move(str(item), str(dest))
-                    try:
-                        legacy_root.rmdir()
-                    except Exception:
-                        pass
-            return shared_root
-        return (data_path.parent / "agentskills").resolve()
-    except Exception:
+        return Path(CUSTOM_SKILLS_DIR).expanduser().resolve()
+    except (OSError, RuntimeError):
         return None
 
 

@@ -253,7 +253,6 @@ class WorkspaceMessageStub(MessageMixin, RuntimeMixin):
         "name={project_name}\n"
         "runtime_environment={runtime_environment}\n"
         "resource_limit={resource_limit}\n"
-        "container_path={container_path}\n"
         "file_tree={file_tree}\n"
     )
 

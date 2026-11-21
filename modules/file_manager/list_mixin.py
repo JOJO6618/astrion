@@ -14,9 +14,6 @@ try:
         FORBIDDEN_ROOT_PATHS,
         OUTPUT_FORMATS,
         READ_TOOL_MAX_FILE_SIZE,
-        PROJECT_MAX_STORAGE_BYTES,
-        TERMINAL_SANDBOX_MODE,
-        LINUX_SAFETY,
     )
 except ImportError:  # 兼容全局环境中存在同名包的情况
     import sys
@@ -30,17 +27,10 @@ except ImportError:  # 兼容全局环境中存在同名包的情况
         FORBIDDEN_ROOT_PATHS,
         OUTPUT_FORMATS,
         READ_TOOL_MAX_FILE_SIZE,
-        PROJECT_MAX_STORAGE_BYTES,
-        TERMINAL_SANDBOX_MODE,
-        LINUX_SAFETY,
     )
-from modules.container_file_proxy import ContainerFileProxy
 from modules.host_sandbox_policy import get_macos_writable_paths, get_macos_readable_paths
 from utils.logger import setup_logger
 from modules.i18n import tr
-
-if TYPE_CHECKING:
-    from modules.user_container_manager import ContainerHandle
 
 # 临时禁用长度检查
 DISABLE_LENGTH_CHECK = True
@@ -87,14 +77,6 @@ class ListMixin:
         
         try:
             relative_path = self._relative_path(full_path)
-            if self._use_container():
-                return self._container_call("edit_lines_range", {
-                    "path": relative_path,
-                    "start_line": start_line,
-                    "end_line": end_line,
-                    "content": content,
-                    "operation": operation
-                })
 
             # 读取文件内容
             with self._native_open(full_path, 'r', encoding='utf-8') as f:

@@ -186,12 +186,6 @@ def execute(storage, conversation_id, message_id, principal, workspace, snapshot
         from modules.chat_mode.summarize import summarize
         worker.check()
         state = read(storage, conversation_id, message_id)
-        if not principal.host_mode and not principal.is_api_user:
-            from modules.chat_mode.quota import tracker_for
-            allowed, quota = tracker_for(storage.root, principal.role).check_and_increment(
-                "thinking" if snapshot["metadata"].get("thinking_mode") else "fast")
-            if not allowed:
-                raise RuntimeError(f"Summary quota exceeded: {quota}")
         summary = worker.summarize(summarize(storage, snapshot, snapshot["messages"], instruction=(
             "请为接手的 Agent 总结当前对话。详细保留用户目标、确认的产品行为与限制、"
             "已完成且验证的工作、未完成事项、关键数据、后续建议。不要执行工具，不要遗漏"

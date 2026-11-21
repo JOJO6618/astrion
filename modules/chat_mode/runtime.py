@@ -43,17 +43,6 @@ class ChatRuntime:
             self.apply_model_profile(self.model_profile)
         self.tools = ChatTools(self)
         self._tool_loop_active = False
-        self.usage_tracker = None
-
-    def record_model_call(self, is_thinking):
-        if self.usage_tracker is None:
-            return True, {}
-        return self.usage_tracker.check_and_increment("thinking" if is_thinking else "fast")
-
-    def record_search_call(self):
-        if self.usage_tracker is None:
-            return True, {}
-        return self.usage_tracker.check_and_increment("search")
 
     def apply_model_profile(self, profile):
         self.model_profile = profile

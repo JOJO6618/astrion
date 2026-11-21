@@ -111,11 +111,6 @@ export const chatMethods = {
     if (!message || !this.isConnected) {
       return false;
     }
-    const quotaType = this.thinkingMode ? 'thinking' : 'fast';
-    if (this.isQuotaExceeded(quotaType)) {
-      this.showQuotaToast({ type: quotaType });
-      return false;
-    }
     const session = ensureMessageSession(this);
     const owns = () => ownsConversationSession(this, session);
     this.taskInProgress = true;

@@ -5,7 +5,6 @@
 即可接入 Gateway 公共协议端点。
 
 安全模型与 /host-login 完全对齐（host 模式定位为本机单人使用）：
-- 仅 TERMINAL_SANDBOX_MODE=host（且非 LINUX_SAFETY）生效；
 - 仅允许回环地址（127.0.0.1/::1/localhost）直连调用；
 - token 为本机生成的随机串，存于运行态数据目录
   （<DATA_DIR>/host_api_token，权限 0600），本机客户端读取后经
@@ -22,8 +21,7 @@ from typing import Optional
 
 from flask import current_app, g, jsonify, request, session
 
-from config import DATA_DIR, TERMINAL_SANDBOX_MODE
-from config.terminal import LINUX_SAFETY
+from config import DATA_DIR
 from modules.host_workspace_manager import resolve_host_workspace
 from modules.i18n import tr
 from server.auth_helpers import is_logged_in
@@ -32,23 +30,17 @@ _LOOPBACK_ADDRS = {"127.0.0.1", "::1", "localhost"}
 _TOKEN_FILENAME = "host_api_token"
 
 
-def _host_channel_enabled() -> bool:
-    return (TERMINAL_SANDBOX_MODE or "").lower() == "host" and not LINUX_SAFETY
-
-
 def host_api_token_path() -> Path:
     return Path(DATA_DIR).expanduser() / _TOKEN_FILENAME
 
 
 def get_or_create_host_api_token() -> Optional[str]:
-    """读取（不存在则生成）host 通道 token；非 host 模式返回 None。
+    """读取或生成 Host 通道 token。
 
     生成使用临时文件 + os.replace 原子替换 + 0600 权限。本地单进程
     场景下并发首次生成概率极低；万一竞争产生两个 token，后写覆盖先写，
     持旧 token 的一方 401 后重读文件即可自愈。
     """
-    if not _host_channel_enabled():
-        return None
     path = host_api_token_path()
     try:
         existing = path.read_text(encoding="utf-8").strip()
@@ -77,7 +69,7 @@ def _extract_bearer_token() -> str:
 
 def _verify_host_bearer(token: str) -> bool:
     """校验 host Bearer token：host 模式 + 回环地址 + token 匹配。"""
-    if not token or not _host_channel_enabled():
+    if not token:
         return False
     remote_addr = (request.remote_addr or "").strip()
     if remote_addr not in _LOOPBACK_ADDRS:

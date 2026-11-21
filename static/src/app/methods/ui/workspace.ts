@@ -32,11 +32,6 @@ export const workspaceMethods = {
       clearTimeout(this.runningWorkspaceTasksRefreshTimer);
       this.runningWorkspaceTasksRefreshTimer = null;
     }
-    if (!(this.versioningHostMode || this.dockerProjectMode)) {
-      this.runningWorkspaceTasks = [];
-      requests.delete(this);
-      return true;
-    }
     let retry = false;
     let waitingForTitle = false;
     const timeout = setTimeout(() => controller.abort(), 12000);
@@ -167,7 +162,6 @@ export const workspaceMethods = {
   /** 空闲轮询入口：已有索引请求在飞或刚刷新过就跳过，避免打断内部续排。 */
   refreshWorkspaceTaskIndexIdle() {
     if (retiredHosts.has(this)) return;
-    if (!(this.versioningHostMode || this.dockerProjectMode)) return;
     if (requests.get(this)) return;
     const now = Date.now();
     if (now - Number(this.workspaceTaskIndexRefreshedAt || 0) < 4000) return;
@@ -180,7 +174,6 @@ export const workspaceMethods = {
    */
   maybeRefreshConversationListFromTasks(tasks) {
     if (!Array.isArray(tasks) || !tasks.length) return;
-    if (!(this.versioningHostMode || this.dockerProjectMode)) return;
     if (this.searchActive) return;
     const store = useConversationStore();
     // 侧边栏只有在分组开启且确实有工作区时才渲染分组列表。
@@ -220,7 +213,6 @@ export const workspaceMethods = {
   /** 静默重拉对话列表：任务驱动最短间隔 5s，空闲兜底最短间隔 30s。 */
   refreshConversationListSilently(reason = 'idle') {
     if (retiredHosts.has(this)) return;
-    if (!(this.versioningHostMode || this.dockerProjectMode)) return;
     if (!isViewVisible()) return;
     if (this.searchActive) return;
     const minInterval = reason === 'idle' ? 30000 : 5000;

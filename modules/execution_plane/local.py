@@ -1,4 +1,4 @@
-"""LocalExecutionBackend：真实 Host/Docker 的薄适配执行后端。
+"""LocalExecutionBackend：真实 Host 的薄适配执行后端。
 
 定位：把「执行层契约」落到本机既有实现上，供两类调用方使用：
 1. 完整 App：`LocalExecutionBackend(web_terminal)`，owner 就是终端实例
@@ -36,7 +36,7 @@ _OWNER_RESOURCES = (
 
 
 class LocalExecutionBackend:
-    """真实本机执行后端（Host 或已注入的 Docker 容器会话）。
+    """真实 Host 执行后端。
 
     资源动态解析约定：
     - 构造只保存 ``owner`` 引用，**不触资源、不校验完整度**；轻量查询（只看
@@ -69,7 +69,9 @@ class LocalExecutionBackend:
     def __init__(self, owner: Any) -> None:
         if owner is None:
             raise ValueError("LocalExecutionBackend 需要 owner（ExecutionResources 或终端实例）。")
-        # 只保存引用：不校验资源完整性，不创建任何执行资源（轻量 query 也要能构造）。
+        if getattr(getattr(owner, 'container_session', None), 'mode', None) == 'docker':
+            raise ValueError('This backend only accepts Host execution resources')
+        # 只保存引用，不创建任何执行资源。
         self.owner = owner
 
     # ------------------------------------------------------------------
@@ -116,10 +118,6 @@ class LocalExecutionBackend:
         if callable(getter):
             return str(getter() or "restricted")
         return str(getattr(self.owner, "network_permission", None) or "restricted")
-
-    @property
-    def container_session(self) -> Any:
-        return getattr(self.owner, "container_session", None)
 
     @property
     def files(self) -> Any:

@@ -44,15 +44,14 @@ from modules.personalization_manager import (
 )
 from modules.sub_agent.state import TERMINAL_STATUSES as SUB_AGENT_TERMINAL_STATUSES
 from modules.upload_security import UploadSecurityError
-from modules.user_manager import UserWorkspace
-from modules.usage_tracker import QUOTA_DEFAULTS
+from modules.workspace import UserWorkspace
 from core.web_terminal import WebTerminal
 from utils.tool_result_formatter import format_tool_result_for_context
 from utils.conversation_manager import ConversationManager
 from config.model_profiles import get_model_context_window, get_model_profile
 
-from .auth_helpers import api_login_required, resolve_admin_policy, get_current_user_record, get_current_username
-from .context import with_terminal, get_gui_manager, get_upload_guard, build_upload_error_response, ensure_conversation_loaded, reset_system_state, get_user_resources, get_or_create_usage_tracker
+from .auth_helpers import api_login_required, resolve_admin_policy, get_current_username
+from .context import with_terminal, get_gui_manager, get_upload_guard, build_upload_error_response, ensure_conversation_loaded, reset_system_state, get_user_resources
 from .work_timer import finalize_conversation_work_timer
 from .utils_common import (
     build_review_lines,
@@ -77,7 +76,6 @@ from .state import (
     MONITOR_MEMORY_ENTRY_LIMIT,
     RATE_LIMIT_BUCKETS,
     FAILURE_TRACKERS,
-    usage_trackers,
     MONITOR_SNAPSHOT_CACHE,
     MONITOR_SNAPSHOT_CACHE_LIMIT,
     PROJECT_STORAGE_CACHE,
@@ -85,9 +83,6 @@ from .state import (
     RECENT_UPLOAD_EVENT_LIMIT,
     RECENT_UPLOAD_FEED_LIMIT,
     TITLE_PROMPT_PATH,
-    get_last_active_ts,
-    user_manager,
-    container_manager,
     custom_tool_registry,
     user_terminals,
     terminal_rooms,

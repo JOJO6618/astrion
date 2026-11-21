@@ -107,20 +107,5 @@ export default {
   costRate: '1 USD = {rate} CNY, reference rate dated {date}',
   costRateCached: '1 USD = {rate} CNY, using cached rate ({date})',
   costRateUnavailable: 'Exchange rate unavailable; CNY conversion is pending.',
-  performanceStats: 'Performance',
-  memory: 'Memory',
-  containerMetricsPending: 'Container is running, waiting for metrics...',
-  hostModeNoContainer: 'Running in host mode; no container metrics available.',
-  quotaStats: 'Quota stats',
-  hostModeNoQuota: 'Application call quotas do not apply in host mode.',
-  resetAt: 'Resets {time}',
-  resourceStats: 'Resources',
-  network: 'Network',
-  storage: 'Storage',
-  quotaTierFast: 'Regular models',
-  quotaTierThinking: 'Thinking models',
-  quotaTierSearch: 'Search',
-  unknown: 'Unknown',
-  stopped: 'Stopped',
-  containerRunning: 'Running'
+  resetAt: 'Resets {time}'
 } as const;

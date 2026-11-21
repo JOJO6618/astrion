@@ -16,7 +16,6 @@
     >
       <div ref="fileAtList" class="file-at-menu">
         <button
-          v-if="hostMode"
           type="button"
           class="file-at-item file-at-item--picker"
           :class="{ 'file-at-item--active': activeIndex === 0 }"
@@ -42,9 +41,6 @@
           <span class="file-at-item__name">{{ item.name }}</span>
           <span class="file-at-item__description">{{ item.path }}</span>
         </button>
-        <div v-if="!hostMode && !fileItems.length && !loading" class="file-at-empty">
-          {{ $t('quickdock.atMenuNoMatch') }}
-        </div>
         <div v-if="loading" class="file-at-empty">{{ $t('quickdock.atMenuSearching') }}</div>
       </div>
     </div>
@@ -66,7 +62,6 @@ const props = defineProps<{
   items: FileAtItem[];
   activeIndex: number;
   loading: boolean;
-  hostMode: boolean;
   menuStyle: Record<string, string>;
 }>();
 
@@ -78,10 +73,9 @@ defineEmits<{
 
 const fileAtList = ref<HTMLElement | null>(null);
 
-const hasPicker = computed(() => props.hostMode);
 const fileItems = computed(() => props.items || []);
 
-const displayIndex = (fileIndex: number) => (hasPicker.value ? fileIndex + 1 : fileIndex);
+const displayIndex = (fileIndex: number) => fileIndex + 1;
 
 watch(
   () => props.visible,

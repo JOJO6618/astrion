@@ -1,6 +1,7 @@
-"""Backend i18n message pack: server/admin.py API user-visible messages.
+"""Backend i18n message pack: server/admin.py user-visible messages.
 
-Domain prefix: admin.
+Domain prefix: admin. 保留 Host 管理员页（二级密码 / 自定义工具 / MCP）；
+旧 Web 租户管理（邀请码、普通账号密码重置、API 用户）随 Docker fork 移出。
 """
 
 MESSAGES = {
@@ -15,22 +16,6 @@ MESSAGES = {
     "admin.secondary_password_wrong": {
         "zh-CN": "二级密码错误",
         "en-US": "Incorrect secondary password",
-    },
-    "admin.invite_code_not_found": {
-        "zh-CN": "邀请码不存在",
-        "en-US": "Invite code not found",
-    },
-    "admin.missing_username": {
-        "zh-CN": "缺少用户名",
-        "en-US": "Missing username",
-    },
-    "admin.new_password_required": {
-        "zh-CN": "新密码不能为空",
-        "en-US": "New password is required",
-    },
-    "admin.password_reset": {
-        "zh-CN": "密码已重置",
-        "en-US": "Password has been reset",
     },
     "admin.missing_id": {
         "zh-CN": "缺少 id",
@@ -55,13 +40,5 @@ MESSAGES = {
     "admin.server_not_found": {
         "zh-CN": "未找到该服务",
         "en-US": "Server not found",
-    },
-    "admin.username_required": {
-        "zh-CN": "用户名不能为空",
-        "en-US": "Username is required",
-    },
-    "admin.user_not_found": {
-        "zh-CN": "用户不存在",
-        "en-US": "User not found",
     },
 }

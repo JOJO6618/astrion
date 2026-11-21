@@ -11,7 +11,6 @@ import input from './en-US/input';
 import tutorial from './en-US/tutorial';
 import monitor from './en-US/monitor';
 import workflow from './en-US/workflow';
-import adminDashboard from './en-US/adminDashboard';
 import adminPolicy from './en-US/adminPolicy';
 import adminApi from './en-US/adminApi';
 import adminCustomTools from './en-US/adminCustomTools';
@@ -57,7 +56,6 @@ const enUS: DeepString<typeof zhCN> = {
   tutorial,
   monitor,
   workflow,
-  adminDashboard,
   adminPolicy,
   adminApi,
   adminCustomTools,

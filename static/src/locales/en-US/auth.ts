@@ -1,32 +1,13 @@
 // Locale namespace: auth (en-US mirror, keys must match zh-CN/auth.ts exactly).
 export default {
-  loginTitle: 'Astrion Login',
-  loginSubtitle: 'Sign in to continue to the workspace',
-  email: 'Email',
   password: 'Password',
-  login: 'Log in',
   hostModeNoLogin: 'Host mode (no sign-in)',
   hostLoginTitle: 'Host Login',
   hostLoginSubtitle: 'Enter the Host password to continue to the workspace',
   hostLogin: 'Enter Host',
   hostPasswordRequired: 'Please enter the Host password',
-  noAccount: 'No account yet?',
-  signUp: 'Sign up',
-  emailAndPasswordRequired: 'Please enter your email and password',
   serviceUnavailable: 'Service is temporarily unavailable, please try again later',
-  loginFailed: 'Login failed',
   networkErrorRetry: 'Network error, please retry',
   resourceBusy: 'Resources are busy, please try again later',
-  hostModeUnavailable: 'Host mode is unavailable',
-  createAccount: 'Create account',
-  registerDoneHint: 'You can log in once registration is complete',
-  username: 'Username',
-  usernamePlaceholder: 'Lowercase letters, digits, and underscores only',
-  inviteCode: 'Invite code',
-  requiredPlaceholder: 'Required',
-  register: 'Sign up',
-  haveAccount: 'Already have an account?',
-  backToLogin: 'Back to login',
-  fillAllFields: 'Please fill in all fields',
-  registerFailed: 'Registration failed'
+  hostModeUnavailable: 'Host mode is unavailable'
 } as const;

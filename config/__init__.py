@@ -77,15 +77,11 @@ def _load_dotenv():
             _LEGACY_MAP = {
                 "terminal.sandbox_mode":             "TERMINAL_SANDBOX_MODE",
                 "terminal.execution_mode_default":   "HOST_EXECUTION_MODE_DEFAULT",
-                "terminal.max_active_containers":     "MAX_ACTIVE_USER_CONTAINERS",
                 "terminal.project_max_storage_mb":    "PROJECT_MAX_STORAGE_MB",
                 "server.port":                        "WEB_SERVER_PORT",
                 "server.host":                        "WEB_SERVER_HOST",
-                "admin.username":                     "AGENT_ADMIN_USERNAME",
-                "admin.password_hash":                "AGENT_ADMIN_PASSWORD_HASH",
                 "admin.secondary_password_hash":      "ADMIN_SECONDARY_PASSWORD_HASH",
                 "secrets.web_secret_key":             "WEB_SECRET_KEY",
-                "secrets.api_token_secret":           "API_TOKEN_SECRET",
                 "search.tavily_api_key":              "AGENT_TAVILY_API_KEY",
                 "search.tavily_api_key_2":            "AGENT_TAVILY_API_KEY_2",
                 "models.default_response_max_tokens": "AGENT_DEFAULT_RESPONSE_MAX_TOKENS",
@@ -119,6 +115,15 @@ def _load_dotenv():
 
 
 _load_dotenv()
+
+# Reject legacy deployments before resolving runtime data directories.
+_configured_mode = os.environ.get("TERMINAL_SANDBOX_MODE", "host").strip().lower()
+_legacy_linux_safety = os.environ.get("LINUX_SAFETY", "0") not in {"0", "false", "False"}
+if _configured_mode not in {"", "host"} or _legacy_linux_safety:
+    raise SystemExit(
+        "Astrion Host requires TERMINAL_SANDBOX_MODE=host and LINUX_SAFETY disabled. "
+        "Use the matching Docker/Web release for existing multi-user deployments."
+    )
 
 # 桌面壳 AI 浏览器凭据：须在任何子进程启动前读出并关闭管道。
 from . import desktop_browser as _desktop_browser  # noqa: E402,F401

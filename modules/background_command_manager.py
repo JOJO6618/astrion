@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import shutil
 import signal
 import subprocess
 import threading
@@ -19,13 +18,10 @@ from modules.host_sandbox_runner import (
     build_host_sandbox_readonly_plan,
     host_sandbox_enabled,
 )
-from modules.docker_readonly_exec import docker_readonly_exec_args, docker_readonly_wrap_inner
 from modules.i18n import tr
 from modules.execution_scope import current_execution_scope, bind_execution_scope
 from modules.git_worktree.grants import bind_extra_roots, current_extra_roots
-from modules.scoped_execution_policy import (
-    require_scoped_docker_support, scoped_work_path, scoped_write_access,
-)
+from modules.scoped_execution_policy import scoped_work_path, scoped_write_access
 
 
 TERMINAL_STATUSES = {"completed", "failed", "timeout", "cancelled"}
@@ -70,9 +66,16 @@ class BackgroundCommandManager:
         if timeout_value <= 0:
             timeout_value = 1
 
-        session_override = None
-        if not getattr(terminal_ops, "container_session", None):
-            session_override = terminal_ops._resolve_active_container_session()
+        # Host-only：外部仍可能把 Docker 句柄挂在 terminal_ops 上；明确拒绝而非回落 Host。
+        session = getattr(terminal_ops, "container_session", None)
+        if session is not None and getattr(session, "mode", None) == "docker":
+            return {
+                "success": False,
+                "error": "后台命令是 Host-only 构建，不支持 Docker 容器会话。",
+                "status": "error",
+                "output": "",
+                "return_code": -1,
+            }
 
         final_command = command
 
@@ -133,7 +136,7 @@ class BackgroundCommandManager:
                 "command": final_command,
                 "work_path": work_path,
                 "timeout": timeout_value,
-                "session": session_override or getattr(terminal_ops, "container_session", None),
+                "session": None,
                 "host_execution_mode": scope.execution_mode if scope else getattr(terminal_ops, "host_execution_mode", "sandbox"),
                 "execution_scope": scope,
                 # threading.Thread 不会继承 ContextVar；工作区外执行根的临时放行
@@ -235,108 +238,59 @@ class BackgroundCommandManager:
             if scope:
                 host_execution_mode = scope.execution_mode
                 sandbox_write_access = scoped_write_access(sandbox_write_access, scope)
-            exec_cmd: Optional[List[str]] = None
-            use_shell = True
+            if session is not None and getattr(session, "mode", None) == "docker":
+                raise RuntimeError("后台命令是 Host-only 构建，不支持 Docker 容器会话。")
             env = os.environ.copy()
             env.setdefault("PYTHONUNBUFFERED", "1")
 
-            if session and getattr(session, "mode", None) == "docker":
-                require_scoped_docker_support(scope)
-                container_name = getattr(session, "container_name", None)
-                mount_path = getattr(session, "mount_path", "/workspace") or "/workspace"
-                docker_bin = shutil.which("docker") or "docker"
-                if not container_name:
-                    raise RuntimeError(tr("bg_cmd.container_name_missing"))
-                try:
-                    relative = work_path.relative_to(self.project_path).as_posix()
-                except ValueError:
-                    relative = ""
-                container_workdir = mount_path.rstrip("/")
-                if relative:
-                    container_workdir = f"{container_workdir}/{relative}"
-                exec_cmd = [docker_bin, "exec"]
-                inner_cmd = ["/bin/bash", "-lc", command]
-                if scope and scope.workspace_only:
-                    from modules.docker_scoped_exec import wrap_scoped_docker_command
-                    inner_cmd = wrap_scoped_docker_command(mount_path, inner_cmd, scope)
-                if not sandbox_write_access:
-                    # 只读执行：非特权 uid（内核 DAC 强制只读，见 modules/docker_readonly_exec.py）
-                    exec_cmd += docker_readonly_exec_args()
-                    # Landlock 加固：可用时再以进程级只读域封住工作区写；失败自动降级纯 DAC。
-                    inner_cmd = docker_readonly_wrap_inner(container_name, mount_path, inner_cmd, docker_bin)
-                exec_cmd += [
-                    "-e",
-                    "PATH=/opt/agent-venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-                    "-e",
-                    "VIRTUAL_ENV=/opt/agent-venv",
-                    "-w",
-                    container_workdir,
-                    container_name,
-                    *inner_cmd,
-                ]
-                use_shell = False
-
-            if use_shell:
-                use_host_sandbox = host_execution_mode != "direct"
-                if use_host_sandbox and host_sandbox_enabled():
-                    # 优先使用创建时快照的权限；缺省才回落环境变量（兼容旧调用方）。
-                    effective_network_permission = (
-                        str(network_permission).strip().lower()
-                        if network_permission
-                        else os.environ.get("HOST_SANDBOX_NETWORK_PERMISSION", "restricted")
-                    )
-                    if sandbox_write_access:
-                        plan = build_host_sandbox_plan(command, work_path, env, network_permission=effective_network_permission, workspace_root=self.project_path)
-                    else:
-                        plan = build_host_sandbox_readonly_plan(command, work_path, env, network_permission=effective_network_permission, workspace_root=self.project_path)
-                    cmd_args = plan.command
-                    pass_fds = ()
-                    seccomp_fd = None
-                    if plan.seccomp_bpf_path:
-                        seccomp_fd = os.open(plan.seccomp_bpf_path, os.O_RDONLY)
-                        cmd_args = [str(seccomp_fd) if token == "__SECCOMP_FD__" else token for token in cmd_args]
-                        pass_fds = (seccomp_fd,)
-                    try:
-                        process = self._spawn_and_register(
-                            command_id, cancel_event, cmd_args,
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE,
-                            cwd=plan.cwd,
-                            env=plan.env,
-                            start_new_session=True,
-                            text=True,
-                            encoding="utf-8",
-                            errors="replace",
-                            bufsize=1,
-                            pass_fds=pass_fds,
-                        )
-                    finally:
-                        if seccomp_fd is not None:
-                            try:
-                                os.close(seccomp_fd)
-                            except OSError:
-                                pass
-                elif use_host_sandbox:
+            use_host_sandbox = host_execution_mode != "direct"
+            if use_host_sandbox:
+                if not host_sandbox_enabled():
                     raise HostSandboxError(tr("terminal.host_sandbox_disabled"))
+                # 优先使用创建时快照的权限；缺省才回落环境变量（兼容旧调用方）。
+                effective_network_permission = (
+                    str(network_permission).strip().lower()
+                    if network_permission
+                    else os.environ.get("HOST_SANDBOX_NETWORK_PERMISSION", "restricted")
+                )
+                if sandbox_write_access:
+                    plan = build_host_sandbox_plan(command, work_path, env, network_permission=effective_network_permission, workspace_root=self.project_path)
                 else:
+                    plan = build_host_sandbox_readonly_plan(command, work_path, env, network_permission=effective_network_permission, workspace_root=self.project_path)
+                cmd_args = plan.command
+                pass_fds = ()
+                seccomp_fd = None
+                if plan.seccomp_bpf_path:
+                    seccomp_fd = os.open(plan.seccomp_bpf_path, os.O_RDONLY)
+                    cmd_args = [str(seccomp_fd) if token == "__SECCOMP_FD__" else token for token in cmd_args]
+                    pass_fds = (seccomp_fd,)
+                try:
                     process = self._spawn_and_register(
-                        command_id, cancel_event, command,
+                        command_id, cancel_event, cmd_args,
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE,
-                        cwd=str(work_path),
-                        shell=True,
-                        env=env,
+                        cwd=plan.cwd,
+                        env=plan.env,
                         start_new_session=True,
                         text=True,
                         encoding="utf-8",
                         errors="replace",
                         bufsize=1,
+                        pass_fds=pass_fds,
                     )
+                finally:
+                    if seccomp_fd is not None:
+                        try:
+                            os.close(seccomp_fd)
+                        except OSError:
+                            pass
             else:
                 process = self._spawn_and_register(
-                    command_id, cancel_event, exec_cmd,
+                    command_id, cancel_event, command,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
+                    cwd=str(work_path),
+                    shell=True,
                     env=env,
                     start_new_session=True,
                     text=True,

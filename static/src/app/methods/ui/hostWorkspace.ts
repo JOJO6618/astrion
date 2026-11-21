@@ -6,18 +6,15 @@ import { workspaceScopedFetch as fetch } from '../workspaceRequestScope';
 import { currentConversationSession } from '../conversation/session';
 import { workspaceNavigationMethods } from './workspaceNavigation';
 
+/** Host-only：工作区目录与操作一律走可信的 Host 工作区接口。 */
+const HOST_WORKSPACES_API = '/api/host/workspaces';
+
 export const hostWorkspaceMethods = {
   ...workspaceNavigationMethods,
   async fetchHostWorkspaces() {
     const owns = beginAuxiliaryRequest(this, 'host-workspaces');
-    if (!(this.versioningHostMode || this.dockerProjectMode)) {
-      this.hostWorkspaces = [];
-      this.currentHostWorkspaceId = '';
-      this.defaultHostWorkspaceId = '';
-      return;
-    }
     try {
-      const resp = await fetch(this.versioningHostMode ? '/api/host/workspaces' : '/api/projects');
+      const resp = await fetch(HOST_WORKSPACES_API);
       const payload = await resp.json().catch(() => ({}));
       if (!owns()) return;
       if (!resp.ok || !payload?.success) {
@@ -44,7 +41,7 @@ export const hostWorkspaceMethods = {
       void this.refreshRunningWorkspaceTasks();
     } catch (error) {
       if (!owns()) return;
-      console.warn('加载工作区/项目失败:', error);
+      console.warn('加载工作区失败:', error);
       this.uiPushToast?.({
         title: t('appUi.fetchProjectsFailed'),
         message: String(error?.message || error),
@@ -54,47 +51,29 @@ export const hostWorkspaceMethods = {
   },
   async submitHostWorkspaceCreate() {
     const owns = beginAuxiliaryRequest(this, 'host-workspace-create');
-    if (!(this.versioningHostMode || this.dockerProjectMode)) {
-      return;
-    }
     if (this.hostWorkspaceSwitching || this.hostWorkspaceCreateSubmitting) {
       return;
     }
     const workspacePath = String(this.hostWorkspaceCreatePath || '').trim();
     const label = String(this.hostWorkspaceCreateLabel || '').trim();
-    if (this.versioningHostMode && !workspacePath) {
+    if (!workspacePath) {
       this.hostWorkspaceCreateError = t('appUi.pathCannotBeEmpty');
-      return;
-    }
-    if (this.dockerProjectMode && !label) {
-      this.hostWorkspaceCreateError = t('appUi.projectNameCannotBeEmpty');
       return;
     }
 
     this.hostWorkspaceCreateSubmitting = true;
     this.hostWorkspaceCreateError = '';
     try {
-      const resp = await fetch(
-        this.versioningHostMode ? '/api/host/workspaces/create' : '/api/projects/create',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'same-origin',
-          body: JSON.stringify({
-            path: this.versioningHostMode ? workspacePath : undefined,
-            label
-          })
-        }
-      );
+      const resp = await fetch(`${HOST_WORKSPACES_API}/create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ path: workspacePath, label })
+      });
       const payload = await resp.json().catch(() => ({}));
       if (!owns()) return;
       if (!resp.ok || !payload?.success) {
-        throw new Error(
-          payload?.error ||
-            (this.versioningHostMode
-              ? t('appUi.createWorkspaceFailed')
-              : t('appUi.createProjectFailed'))
-        );
+        throw new Error(payload?.error || t('appUi.createWorkspaceFailed'));
       }
       await this.fetchHostWorkspaces();
       const createdLabel = payload?.data?.workspace?.label || label || workspacePath;
@@ -102,7 +81,7 @@ export const hostWorkspaceMethods = {
       this.hostWorkspaceCreatePath = '';
       this.hostWorkspaceCreateLabel = '';
       this.uiPushToast({
-        title: this.versioningHostMode ? t('appUi.workspaceCreated') : t('appUi.projectCreated'),
+        title: t('appUi.workspaceCreated'),
         message: createdLabel,
         type: 'success'
       });
@@ -117,9 +96,7 @@ export const hostWorkspaceMethods = {
         error instanceof Error ? error.message : String(error || t('appUi.createFailed'));
       this.hostWorkspaceCreateError = message;
       this.uiPushToast({
-        title: this.versioningHostMode
-          ? t('appUi.createWorkspaceFailed')
-          : t('appUi.createProjectFailed'),
+        title: t('appUi.createWorkspaceFailed'),
         message,
         type: 'error'
       });
@@ -133,24 +110,16 @@ export const hostWorkspaceMethods = {
     await this.submitHostWorkspaceCreate();
   },
   async renameHostWorkspace(payload = {}) {
-    if (!(this.versioningHostMode || this.dockerProjectMode)) {
-      return;
-    }
     const workspaceId = String(payload?.workspace_id || '').trim();
     const label = String(payload?.label || '').trim();
     if (!workspaceId || !label) {
-      this.hostWorkspaceCreateError = this.dockerProjectMode
-        ? t('appUi.projectNameCannotBeEmpty')
-        : t('appUi.workspaceNameCannotBeEmpty');
+      this.hostWorkspaceCreateError = t('appUi.workspaceNameCannotBeEmpty');
       return;
     }
     this.hostWorkspaceManageSubmitting = true;
     this.hostWorkspaceCreateError = '';
     try {
-      const endpoint = this.versioningHostMode
-        ? '/api/host/workspaces/rename'
-        : '/api/projects/rename';
-      const resp = await fetch(endpoint, {
+      const resp = await fetch(`${HOST_WORKSPACES_API}/rename`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
@@ -162,7 +131,7 @@ export const hostWorkspaceMethods = {
       }
       await this.fetchHostWorkspaces();
       this.uiPushToast({
-        title: this.versioningHostMode ? t('appUi.workspaceRenamed') : t('appUi.projectRenamed'),
+        title: t('appUi.workspaceRenamed'),
         message: label,
         type: 'success'
       });
@@ -171,9 +140,7 @@ export const hostWorkspaceMethods = {
         error instanceof Error ? error.message : String(error || t('appUi.renameFailed'));
       this.hostWorkspaceCreateError = message;
       this.uiPushToast({
-        title: this.versioningHostMode
-          ? t('appUi.renameWorkspaceFailed')
-          : t('appUi.renameProjectFailed'),
+        title: t('appUi.renameWorkspaceFailed'),
         message,
         type: 'error'
       });
@@ -186,21 +153,14 @@ export const hostWorkspaceMethods = {
     await this.deleteHostWorkspace(item, { skipConfirm: true });
   },
   async deleteHostWorkspace(item, opts = {}) {
-    if (!(this.versioningHostMode || this.dockerProjectMode)) {
-      return;
-    }
     const workspaceId = String(item?.workspace_id || '').trim();
     if (!workspaceId) return;
     const wasCurrent = workspaceId === this.currentHostWorkspaceId;
     const ok = opts.skipConfirm
       ? true
       : await this.confirmAction({
-          title: this.versioningHostMode
-            ? t('appUi.deleteWorkspaceConfirmTitle')
-            : t('appUi.deleteProjectConfirmTitle'),
-          message: this.versioningHostMode
-            ? t('appUi.deleteWorkspaceConfirmMessage', { name: item?.label || workspaceId })
-            : t('appUi.deleteProjectConfirmMessage', { name: item?.label || workspaceId }),
+          title: t('appUi.deleteWorkspaceConfirmTitle'),
+          message: t('appUi.deleteWorkspaceConfirmMessage', { name: item?.label || workspaceId }),
           confirmText: t('common.delete'),
           cancelText: t('common.cancel'),
           confirmVariant: 'danger'
@@ -210,10 +170,7 @@ export const hostWorkspaceMethods = {
     this.hostWorkspaceManageSubmitting = true;
     this.hostWorkspaceCreateError = '';
     try {
-      const endpoint = this.versioningHostMode
-        ? '/api/host/workspaces/delete'
-        : '/api/projects/delete';
-      const resp = await fetch(endpoint, {
+      const resp = await fetch(`${HOST_WORKSPACES_API}/delete`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
@@ -256,7 +213,7 @@ export const hostWorkspaceMethods = {
         await this.enterNewConversationPage();
       }
       this.uiPushToast({
-        title: this.versioningHostMode ? t('appUi.workspaceDeleted') : t('appUi.projectDeleted'),
+        title: t('appUi.workspaceDeleted'),
         message: item?.label || workspaceId,
         type: 'success'
       });
@@ -265,9 +222,7 @@ export const hostWorkspaceMethods = {
         error instanceof Error ? error.message : String(error || t('appUi.deleteFailed'));
       this.hostWorkspaceCreateError = message;
       this.uiPushToast({
-        title: this.versioningHostMode
-          ? t('appUi.deleteWorkspaceFailed')
-          : t('appUi.deleteProjectFailed'),
+        title: t('appUi.deleteWorkspaceFailed'),
         message,
         type: 'error'
       });
@@ -287,9 +242,6 @@ export const hostWorkspaceMethods = {
     void _workspaceId;
   },
   async revealHostWorkspace(workspaceId: string) {
-    if (!(this.versioningHostMode || this.dockerProjectMode)) {
-      return;
-    }
     const targetId = String(workspaceId || '').trim();
     if (!targetId) return;
     try {
@@ -306,18 +258,13 @@ export const hostWorkspaceMethods = {
       const message =
         error instanceof Error ? error.message : String(error || t('appUi.openFailed'));
       this.uiPushToast({
-        title: this.versioningHostMode
-          ? t('appUi.openWorkspaceFailed')
-          : t('appUi.openProjectFailed'),
+        title: t('appUi.openWorkspaceFailed'),
         message,
         type: 'error'
       });
     }
   },
   async setDefaultHostWorkspace(payload = {}) {
-    if (!(this.versioningHostMode || this.dockerProjectMode)) {
-      return;
-    }
     /* 组件事件契约为 workspaceId 字符串（WorkspaceSwitcher/ConversationSidebar 声明），兼容对象形式 */
     const workspaceId = String(
       typeof payload === 'string' ? payload : payload?.workspace_id || ''
@@ -327,12 +274,8 @@ export const hostWorkspaceMethods = {
 
     this.hostWorkspaceManageSubmitting = true;
     this.hostWorkspaceCreateError = '';
-    const isHostMode = this.versioningHostMode;
     try {
-      const endpoint = this.versioningHostMode
-        ? '/api/host/workspaces/set-default'
-        : '/api/projects/set-default';
-      const resp = await fetch(endpoint, {
+      const resp = await fetch(`${HOST_WORKSPACES_API}/set-default`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
@@ -340,16 +283,13 @@ export const hostWorkspaceMethods = {
       });
       const result = await resp.json().catch(() => ({}));
       if (!resp.ok || !result?.success) {
-        throw new Error(
-          result?.error ||
-            (isHostMode ? t('appUi.setDefaultWorkspaceFailed') : t('appUi.setDefaultProjectFailed'))
-        );
+        throw new Error(result?.error || t('appUi.setDefaultWorkspaceFailed'));
       }
       const data = result.data || {};
       this.defaultHostWorkspaceId = String(data.default_workspace_id || workspaceId);
       await this.fetchHostWorkspaces();
       this.uiPushToast({
-        title: isHostMode ? t('appUi.setAsDefaultWorkspace') : t('appUi.setAsDefaultProject'),
+        title: t('appUi.setAsDefaultWorkspace'),
         message:
           (this.hostWorkspaces || []).find((w: any) => w.workspace_id === workspaceId)?.label ||
           workspaceId,
@@ -359,17 +299,10 @@ export const hostWorkspaceMethods = {
       const message =
         error instanceof Error
           ? error.message
-          : String(
-              error ||
-                (isHostMode
-                  ? t('appUi.setDefaultWorkspaceFailed')
-                  : t('appUi.setDefaultProjectFailed'))
-            );
+          : String(error || t('appUi.setDefaultWorkspaceFailed'));
       this.hostWorkspaceCreateError = message;
       this.uiPushToast({
-        title: isHostMode
-          ? t('appUi.setDefaultWorkspaceFailed')
-          : t('appUi.setDefaultProjectFailed'),
+        title: t('appUi.setDefaultWorkspaceFailed'),
         message,
         type: 'error'
       });

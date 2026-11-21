@@ -1,9 +1,10 @@
 """Backend i18n message pack: infrastructure user-visible error messages.
 
 Covers modules/gui_file_manager.py (gui_file.*), modules/host_sandbox_runner.py
-(sandbox.*), modules/user_container_manager.py (container_mgr.*),
-modules/persistent_terminal/start.py (terminal_start.*) and
-modules/background_command_manager.py (bg_cmd.*).
+(sandbox.*) and modules/persistent_terminal/start.py (terminal_start.*).
+
+旧用户容器体系（modules/user_container_manager.py 的 container_mgr.*、容器终端
+与容器后台命令）已随 Docker fork 移出主仓。
 
 Pure data module — do not import anything here. Auto-discovered and merged by
 modules/i18n.py at import time. zh-CN copy is verbatim from source; en-US is
@@ -217,65 +218,9 @@ MESSAGES = {
         "en-US": "Distro name '{distro}' contains illegal characters (only letters, digits, dot, underscore, hyphen allowed)",
     },
 
-    # ── modules/user_container_manager.py（用户容器管理器） ──
-    "container_mgr.quota_exhausted": {
-        "zh-CN": "资源繁忙：容器配额已用尽，请稍候再试。",
-        "en-US": "Busy: container quota exhausted, please try again later",
-    },
-    "container_mgr.per_user_quota_exhausted": {
-        "zh-CN": "资源繁忙：您的容器数量已达上限（{limit} 个），请先释放其他工作区的容器。",
-        "en-US": "Busy: you have reached your container limit ({limit}); please release containers of other workspaces first",
-    },
-    "container_mgr.runtime_not_found": {
-        "zh-CN": "未找到容器运行时 {runtime}",
-        "en-US": "Container runtime not found: {runtime}",
-    },
-    "container_mgr.image_not_configured": {
-        "zh-CN": "TERMINAL_SANDBOX_IMAGE 未配置，无法启动容器。",
-        "en-US": "TERMINAL_SANDBOX_IMAGE is not configured; cannot start a container",
-    },
-    "container_mgr.docker_start_failed": {
-        "zh-CN": "容器启动失败",
-        "en-US": "Container failed to start",
-    },
-    "container_mgr.docker_mode_runtime_not_found": {
-        "zh-CN": "Docker 模式启动失败：未找到容器运行时 {runtime}",
-        "en-US": "Docker mode failed to start: container runtime not found: {runtime}",
-    },
-    "container_mgr.docker_daemon_unreachable": {
-        "zh-CN": "Docker 模式启动失败：无法访问 Docker daemon: {error}",
-        "en-US": "Docker mode failed to start: cannot reach the Docker daemon: {error}",
-    },
-    "container_mgr.docker_info_nonzero": {
-        "zh-CN": "docker info 返回非零状态",
-        "en-US": "docker info returned a non-zero status",
-    },
-    "container_mgr.docker_mode_failed": {
-        "zh-CN": "Docker 模式启动失败：{message}",
-        "en-US": "Docker mode failed to start: {message}",
-    },
-
     # ── modules/persistent_terminal/start.py（持久化终端 start mixin） ──
     "terminal_start.host_sandbox_disabled": {
         "zh-CN": "宿主机沙箱已禁用（HOST_SANDBOX_ENABLED=0），拒绝启动 host 终端。",
         "en-US": "Host sandbox is disabled (HOST_SANDBOX_ENABLED=0); refusing to start a host terminal",
-    },
-    "terminal_start.container_not_running": {
-        "zh-CN": "目标容器未运行: {container_name}",
-        "en-US": "Target container is not running: {container_name}",
-    },
-    "terminal_start.container_name_missing": {
-        "zh-CN": "容器终端缺少 container_name：docker 模式下必须先有用户容器（架构不变量被破坏）",
-        "en-US": "container_name is missing for the container terminal: a user container must already exist in docker mode (architectural invariant violated)",
-    },
-    "terminal_start.runtime_not_found": {
-        "zh-CN": "未找到容器运行时: {runtime}",
-        "en-US": "Container runtime not found: {runtime}",
-    },
-
-    # ── modules/background_command_manager.py（后台命令管理器） ──
-    "bg_cmd.container_name_missing": {
-        "zh-CN": "容器模式下缺少 container_name",
-        "en-US": "container_name is missing in container mode",
     },
 }

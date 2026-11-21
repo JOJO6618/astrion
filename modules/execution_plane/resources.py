@@ -57,7 +57,6 @@ class ExecutionResources:
     execution_mode: str = "sandbox"
     network_permission: str = "restricted"
     readonly: bool = True
-    container_session: Any = None
     command_validator: Optional[Callable[[str], Tuple[bool, str]]] = None
     _toggles: Dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
 
@@ -98,11 +97,6 @@ class ExecutionResources:
     def cwd(self) -> Path:
         """默认命令 cwd（与终端默认工作目录一致：工作区根）。"""
         return self.workspace_root
-
-    @property
-    def is_docker(self) -> bool:
-        session = self.container_session
-        return bool(session is not None and getattr(session, "mode", None) == "docker")
 
     # ---- 运行期开关（同步到已注入的 getter） ----
 
@@ -153,12 +147,10 @@ def create_local_resources(
     execution_mode: str = "sandbox",
     network_permission: str = "restricted",
     readonly: bool = True,
-    container_session: Any = None,
     command_validator: Optional[Callable[[str], Tuple[bool, str]]] = None,
 ) -> ExecutionResources:
-    """构造本机执行资源（Host 或已注入的 Docker 会话）。
+    """构造本机 Host 执行资源。
 
-    参数全部显式；容器会话需由调用方提供（本函数不建容器、不装沙箱）。
     `command_validator` 缺省时沿用 `TerminalOperator._validate_command`
     （基础危险命令校验）；个人 command_blocking 规则仍由调用方在编排层执行。
     """
@@ -179,12 +171,11 @@ def create_local_resources(
         "readonly": bool(readonly),
     }
 
-    file_manager = FileManager(project, container_session=container_session, data_dir=data)
-    terminal_ops = TerminalOperator(project, container_session=container_session, data_dir=data)
+    file_manager = FileManager(project, data_dir=data)
+    terminal_ops = TerminalOperator(project, data_dir=data)
     validator = command_validator or terminal_ops._validate_command
     terminal_manager = TerminalManager(
         project_path=project,
-        container_session=container_session,
         network_permission_getter=lambda: str(toggles.get("network_permission") or network),
         terminal_readonly_getter=lambda: bool(toggles.get("readonly", readonly)),
         command_validator=validator,
@@ -207,7 +198,6 @@ def create_local_resources(
         execution_mode=mode,
         network_permission=network,
         readonly=bool(readonly),
-        container_session=container_session,
         command_validator=validator,
         _toggles=toggles,
     )

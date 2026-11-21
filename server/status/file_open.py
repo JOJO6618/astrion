@@ -14,16 +14,8 @@ import plistlib
 from pathlib import Path
 from flask import Blueprint, jsonify, request, send_file, session
 
-from server.auth_helpers import api_login_required, resolve_admin_policy
+from server.auth_helpers import api_login_required
 from server.context import with_terminal
-from server.state import (
-    PROJECT_STORAGE_CACHE,
-    PROJECT_STORAGE_CACHE_TTL_SECONDS,
-    PROJECT_MAX_STORAGE_MB,
-    container_manager,
-    user_manager,
-)
-from config import AGENT_VERSION, TERMINAL_SANDBOX_MODE
 from modules.host_workspace_manager import (
     create_host_workspace,
     delete_host_workspace,
@@ -34,7 +26,6 @@ from modules.host_workspace_manager import (
 )
 from utils.host_workspace_debug import write_host_workspace_debug
 from server.utils_common import log_conn_diag
-import server.state as state
 from modules.i18n import tr
 
 def _open_path_in_file_manager(path: Path) -> bool:
@@ -387,21 +378,16 @@ def open_project_in_file_manager(terminal, workspace, username):
     target_workspace_id = (data.get("workspace_id") or "").strip()
 
     if target_workspace_id:
-        if _is_host_mode_request():
-            catalog, _ = resolve_host_workspace()
-            target = next(
-                (item for item in (catalog.get("workspaces") or [])
-                 if item.get("workspace_id") == target_workspace_id),
-                None,
-            )
-            if not target:
-                return jsonify({"success": False, "error": tr("status_file_open.workspace_not_found")}), 404
-            project_path = Path(target.get("path") or "").expanduser().resolve()
-        else:
-            if target_workspace_id not in user_manager.list_user_workspaces(username):
-                return jsonify({"success": False, "error": tr("status_file_open.project_not_found")}), 404
-            ws_obj = user_manager.ensure_user_workspace(username, target_workspace_id)
-            project_path = Path(getattr(ws_obj, "project_path", "") or "").expanduser().resolve()
+        # Host 单机形态：目标工作区一律按 Host 工作区目录解析（已在上方限定 host 模式）
+        catalog, _ = resolve_host_workspace()
+        target = next(
+            (item for item in (catalog.get("workspaces") or [])
+             if item.get("workspace_id") == target_workspace_id),
+            None,
+        )
+        if not target:
+            return jsonify({"success": False, "error": tr("status_file_open.workspace_not_found")}), 404
+        project_path = Path(target.get("path") or "").expanduser().resolve()
     else:
         project_path = Path(getattr(workspace, "project_path", "") or "").expanduser().resolve()
 

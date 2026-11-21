@@ -2,7 +2,6 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { t, currentLocale } from '@/locales';
 import type { ModelOption } from '@/stores/model';
 import { usePersonalizationStore } from '@/stores/personalization';
-import { useSettingsStore } from '@/stores/settings';
 import { useChatgptQuota } from './useChatgptQuota';
 
 /**
@@ -50,15 +49,12 @@ export function useSubscriptionQuota(
   active: () => boolean
 ) {
   const personalization = usePersonalizationStore();
-  const settings = useSettingsStore();
 
   const enabled = computed(() => personalization.form.subscription_quota_enabled !== false);
   const configured = computed(() => personalization.form.subscription_quota_source || 'auto');
-  // docker 多用户部署只对管理员显示（订阅凭证全局共享）；host 本机模式不限。
-  const allowed = computed(() => settings.isHostMode || settings.isAdmin);
 
   const source = computed<SubscriptionSource | null>(() => {
-    if (!enabled.value || !allowed.value) return null;
+    if (!enabled.value) return null;
     if (configured.value === 'opencode') return 'opencode';
     if (configured.value === 'chatgpt') return 'chatgpt';
     const current = model();

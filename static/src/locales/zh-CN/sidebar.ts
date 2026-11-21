@@ -110,20 +110,5 @@ export default {
   costRate: '1 USD = {rate} CNY，参考汇率日期 {date}',
   costRateCached: '1 USD = {rate} CNY，使用缓存汇率（{date}）',
   costRateUnavailable: '汇率暂不可用，无法换算人民币。',
-  performanceStats: '性能统计',
-  memory: '内存',
-  containerMetricsPending: '容器已运行，等待采集指标...',
-  hostModeNoContainer: '当前运行在宿主机模式，暂无容器指标。',
-  quotaStats: '额度统计',
-  hostModeNoQuota: '宿主机模式不适用应用调用配额。',
-  resetAt: '重置 {time}',
-  resourceStats: '资源统计',
-  network: '网络',
-  storage: '存储',
-  quotaTierFast: '常规模型',
-  quotaTierThinking: '思考模型',
-  quotaTierSearch: '搜索',
-  unknown: '未知',
-  stopped: '停止',
-  containerRunning: '运行'
+  resetAt: '重置 {time}'
 } as const;

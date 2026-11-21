@@ -3,16 +3,13 @@ from __future__ import annotations
 from pathlib import Path
 import tempfile
 import time
-from types import SimpleNamespace
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 from flask import Flask, session
 
 from modules.project_memory import NOTICE_NAME
-from modules.project_memory_migration import WorkspaceMemories
 from server import project_memory_migration as migration
-from server import state
 
 
 class MigrationApiTest(unittest.TestCase):
@@ -39,19 +36,25 @@ class MigrationApiTest(unittest.TestCase):
         (legacy / 'topic.md').write_text(f'memory in {name}')
         return legacy
 
+    def catalog(self, *names):
+        patch.object(migration, 'DATA_DIR', str(self.root / 'runtime')).start()
+        patch.object(migration, 'load_host_workspace_catalog', return_value={
+            'workspaces': [{'workspace_id': name, 'label': name, 'path': str(self.root / name / 'project')}
+                           for name in names],
+        }).start()
+
     def test_host_startup_claims_once_and_settings_still_reopens(self):
         self.login('admin', host=True)
         first = self.create_legacy('one')
         self.create_legacy('two')
-        patch.object(migration, 'DATA_DIR', str(self.root / 'runtime')).start()
-        patch.object(migration, 'load_host_workspace_catalog', return_value={
-            'workspaces': [{'workspace_id': name, 'label': name, 'path': str(self.root / name / 'project')}
-                           for name in ('one', 'two')],
-        }).start()
+        self.catalog('one', 'two')
         url = '/api/project-memory-migration'
         self.assertEqual(self.client.post(url + '/startup').json['overview']['total'], 2)
         self.assertEqual(self.client.post(url + '/startup').json, {})
         overview = self.client.get(url).json['overview']
+        self.assertEqual(overview['mode'], 'host')
+        self.assertEqual(overview['users'], 1)
+        self.assertEqual(overview['data_root'], str(self.root / 'runtime/memory'))
         self.assertEqual(len(overview['workspaces']), 2)
         self.assertNotEqual(overview['workspaces'][0]['target'], overview['workspaces'][1]['target'])
         self.assertTrue((first / 'topic.md').exists())
@@ -68,42 +71,25 @@ class MigrationApiTest(unittest.TestCase):
         self.assertEqual(self.client.get(url).json['overview']['total'], 0)
         self.assertEqual([p.name for p in first.iterdir()], [NOTICE_NAME])
 
-    def test_docker_requires_admin_for_scan_and_start_and_includes_api_accounts(self):
-        patch.object(migration, 'TERMINAL_SANDBOX_MODE', 'docker').start()
+    def test_non_host_identity_is_rejected_without_scanning(self):
         url = '/api/project-memory-migration'
         self.assertEqual(self.client.get(url).status_code, 401)
         self.login('user')
         self.assertEqual(self.client.get(url).status_code, 403)
         self.assertEqual(self.client.post(url).status_code, 403)
         self.login('admin')
+        self.assertEqual(self.client.get(url).status_code, 403)
+        self.assertEqual(self.client.post(url).status_code, 403)
         self.assertEqual(self.client.post(url + '/startup').status_code, 403)
-        self.create_legacy('web/web-user/projects/default')
-        self.create_legacy('api/api-user/workspaces/job')
-        users = Mock()
-        users.workspace_root = self.root / 'web'
-        users.list_users.return_value = {'web-user': object()}
-        users.list_user_workspaces.return_value = {'default': {'label': 'Default'}}
-        api = Mock()
-        api.workspace_root = self.root / 'api'
-        api.list_users.return_value = {'api-user': object()}
-        api.list_workspaces.return_value = {'job': {}}
-        with patch.object(state, 'user_manager', users), patch.object(state, 'api_user_manager', api):
-            overview = self.client.get(url).json['overview']
-        self.assertEqual((overview['users'], len(overview['workspaces']), overview['total']), (2, 2, 2))
-        users.list_user_workspaces.assert_called_once_with('web-user', prepare=False)
-        api.list_workspaces.assert_called_once_with('api-user')
-        api.ensure_workspace.assert_not_called()
 
-    def test_active_docker_workspace_never_reaches_mount_cutover(self):
-        from server.tasks import task_manager
+    def test_empty_catalog_returns_empty_overview_and_no_job(self):
+        self.login('user', host=True)
+        self.catalog()
+        url = '/api/project-memory-migration'
+        self.assertEqual(self.client.post(url + '/startup').json, {})
+        self.assertEqual(self.client.post(url).json['overview']['total'], 0)
+        self.assertIsNone(migration._JOB)
 
-        legacy = self.create_legacy('active')
-        workspace = WorkspaceMemories('active', 'default', 'Default', legacy.parents[1], self.root / 'data',
-                                     True, (legacy / 'topic.md',))
-        verify, clean = Mock(), Mock()
-        with patch.object(task_manager, 'list_tasks', return_value=[SimpleNamespace(status='running')]):
-            with self.assertRaisesRegex(RuntimeError, '空闲后重试'):
-                migration._with_idle_docker_workspace(workspace, verify, clean)
-        verify.assert_not_called()
-        clean.assert_not_called()
-        self.assertTrue((legacy / 'topic.md').exists())
+
+if __name__ == '__main__':
+    unittest.main()

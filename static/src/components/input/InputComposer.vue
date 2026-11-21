@@ -63,7 +63,6 @@
         :items="fileAtItems"
         :active-index="fileAtActiveIndex"
         :loading="fileAtLoading"
-        :host-mode="!!props.hostMode"
         :menu-style="fileAtMenuStyle"
         @transitioning="fileAtTransitioning = $event"
         @select="selectFileAtItemByIndex"
@@ -415,45 +414,6 @@
             </div>
             <div class="input-actions-right">
               <button
-                v-if="isVoiceInputSupported"
-                type="button"
-                class="stadium-btn voice-btn"
-                :class="{
-                  'voice-btn--recording': isRecording,
-                  'voice-btn--disabled':
-                    voiceModelStatus === 'downloading' || voiceModelStatus === 'model_not_ready'
-                }"
-                @click="toggleVoiceRecording"
-                :disabled="!isConnected || inputLocked"
-                :title="voiceButtonTitle"
-              >
-                <template v-if="!isRecording">
-                  <svg
-                    class="mic-icon"
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    width="20"
-                    height="20"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.5"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <path d="M12 19v3m7-12v2a7 7 0 0 1-14 0v-2" />
-                    <rect width="6" height="13" x="9" y="2" rx="3" />
-                  </svg>
-                </template>
-                <template v-else>
-                  <div class="voice-wave">
-                    <span class="voice-wave-bar" />
-                    <span class="voice-wave-bar" />
-                    <span class="voice-wave-bar" />
-                    <span class="voice-wave-bar" />
-                  </div>
-                </template>
-              </button>
-              <button
                 type="button"
                 class="stadium-btn send-btn"
                 :title="sendButtonTitle"
@@ -604,7 +564,7 @@
                 >
                   <span class="permission-switcher__item-label">{{ $t(option.labelKey) }}</span>
                   <span class="permission-switcher__item-desc">{{
-                    $t(permissionDescKey(option))
+                    $t(option.descriptionKey)
                   }}</span>
                   <UiIcon
                     v-if="option.value === currentPermissionMode"
@@ -968,7 +928,7 @@ const props = defineProps<{
   workModeMenuOpen?: boolean;
   /** 运行模式选项 */
   workModeOptions?: Array<{ value: string; labelKey: string; descriptionKey: string }>;
-  /** host/docker 项目模式下的工作区列表（/菜单「切换工作区」数据源） */
+  /** Host 工作区列表（/菜单「切换工作区」数据源） */
   hostWorkspaces?: Array<{
     workspace_id: string;
     label: string;
@@ -980,8 +940,8 @@ const props = defineProps<{
   currentHostWorkspaceId?: string;
   /** 工作区切换进行中 */
   hostWorkspaceSwitching?: boolean;
-  /** 工作区文案类型：workspace=host 工作区；project=docker 项目；null=不显示工作区切换项 */
-  workspaceKind?: 'workspace' | 'project' | null;
+  /** 工作区文案类型：workspace=显示工作区切换项；null=不显示 */
+  workspaceKind?: 'workspace' | null;
   /**
    * 主对话是否空闲（composerBusy 可能是 true，但只是因为后台子智能体在跑）。
    * 多智能体模式下，若主对话空闲，输入栏应处于“正常发送”状态，不是“停止”状态。
@@ -990,7 +950,6 @@ const props = defineProps<{
   /** 未终结子实例数量；点击状态栏按钮展开快捷窗口中的子智能体卡片。 */
   subAgentCount?: number;
   terminalCount?: number;
-  hostMode?: boolean;
   avatarStatus?: {
     mode: string;
     toolKeys?: string[];
@@ -1009,13 +968,6 @@ const props = defineProps<{
 const inputStore = useInputStore();
 const personalizationStore = usePersonalizationStore();
 const resourceStore = useResourceStore();
-
-/** 项目模式（docker/web）下优先用「项目」口径的权限说明。 */
-function permissionDescKey(option: { descriptionKey: string; descriptionKeyProject?: string }) {
-  return !props.hostMode && option.descriptionKeyProject
-    ? option.descriptionKeyProject
-    : option.descriptionKey;
-}
 
 const inputAreaRoot = ref<HTMLElement | null>(null);
 const stadiumShellOuter = ref<HTMLElement | null>(null);
@@ -1551,15 +1503,12 @@ const insertFileAtMention = (item: FileAtItem) => {
 
 const openFilePickerAndReference = () => {
   closeFileAtMenu();
-  if (!props.hostMode) {
-    return;
-  }
   fileAtPickerActive.value = true;
   fileUploadInput.value?.click();
 };
 
 const selectFileAtItemByIndex = (index: number) => {
-  const hasPicker = !!props.hostMode;
+  const hasPicker = true;
   if (hasPicker && index === 0) {
     void openFilePickerAndReference();
     return;
@@ -1573,7 +1522,7 @@ const selectFileAtItemByIndex = (index: number) => {
 
 const handleFileAtKeydown = (event: KeyboardEvent): boolean => {
   if (!fileAtOpen.value) return false;
-  const hasPicker = !!props.hostMode;
+  const hasPicker = true;
   const total = (hasPicker ? 1 : 0) + fileAtItems.value.length;
   if (total <= 0) return false;
 
@@ -1831,12 +1780,8 @@ const rootSlashMenuItems = computed<SlashMenuItem[]>(() => {
       ? [
           {
             id: 'workspace',
-            label:
-              props.workspaceKind === 'project'
-                ? t('input.switchProject')
-                : t('input.switchWorkspace'),
-            description:
-              props.workspaceKind === 'project' ? t('input.projectDesc') : t('input.workspaceDesc'),
+            label: t('input.switchWorkspace'),
+            description: t('input.workspaceDesc'),
             disabled: !props.isConnected || props.streamingMessage,
             mode: 'workspace'
           } as SlashMenuItem
@@ -2086,10 +2031,7 @@ const slashMenuAriaLabel = computed(() => {
   if (slashMenuMode.value === 'run-mode') return t('input.slashRunModeAria');
   if (slashMenuMode.value === 'network') return t('input.slashNetworkAria');
   if (slashMenuMode.value === 'work-mode') return t('input.slashWorkModeAria');
-  if (slashMenuMode.value === 'workspace')
-    return props.workspaceKind === 'project'
-      ? t('input.slashProjectAria')
-      : t('input.slashWorkspaceAria');
+  if (slashMenuMode.value === 'workspace') return t('input.slashWorkspaceAria');
   return t('input.slashRootAria');
 });
 
@@ -2104,8 +2046,7 @@ const slashMenuEmptyText = computed(() => {
   if (slashMenuMode.value === 'model') return t('input.modelEmpty');
   if (slashMenuMode.value === 'network') return t('input.networkEmpty');
   if (slashMenuMode.value === 'work-mode') return t('input.workModeEmpty');
-  if (slashMenuMode.value === 'workspace')
-    return props.workspaceKind === 'project' ? t('input.projectEmpty') : t('input.workspaceEmpty');
+  if (slashMenuMode.value === 'workspace') return t('input.workspaceEmpty');
   return t('input.commandEmpty');
 });
 
@@ -2670,283 +2611,6 @@ const editor = useEditor({
     emit('input-focus');
   }
 });
-
-/* ═══════════════════ 语音输入 ═══════════════════ */
-
-const isRecording = ref(false);
-const recognitionInstance = ref<SpeechRecognition | null>(null);
-let voiceAnchorPos = 0;
-let lastVoiceTextLength = 0;
-
-// 模型状态：idle | downloading | ready | model_not_ready | error
-const voiceModelStatus = ref<string>('idle');
-const voiceDownloadPercent = ref(0);
-const voiceDownloadMsg = ref('');
-
-// 是否支持语音输入（仅 Android APK 环境，通过 VoiceBridge）
-const isVoiceInputSupported = computed(() => {
-  if (typeof window === 'undefined') return false;
-  return !!(window as any).AndroidVoiceBridge;
-});
-
-const voiceButtonTitle = computed(() => {
-  void currentLocale.value;
-  if (voiceModelStatus.value === 'downloading')
-    return t('input.voiceModelDownloading', { percent: voiceDownloadPercent.value });
-  if (voiceModelStatus.value === 'model_not_ready') return t('input.voiceModelNotReady');
-  if (isRecording.value) return t('input.stopRecording');
-  return t('input.voiceInput');
-});
-
-// 注册全局回调（Android Bridge 会调用这些函数）
-const setupVoiceBridgeCallbacks = () => {
-  if (typeof window === 'undefined') return;
-  (window as any).__onVoiceResult = (text: string) => {
-    const bridge = (window as any).AndroidVoiceBridge;
-    bridge?.debugLog('__onVoiceResult 被调用, text=' + JSON.stringify(text));
-    if (!text) {
-      bridge?.debugLog('__onVoiceResult: text 为空，跳过');
-      return;
-    }
-    const ed = editor.value;
-    if (!ed) {
-      bridge?.debugLog('__onVoiceResult: editor.value 为 null');
-      console.warn('[VoiceInput] editor is null');
-      return;
-    }
-    bridge?.debugLog('__onVoiceResult: editor.value 存在，准备插入文字');
-    bridge?.debugLog(
-      '__onVoiceResult: voiceAnchorPos=' +
-        voiceAnchorPos +
-        ' lastVoiceTextLength=' +
-        lastVoiceTextLength
-    );
-    const { state, view } = ed;
-    const docSize = state.doc.content.size;
-    const safeAnchor = Math.max(0, Math.min(voiceAnchorPos, docSize));
-    const oldEnd = Math.min(safeAnchor + lastVoiceTextLength, docSize);
-    bridge?.debugLog(
-      '__onVoiceResult: docSize=' + docSize + ' safeAnchor=' + safeAnchor + ' oldEnd=' + oldEnd
-    );
-    try {
-      let tr = state.tr;
-      if (oldEnd > safeAnchor) tr = tr.delete(safeAnchor, oldEnd);
-      tr = tr.insertText(text, safeAnchor);
-      const newCursor = Math.min(safeAnchor + text.length, tr.doc.content.size);
-      const TextSelection = (window as any).TextSelection;
-      if (TextSelection) {
-        tr = tr.setSelection(TextSelection.create(tr.doc, newCursor));
-      }
-      view.dispatch(tr);
-      view.focus();
-      lastVoiceTextLength = text.length;
-      emit('update:input-message', getEditorPlainText());
-      emit('input-change');
-      nextTick(() => adjustTextareaSize());
-      bridge?.debugLog('__onVoiceResult: 文字插入成功');
-    } catch (e: any) {
-      bridge?.debugLog('__onVoiceResult: 插入异常 ' + (e.message || String(e)));
-    }
-  };
-  (window as any).__onVoiceStatus = (status: string) => {
-    if (status === 'listening' || status === 'processing' || status === 'initializing') {
-      // initializing 也视为录音中，防止用户重复点击触发多次 startListening
-      isRecording.value = true;
-    } else if (status === 'idle') {
-      isRecording.value = false;
-      voiceAnchorPos = 0;
-      lastVoiceTextLength = 0;
-    } else if (status === 'model_not_ready') {
-      voiceModelStatus.value = 'model_not_ready';
-    }
-  };
-  (window as any).__onVoiceError = (error: string) => {
-    console.warn('[VoiceInput] 错误:', error);
-    isRecording.value = false;
-    voiceAnchorPos = 0;
-    lastVoiceTextLength = 0;
-  };
-  (window as any).__onVoiceDownloadProgress = (pct: number, msg: string) => {
-    voiceModelStatus.value = 'downloading';
-    voiceDownloadPercent.value = pct;
-    voiceDownloadMsg.value = msg;
-    if (pct >= 100) {
-      voiceModelStatus.value = 'ready';
-    }
-  };
-  (window as any).__onVoiceModelReady = () => {
-    voiceModelStatus.value = 'ready';
-  };
-};
-
-// 初始化时设置回调和检查模型状态
-if (typeof window !== 'undefined') {
-  setupVoiceBridgeCallbacks();
-  // 检查 Android Bridge 模型状态
-  const bridge = (window as any).AndroidVoiceBridge;
-  if (bridge && typeof bridge.isModelReady === 'function') {
-    try {
-      voiceModelStatus.value = bridge.isModelReady() ? 'ready' : 'model_not_ready';
-    } catch (_) {
-      voiceModelStatus.value = 'idle';
-    }
-  }
-}
-
-const getSpeechRecognitionConstructor = (): typeof SpeechRecognition | null => {
-  if (typeof window === 'undefined') return null;
-  const Ctor = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition || null;
-  return Ctor;
-};
-
-const stopVoiceRecording = () => {
-  if (recognitionInstance.value) {
-    try {
-      recognitionInstance.value.stop();
-    } catch (e) {
-      console.warn('[VoiceInput] recognition.stop() error:', e);
-    }
-    recognitionInstance.value = null;
-  }
-  isRecording.value = false;
-  voiceAnchorPos = 0;
-  lastVoiceTextLength = 0;
-};
-
-const initSpeechRecognition = () => {
-  const SpeechRecognitionCtor = getSpeechRecognitionConstructor();
-  if (!SpeechRecognitionCtor) return null;
-
-  const recognition = new SpeechRecognitionCtor();
-  recognition.lang = 'zh-CN';
-  recognition.continuous = true;
-  recognition.interimResults = true;
-  recognition.maxAlternatives = 1;
-
-  // 记录锚点位置（录音开始时的光标位置）
-  const instance = editor.value;
-  if (instance) {
-    voiceAnchorPos = instance.state.selection.from;
-  } else {
-    voiceAnchorPos = 0;
-  }
-  lastVoiceTextLength = 0;
-
-  recognition.onresult = (event: SpeechRecognitionEvent) => {
-    let fullText = '';
-    for (let i = 0; i < event.results.length; i++) {
-      const r = event.results[i];
-      fullText += r[0].transcript;
-    }
-
-    if (!fullText) {
-      return;
-    }
-
-    const ed = editor.value;
-    if (!ed) {
-      console.warn('[VoiceInput] editor is null');
-      return;
-    }
-
-    // 从锚点位置替换语音文本：先删旧、再插新
-    const { state, view } = ed;
-    const docSize = state.doc.content.size;
-    // ProseMirror 合法位置范围是 [0, docSize]，docSize 本身是有效位置（文档末尾）
-    const safeAnchor = Math.max(0, Math.min(voiceAnchorPos, docSize));
-    const oldEnd = Math.min(safeAnchor + lastVoiceTextLength, docSize);
-
-    let tr = state.tr;
-    if (oldEnd > safeAnchor) {
-      tr = tr.delete(safeAnchor, oldEnd);
-    }
-    tr = tr.insertText(fullText, safeAnchor);
-
-    const newCursor = Math.min(safeAnchor + fullText.length, tr.doc.content.size);
-    tr = tr.setSelection(TextSelection.create(tr.doc, newCursor));
-    view.dispatch(tr);
-    view.focus();
-
-    lastVoiceTextLength = fullText.length;
-
-    emit('update:input-message', getEditorPlainText());
-    emit('input-change');
-    nextTick(() => {
-      adjustTextareaSize();
-    });
-  };
-
-  recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-    console.warn('[VoiceInput] onerror:', { error: event.error, message: (event as any).message });
-    if (event.error === 'aborted') {
-      return;
-    }
-    // no-speech / network / not-allowed / service-not-allowed 等全部打印
-    console.warn('[VoiceInput] stopping due to error:', event.error);
-    stopVoiceRecording();
-  };
-
-  recognition.onstart = () => {};
-
-  recognition.onaudiostart = () => {};
-
-  recognition.onsoundstart = () => {};
-
-  recognition.onspeechstart = () => {};
-
-  recognition.onspeechend = () => {};
-
-  recognition.onsoundend = () => {};
-
-  recognition.onaudioend = () => {};
-
-  recognition.onend = () => {
-    isRecording.value = false;
-    recognitionInstance.value = null;
-    voiceAnchorPos = 0;
-    lastVoiceTextLength = 0;
-  };
-
-  return recognition;
-};
-
-const toggleVoiceRecording = () => {
-  // Android Bridge 模式
-  const bridge = (window as any).AndroidVoiceBridge;
-  if (bridge) {
-    if (isRecording.value) {
-      bridge.stopListening();
-      return;
-    }
-    // 记录锚点
-    const instance = editor.value;
-    voiceAnchorPos = instance ? instance.state.selection.from : 0;
-    lastVoiceTextLength = 0;
-    bridge.startListening();
-    return;
-  }
-
-  // 浏览器原生 Web Speech API 模式
-  if (isRecording.value) {
-    stopVoiceRecording();
-    return;
-  }
-
-  const recognition = initSpeechRecognition();
-  if (!recognition) {
-    console.warn('[VoiceInput] 浏览器不支持语音识别');
-    return;
-  }
-
-  try {
-    recognition.start();
-    recognitionInstance.value = recognition;
-    isRecording.value = true;
-  } catch (error) {
-    console.warn('[VoiceInput] 启动语音识别失败:', error);
-    stopVoiceRecording();
-  }
-};
 
 const hasComposerContent = computed(() => {
   const hasText = !!(props.inputMessage || '').trim();
@@ -3750,16 +3414,6 @@ watch(goalBannerCollapsed, async () => {
   emitComposerHeight();
 });
 
-// 发送消息或输入锁定时，自动停止语音录音
-watch(
-  () => props.streamingMessage || props.inputLocked,
-  (shouldStop) => {
-    if (shouldStop && isRecording.value) {
-      stopVoiceRecording();
-    }
-  }
-);
-
 onMounted(() => {
   document.addEventListener('click', closeProjectGitMenu);
   window.addEventListener('resize', onWindowResizeRepositionMenu);
@@ -3784,7 +3438,6 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
-  stopVoiceRecording();
   document.removeEventListener('click', closeProjectGitMenu);
   window.removeEventListener('resize', onWindowResizeRepositionMenu);
   editor.value?.destroy();

@@ -18,12 +18,7 @@ try:
         MAX_CONTEXT_SIZE,
         DATA_DIR,
         PROMPTS_DIR,
-        TERMINAL_SANDBOX_MOUNT_PATH,
-        TERMINAL_SANDBOX_CPUS,
-        TERMINAL_SANDBOX_MEMORY,
         PROJECT_MAX_STORAGE_MB,
-        TERMINAL_SANDBOX_MODE,
-        LINUX_SAFETY,
     )
     from config.model_profiles import (
         get_model_prompt_replacements,
@@ -41,12 +36,7 @@ except ImportError:
         MAX_CONTEXT_SIZE,
         DATA_DIR,
         PROMPTS_DIR,
-        TERMINAL_SANDBOX_MOUNT_PATH,
-        TERMINAL_SANDBOX_CPUS,
-        TERMINAL_SANDBOX_MEMORY,
         PROJECT_MAX_STORAGE_MB,
-        TERMINAL_SANDBOX_MODE,
-        LINUX_SAFETY,
     )
     from config.model_profiles import (
         get_model_prompt_replacements,
@@ -86,9 +76,6 @@ class ContextManagerBase:
         self.conversation_kind = conversation_kind
         self.project_path = Path(project_path).resolve() if project_path else None
         self.initial_project_path = self.project_path
-        self.container_mount_path = TERMINAL_SANDBOX_MOUNT_PATH or "/workspace"
-        self.container_cpu_limit = TERMINAL_SANDBOX_CPUS or "未限制"
-        self.container_memory_limit = TERMINAL_SANDBOX_MEMORY or "未限制"
         self.project_storage_limit = f"{PROJECT_MAX_STORAGE_MB}MB" if PROJECT_MAX_STORAGE_MB else "未限制"
         self.workspace_root = Path(__file__).resolve().parents[1]
         self.data_dir = Path(data_dir).expanduser().resolve() if data_dir else Path(DATA_DIR).resolve()
@@ -124,8 +111,8 @@ class ContextManagerBase:
             self.load_annotations()
 
     def _is_host_mode_without_safety(self) -> bool:
-        """是否处于宿主机模式且未启用安全保护。"""
-        return (TERMINAL_SANDBOX_MODE or "").lower() == "host" and not LINUX_SAFETY
+        """Return whether this context uses the Host workspace view."""
+        return True
 
     def set_web_terminal_callback(self, callback):
         """设置Web终端回调函数，用于广播事件"""

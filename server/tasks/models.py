@@ -1177,13 +1177,9 @@ def conversation_title_for_task(rec: TaskRecord) -> Optional[str]:
             from server.chat_mode_scope import scope_for_principal
             from modules.chat_mode.storage import ChatStorage
             return ChatStorage(scope_for_principal(rec.principal).root).read(conv_id).get("title")
-        if rec.username == "host":
-            path = Path(DATA_DIR).expanduser().resolve() / "conversations" / rec.workspace_id / f"{conv_id}.json"
-        else:
-            import server.state as state
-
-            workspace = state.user_manager.ensure_user_workspace(rec.username, rec.workspace_id or "default")
-            path = Path(workspace.data_dir).expanduser().resolve() / "conversations" / f"{conv_id}.json"
+        if rec.username != "host" or not rec.principal.host_mode or rec.principal.is_api_user:
+            return None
+        path = Path(DATA_DIR).expanduser().resolve() / "conversations" / rec.workspace_id / f"{conv_id}.json"
         if not path.exists():
             return None
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -1196,19 +1192,14 @@ def conversation_title_for_task(rec: TaskRecord) -> Optional[str]:
 def workspace_label_for_task(rec: TaskRecord) -> Optional[str]:
     if rec.principal.conversation_kind == "chat":
         return None
+    if rec.username != "host" or not rec.principal.host_mode or rec.principal.is_api_user:
+        return rec.workspace_id
     try:
-        if rec.username == "host":
-            from modules.host_workspace_manager import load_host_workspace_catalog
+        from modules.host_workspace_manager import load_host_workspace_catalog
 
-            catalog = load_host_workspace_catalog()
-            for item in catalog.get("workspaces") or []:
-                if item.get("workspace_id") == rec.workspace_id:
-                    return str(item.get("label") or rec.workspace_id)
-        else:
-            import server.state as state
-
-            item = state.user_manager.list_user_workspaces(rec.username).get(rec.workspace_id)
-            if item:
+        catalog = load_host_workspace_catalog()
+        for item in catalog.get("workspaces") or []:
+            if item.get("workspace_id") == rec.workspace_id:
                 return str(item.get("label") or rec.workspace_id)
     except Exception:
         pass

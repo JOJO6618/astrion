@@ -8,11 +8,8 @@
         @click="emit('toggle')"
       />
       <div class="token-panel-content">
-        <div class="usage-dashboard" :class="{ 'usage-dashboard--host': isHostMode }">
-          <div
-            class="usage-cell usage-cell--token panel-card"
-            :class="isHostMode ? 'usage-cell--full' : 'usage-cell--left'"
-          >
+        <div class="usage-dashboard">
+          <div class="usage-cell usage-cell--token panel-card usage-cell--full">
             <div class="usage-title">{{ $t('sidebar.tokenStats') }}</div>
             <div class="stat-grid stat-grid--triple">
               <div class="stat-block">
@@ -52,86 +49,9 @@
               />
             </div>
           </div>
-          <!-- 容器相关统计只在 docker 模式显示；宿主机模式整块移除 -->
-          <template v-if="!isHostMode">
-            <div class="usage-cell usage-cell--right usage-cell--performance panel-card">
-              <div class="usage-title">
-                <span>{{ $t('sidebar.performanceStats') }}</span>
-                <span class="status-pill" v-if="containerStatus" :class="containerStatusClass">
-                  {{ containerStatusText }}
-                </span>
-              </div>
-              <template v-if="containerStatus && containerStatus.mode === 'docker'">
-                <template v-if="hasContainerStats">
-                  <div class="stat-grid stat-grid--double">
-                    <div class="stat-block">
-                      <div class="stat-label">CPU</div>
-                      <div class="stat-value">
-                        {{ formatPercentage(containerStatus.stats.cpu_percent) }}
-                      </div>
-                    </div>
-                    <div class="stat-block">
-                      <div class="stat-label">{{ $t('sidebar.memory') }}</div>
-                      <div class="stat-value stat-value--mono">
-                        {{ formatBytes(containerStatus.stats.memory.used_bytes) }}
-                        <template v-if="containerStatus.stats.memory.limit_bytes">
-                          / {{ formatBytes(containerStatus.stats.memory.limit_bytes) }}
-                        </template>
-                      </div>
-                      <div class="stat-foot" v-if="containerStatus.stats.memory.percent">
-                        {{ formatPercentage(containerStatus.stats.memory.percent) }}
-                      </div>
-                    </div>
-                  </div>
-                </template>
-                <div class="usage-placeholder" v-else>
-                  {{ $t('sidebar.containerMetricsPending') }}
-                </div>
-              </template>
-              <div class="usage-placeholder" v-else>{{ $t('sidebar.hostModeNoContainer') }}</div>
-            </div>
-            <div class="usage-cell usage-cell--left usage-cell--quota panel-card">
-              <div class="usage-title">{{ $t('sidebar.quotaStats') }}</div>
-              <div class="stat-grid stat-grid--triple" v-if="usageQuota.applicable !== false">
-                <div class="stat-block" v-for="tier in quotaTiers" :key="tier.key">
-                  <div class="stat-label">{{ $t(tier.label) }}</div>
-                  <div class="stat-value">{{ formatQuotaValue(tier.value) }}</div>
-                  <div class="stat-foot" v-if="(tier.value.count || 0) > 0">
-                    {{ $t('sidebar.resetAt', { time: formatResetTime(tier.value.reset_at) }) }}
-                  </div>
-                </div>
-              </div>
-              <div class="usage-placeholder" v-else>{{ $t('sidebar.hostModeNoQuota') }}</div>
-            </div>
-            <div class="usage-cell usage-cell--right usage-cell--resource panel-card">
-              <div class="usage-title">{{ $t('sidebar.resourceStats') }}</div>
-              <div class="stat-grid stat-grid--double">
-                <div class="stat-block">
-                  <div class="stat-label">{{ $t('sidebar.network') }}</div>
-                  <div class="stat-value stat-value--mono">
-                    ↓{{ formatRate(containerNetRate.down_bps) }} ↑{{
-                      formatRate(containerNetRate.up_bps)
-                    }}
-                  </div>
-                </div>
-                <div class="stat-block">
-                  <div class="stat-label">{{ $t('sidebar.storage') }}</div>
-                  <div class="stat-value stat-value--mono">
-                    {{ formatBytes(projectStorage.used_bytes) }}
-                    <template v-if="projectStorage.limit_bytes"
-                      >/ {{ formatBytes(projectStorage.limit_bytes) }}</template
-                    >
-                  </div>
-                  <div class="stat-foot" v-if="typeof projectStorage.usage_percent === 'number'">
-                    {{ projectStorage.usage_percent.toFixed(1) }}%
-                  </div>
-                </div>
-              </div>
-            </div>
-          </template>
           <!-- 宿主机模式：订阅额度（OpenCode Go / ChatGPT，来源由设置决定） -->
           <SubscriptionQuotaPanel
-            v-else-if="quotaVisible"
+            v-if="quotaVisible"
             :title="quotaTitle"
             :account-label="quotaAccountLabel"
             :windows="quotaWindows"
@@ -148,8 +68,6 @@
 defineOptions({ name: 'TokenDrawer' });
 
 import { computed } from 'vue';
-import { t, currentLocale } from '@/locales';
-import { useSettingsStore } from '@/stores/settings';
 import { useModelStore } from '@/stores/model';
 import CloseButton from '@/components/common/CloseButton.vue';
 import CostSummary from './CostSummary.vue';
@@ -173,35 +91,10 @@ const props = defineProps<{
     cache_exempt_input_tokens?: number;
   };
   currentContextTokens: number;
-  containerStatus: any;
-  containerNetRate: { down_bps: number | null; up_bps: number | null };
-  projectStorage: { used_bytes: number; limit_bytes?: number; usage_percent?: number };
-  usageQuota: {
-    applicable?: boolean | null;
-    fast: Record<string, any>;
-    thinking: Record<string, any>;
-    search: Record<string, any>;
-  };
   formatTokenCount: (value: number) => string;
-  formatPercentage: (value: number | null | undefined) => string;
-  formatBytes: (value: number | null | undefined) => string;
-  formatQuotaValue: (quota: Record<string, any>) => string;
-  formatResetTime: (value: unknown) => string;
-  formatRate: (value: number | null | undefined) => string;
 }>();
 
-const quotaTiers = computed(() => [
-  { key: 'fast', label: 'sidebar.quotaTierFast', value: props.usageQuota.fast },
-  { key: 'thinking', label: 'sidebar.quotaTierThinking', value: props.usageQuota.thinking },
-  { key: 'search', label: 'sidebar.quotaTierSearch', value: props.usageQuota.search }
-]);
-
-// 宿主机判定：settings store 先看容器状态 mode，未就绪时回落已验证的 session 身份；
-// docker 模式保持原有四格布局不变。
-const settingsStore = useSettingsStore();
-const isHostMode = computed(() => settingsStore.isHostMode);
-
-// 订阅额度：来源与轮询由 useSubscriptionQuota 统一决定（宿主机模式才渲染该块）
+// 订阅额度：来源与轮询由 useSubscriptionQuota 统一决定
 const modelStore = useModelStore();
 const resolveCurrentModel = () => {
   const key = modelStore.currentModelKey;
@@ -229,55 +122,16 @@ const cacheHitRateText = computed(() => {
   const cached = props.currentConversationTokens.cumulative_cached_input_tokens || 0;
   return `${((cached / effectiveInput) * 100).toFixed(1)}%`;
 });
-
-const hasContainerStats = computed(() => {
-  const status = props.containerStatus;
-  if (!status || !status.stats) {
-    return false;
-  }
-  if (typeof status.stats.cpu_percent !== 'undefined') {
-    return true;
-  }
-  return !!(status.stats.memory && typeof status.stats.memory.used_bytes !== 'undefined');
-});
-
-const containerStatusClass = computed(() => {
-  const status = props.containerStatus;
-  if (!status) {
-    return {};
-  }
-  if (status.mode !== 'docker') {
-    return { 'status-pill--host': true };
-  }
-  const stopped = status.state && status.state.running === false;
-  return {
-    'status-pill--running': !stopped,
-    'status-pill--stopped': stopped
-  };
-});
-
-const containerStatusText = computed(() => {
-  void currentLocale.value;
-  const status = props.containerStatus;
-  if (!status) {
-    return t('sidebar.unknown');
-  }
-  if (status.mode !== 'docker') {
-    return 'Host';
-  }
-  const stopped = status.state && status.state.running === false;
-  return stopped ? t('sidebar.stopped') : t('sidebar.containerRunning');
-});
 </script>
 
 <style scoped lang="scss">
-/* 宿主机模式：取消双列与中间分隔线，Token 统计与 ChatGPT 订阅额度上下排列 */
-.usage-dashboard--host {
+/* Host：Token 统计与订阅额度上下排列 */
+.usage-dashboard {
   grid-template-columns: minmax(0, 1fr);
   row-gap: 20px;
 }
 
-.usage-dashboard--host::before {
+.usage-dashboard::before {
   display: none;
 }
 

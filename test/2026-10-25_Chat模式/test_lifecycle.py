@@ -3,9 +3,7 @@ from datetime import datetime, timedelta
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
 
 from modules.chat_mode.storage import ChatStorage
 from modules.chat_mode.media_gc import collect
@@ -81,22 +79,6 @@ class LifecycleTests(unittest.TestCase):
     def test_media_stores_share_the_same_index_lock(self):
         first, second = MediaStore(self.root), MediaStore(self.root)
         self.assertIs(first._lock, second._lock)
-
-    def test_chat_and_agent_share_account_quota_without_workspace(self):
-        from modules.chat_mode.quota import tracker_for
-        from server.context.usage import get_or_create_usage_tracker
-        from server import state
-        personal = self.root / "user" / "personal"
-        manager = SimpleNamespace(get_user=lambda username: SimpleNamespace(username=username, role="user"),
-                                  _personal_root=lambda username: personal)
-        with patch.object(state, "user_manager", manager), patch.object(state, "usage_trackers", {}):
-            chat = tracker_for(personal / "chat", "user")
-            agent = get_or_create_usage_tracker("user")
-            self.assertIs(chat, agent)
-            chat.check_and_increment("fast")
-            self.assertEqual(agent.get_stats()["quotas"]["fast"]["count"], 1)
-        self.assertFalse((self.root / "user" / "projects").exists())
-
 
 if __name__ == "__main__":
     unittest.main()

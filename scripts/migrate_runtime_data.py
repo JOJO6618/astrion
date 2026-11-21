@@ -1,22 +1,24 @@
 #!/usr/bin/env python3
-"""运行态数据迁移脚本：源码树 -> 运行态根目录（~/.astrion/astrion/<mode>）。
+"""运行态数据迁移脚本：源码树 -> Host 运行态根目录（~/.astrion/astrion/host）。
 
-把历史遗留在源码树内的运行态数据迁移到新的运行态根目录。目标位置直接复用
-``config`` 模块的解析结果（``config.DATA_DIR`` / ``USER_SPACE_DIR`` / ... ），
-因此与程序运行时使用的是**同一套路径**——包括 ``.env`` 中的
-``TERMINAL_SANDBOX_MODE`` 与各路径环境变量。这样可避免脚本自行推断模式与
-程序实际读取位置不一致的问题。
+把历史遗留在源码树内的 Host 运行态数据迁移到新的运行态根目录。目标位置直接
+复用 ``config`` 模块的解析结果（``config.DATA_DIR`` / ``config.SUB_AGENT_TASKS_BASE_DIR``），
+因此与程序运行时使用的是**同一套路径**——包括 ``.env`` 中的各路径环境变量。
+这样可避免脚本自行推断模式与程序实际读取位置不一致的问题。
+
+本仓只交付 Host，因此不再迁移 web 多用户目录（``users/``）和 API 用户目录
+（``api/``）；旧 Docker/Web 部署继续使用对应旧版本，详见拆分方案。
 
 策略（与既定决策一致）：
 
-- logs/        跳过不迁（历史日志直接丢弃）。
-- data / users / api / sub_agent/tasks
+- logs/        跳过不迁（历史日志直接丢弃，沿用既定迁移约定）。
+- data / sub_agent/tasks
                先打包备份到 ``<运行态根上级>/backup_<时间戳>.tar.gz``，
                校验备份成功后再复制到目标位置；复制采用「不覆盖已存在目标」的
                保守策略，全程复制而非移动，旧目录保留，便于回滚。
 - 部署级配置文件（custom_models / host_workspaces / auto_approval / goal_review /
-               forbidden_commands / host_sandbox_policy）
-               从源码树 ``config/`` 复制到部署配置目录 ``~/.astrion/astrion/<mode>/config/``，
+               host_sandbox_policy）
+               从源码树 ``config/`` 复制到部署配置目录 ``~/.astrion/astrion/config/``，
                同样先备份、不覆盖已存在目标。docker_risk_markers、skill_hints 属于
                程序能力，保留源码树，不迁。
 
@@ -24,7 +26,7 @@
 确认新目录工作正常后，可自行手动删除源码树内的旧目录。
 
 用法：
-    python scripts/migrate_runtime_data.py            # 实际执行（按 .env 决定 host/web）
+    python scripts/migrate_runtime_data.py            # 实际执行（Host 数据目录由 .env 决定）
     python scripts/migrate_runtime_data.py --dry-run  # 仅打印将要做什么
 """
 
@@ -45,19 +47,18 @@ if str(REPO_ROOT) not in sys.path:
 import config
 
 
-# 需要迁移的运行态目录：源码树相对路径 -> 目标绝对路径（取自 config，与程序一致）。
-# logs 不在其列：历史日志直接丢弃。
+# 需要迁移的 Host 运行态目录：源码树相对路径 -> 目标绝对路径（取自 config，与程序一致）。
+# logs 不在其列：按既定约定，历史日志直接丢弃。
+# users/ 与 api/ 属于 web/API 多用户部署，本仓 Host 不迁移。
 # sub_agent/tasks 旧默认在 ./sub_agent/tasks，新默认跟随 DATA_DIR -> <DATA_DIR>/sub_agent_tasks。
 def _migrate_targets() -> dict[str, Path]:
     return {
         "data": Path(config.DATA_DIR),
-        "users": Path(config.USER_SPACE_DIR),
-        "api": Path(config.API_USER_SPACE_DIR).parent,  # API_USER_SPACE_DIR=<root>/api/users，迁整个 api/
         "sub_agent/tasks": Path(config.SUB_AGENT_TASKS_BASE_DIR),
     }
 
 
-# 部署级配置文件：源码树 config/<name> -> 部署配置目录 ~/.astrion/astrion/<mode>/config/<name>。
+# 部署级配置文件：源码树 config/<name> -> 部署配置目录 ~/.astrion/astrion/config/<name>。
 # 仅迁移部署者自定义类（含密钥/机器特定/可调策略）；docker_risk_markers、skill_hints
 # 属于程序能力，保留源码树，不迁。
 _DEPLOY_CONFIG_FILES = (
@@ -151,7 +152,7 @@ def _copy_file(src: Path, dst: Path, *, dry_run: bool) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="迁移运行态数据到运行态根目录（~/.astrion/astrion/<mode>）")
+    parser = argparse.ArgumentParser(description="迁移 Host 运行态数据到运行态根目录（~/.astrion/astrion/host）")
     parser.add_argument("--dry-run", action="store_true", help="仅打印将要执行的操作，不实际写入")
     args = parser.parse_args()
 

@@ -90,8 +90,6 @@ class SubAgentRuntimeMixin:
         parent = self.manager.terminal
         if not getattr(parent, "mcp_tools_enabled", False):
             return tools
-        if getattr(parent, "_is_mcp_disabled_in_docker_mode", lambda: False)():
-            return tools
         if self._mcp_manager is not None:
             await asyncio.to_thread(self._mcp_manager.close_all_clients)
         from modules.mcp_client_manager import MCPClientManager

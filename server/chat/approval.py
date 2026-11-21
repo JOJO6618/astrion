@@ -33,13 +33,13 @@ from modules.skills_manager import (
 )
 from modules.upload_security import UploadSecurityError
 from modules.host_sandbox_policy import load_policy, save_policy
-from modules.user_manager import UserWorkspace
+from modules.workspace import UserWorkspace
 from core.web_terminal import WebTerminal
 from config.model_profiles import get_model_context_window
 
-from server.auth_helpers import resolve_admin_policy, get_current_user_record, get_current_username
+from server.auth_helpers import resolve_admin_policy, get_current_username
 from server.gateway_auth import api_login_or_host_token_required
-from server.context import with_terminal, get_gui_manager, get_upload_guard, build_upload_error_response, ensure_conversation_loaded, get_or_create_usage_tracker
+from server.context import with_terminal, get_gui_manager, get_upload_guard, build_upload_error_response, ensure_conversation_loaded
 from server.security import rate_limited
 from server.utils_common import debug_log
 from server.state import PROJECT_MAX_STORAGE_MB

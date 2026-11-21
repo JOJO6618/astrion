@@ -48,12 +48,10 @@ def _require_local_parent_backend(manager: Any) -> None:
 
 def build_child_terminal(manager: Any, record: Dict[str, Any]) -> Any:
     parent = manager.terminal
-    from modules.execution_scope import uses_docker
-    if uses_docker(parent) and not (
-        manager.container_session and manager.container_session.mode == "docker"
-        and manager.container_session.container_name
-    ):
-        raise ValueError("子智能体工具箱未就绪，不能回退到宿主机执行。")
+    # Host-only: a container parent cannot fall back to Host execution, and this
+    # product no longer assembles container-backed child resources.
+    if str(getattr(getattr(parent, "container_session", None), "mode", "") or "").lower() == "docker":
+        raise ValueError("当前版本仅支持宿主机执行，不能从容器会话创建子智能体。")
     _require_local_parent_backend(manager)
     from modules.scoped_execution_policy import fixed_workspace_root
     root = fixed_workspace_root(ExecutionScope(

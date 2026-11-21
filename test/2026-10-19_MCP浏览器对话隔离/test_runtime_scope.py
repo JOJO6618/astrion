@@ -11,6 +11,7 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
+from modules.mcp_client_manager.exceptions import MCPClientError
 from modules.mcp_client_manager.manager import MCPClientManager
 from modules.mcp_client_manager.models import MCPToolBinding
 from modules.mcp_client_manager.runtime_scope import MCPRuntimeScope, prepare_stdio_server
@@ -129,20 +130,15 @@ class RuntimeScopeTests(unittest.TestCase):
         with patch.dict(os.environ, {"PLAYWRIGHT_MCP_ISOLATED": "false"}):
             self.assertIsNot(self.prepared(), self.server)
 
-    def test_docker_uses_mounted_conversation_directory(self):
+    def test_docker_session_is_rejected_instead_of_rehosted(self):
         session = SimpleNamespace(mode="docker", workspace_path=str(self.workspace),
                                   mount_path="/workspace", container_name="fixture", sandbox_bin="docker")
-        prepared = self.prepared(session=session)
-        self.assertTrue(prepared["args"][-1].startswith("/workspace/.astrion/mcp_profiles/"))
-        client = _StdioMCPClient(prepared, 5, "2024-11-05", session)
-        with patch("modules.mcp_client_manager.stdio_client.shutil.which", return_value="/bin/docker"):
-            command, cwd, _ = client._prepare_launch()
-        self.assertIn("fixture", command)
-        self.assertEqual(command[-2:], ["--user-data-dir", prepared["args"][-1]])
-        self.assertIsNone(cwd)
-        # Host-only env is not inherited by docker exec.
-        with patch.dict(os.environ, {"PLAYWRIGHT_MCP_USER_DATA_DIR": "/host-only"}):
-            self.assertIsNot(self.prepared(session=session), self.server)
+        with self.assertRaises(MCPClientError):
+            self.prepared(session=session)
+        with self.assertRaises(MCPClientError):
+            MCPClientManager(SimpleNamespace(get_server=lambda _: self.server), container_session=session)
+        with self.assertRaises(MCPClientError):
+            _StdioMCPClient(self.server, 5, "2024-11-05", session)
 
     def test_two_conversations_keep_independent_processes_pages_and_storage(self):
         first, second = self.manager("conv_a"), self.manager("conv_b")

@@ -12,10 +12,6 @@ try:
         READ_TOOL_MAX_CONTEXT_BEFORE, READ_TOOL_MAX_CONTEXT_AFTER,
         READ_TOOL_DEFAULT_MAX_MATCHES, READ_TOOL_MAX_MATCHES,
         READ_TOOL_MAX_FILE_SIZE,
-        TERMINAL_SANDBOX_MOUNT_PATH,
-        TERMINAL_SANDBOX_MODE,
-        TERMINAL_SANDBOX_CPUS,
-        TERMINAL_SANDBOX_MEMORY,
         PROJECT_MAX_STORAGE_MB,
         CUSTOM_TOOLS_ENABLED,
     )
@@ -32,10 +28,6 @@ except ImportError:
         READ_TOOL_MAX_CONTEXT_BEFORE, READ_TOOL_MAX_CONTEXT_AFTER,
         READ_TOOL_DEFAULT_MAX_MATCHES, READ_TOOL_MAX_MATCHES,
         READ_TOOL_MAX_FILE_SIZE,
-        TERMINAL_SANDBOX_MOUNT_PATH,
-        TERMINAL_SANDBOX_MODE,
-        TERMINAL_SANDBOX_CPUS,
-        TERMINAL_SANDBOX_MEMORY,
         PROJECT_MAX_STORAGE_MB,
         CUSTOM_TOOLS_ENABLED,
     )
@@ -68,7 +60,6 @@ from modules.custom_tool_registry import CustomToolRegistry, build_default_tool_
 from modules.custom_tool_executor import CustomToolExecutor
 
 
-from modules.container_monitor import collect_stats, inspect_state
 from core.tool_config import TOOL_CATEGORIES
 from utils.api_client import APIClient
 from utils.context_manager import ContextManager, AUTO_SHALLOW_PLACEHOLDER

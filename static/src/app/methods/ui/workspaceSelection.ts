@@ -21,9 +21,7 @@ export function selectWorkspaceIdentity(host, workspaceId, owns) {
     .then(async () => {
       if (!owns()) return { superseded: true };
       if (current.selected === workspaceId) return { current_workspace_id: workspaceId };
-      const endpoint = host.versioningHostMode
-        ? '/api/host/workspaces/select'
-        : '/api/projects/select';
+      const endpoint = '/api/host/workspaces/select';
       // Deliberately don't abort a selection write: the next write waits for its
       // response/cookie before selecting the last still-owned navigation target.
       // Even an unreadable response may have changed its cookie on the server.

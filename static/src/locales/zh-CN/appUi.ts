@@ -154,7 +154,6 @@ export default {
   workspaceBootstrapMessage: '请点击侧边栏的「工作区」按钮创建第一个工作区',
   statusApiRequestFailed: '状态接口请求失败: {status}',
   hostModeFileTreeUnavailable: '宿主机模式下文件树不可用',
-  dockerModeFilesChanged: 'Docker 模式下文件区已改为项目列表',
 
   // ── 上传（entries.ts / picker.ts / process.ts / quick.ts） ──
   uploadingTitle: '上传中',

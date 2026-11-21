@@ -16,11 +16,10 @@ const ctx = inject<Record<string, any>>('personalizationDrawer')!;
 const { form, personalization } = ctx;
 
 const settingsStore = useSettingsStore();
-/** 服务端密钥可见性：host 单机模式不受限；docker/web 多用户模式仅管理员可见
- *（对齐模型栏目中提供商分区的权限线——服务器密钥由管理员统一管控）。 */
-const canEditSearchKeys = computed(() => settingsStore.isHostMode || settingsStore.isAdmin);
+/** 服务端密钥可见性：仅管理员可编辑（Host 登录即管理员）。 */
+const canEditSearchKeys = computed(() => settingsStore.isAdmin);
 onMounted(() => {
-  // 补拉会话状态（store 内去重），确保 isAdmin/isHostMode 判定就绪
+  // 补拉会话状态（store 内去重），确保 isAdmin 判定就绪
   settingsStore.fetchSessionStatus();
 });
 

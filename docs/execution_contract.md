@@ -14,8 +14,8 @@
 
 - `modules/execution_plane/base.py` 定义 `ExecutionBackend`；`files.py`、`protocols.py` 定义显式子协议。禁止万能 `__getattr__` 代理隐藏协议缺项。
 - `get_execution_backend(owner)` 返回已绑定后端；仅旧 owner 缺失后端时惰性创建 `LocalExecutionBackend(owner)` 并缓存。后端报错、能力缺失或返回拒绝时不得改用控制端资源。
-- `MainTerminal` 默认绑定真实 `LocalExecutionBackend(self)`，本地 Host/Docker 同样使用公共边界。
-- Local 适配器只保存 owner，按需获取资源，构造时不创建终端、进程或容器。owner 的资源可以在生命周期中更新。
+- `MainTerminal` 默认绑定真实 `LocalExecutionBackend(self)`，Host 通过公共边界装配本机资源。
+- Local 适配器只保存 owner，按需获取资源，构造时不创建终端或进程。owner 的资源可以在生命周期中更新。
 - `create_local_resources(project_path=..., data_dir=...)` 可独立构造 FileManager、TerminalOperator、TerminalManager、BackgroundCommandManager，再交给 Local 适配器；无需 MainTerminal、Flask、APIClient 或模型循环。
 - 此工厂复用既有执行实现，不是已经打包好的安装器。节点部署仍需提供 Python 依赖、配置启动隔离及平台沙箱助手；测试显式使用 `ASTRION_IGNORE_DOTENV=1`。
 
@@ -27,7 +27,7 @@
 | 文件 | `files`：文本／二进制读写、分段／搜索／抽取、目录与文件增删改、inspect_path、resolve_path |
 | 持久终端 | `terminals`：打开、关闭、重置、列举、输入、快照及全部关闭 |
 | 后台 | `background`：查询、等待、取消、状态协调、通知、认领与回滚通知；精简 owner 未提供时允许为 None |
-| 环境 | `get_environment()`：JSON 可序列化的执行侧 workspace、OS、架构、模式、网络、能力与容器信息 |
+| 环境 | `get_environment()`：JSON 可序列化的执行侧 workspace、OS、架构、模式、网络和能力 |
 | 编辑备份 | `track_file_edit(...)`：从执行侧获取原内容，关联当前对话与工作段 |
 | 插件 | `execute_mcp_tool` / `execute_custom_tool` / `list_mcp_servers`；能力不存在应明确报错或返回空发现结果 |
 
@@ -38,16 +38,15 @@
 1. 目标路径属于执行端。工作区归属及路径授权通过执行侧 `resolve_path`／`inspect_path` 判断，控制端不得以本机 `Path.resolve/exists/stat` 代替。对话级工作树另存 `execution_root` 作为相对文件路径、新前台／后台命令及新终端的默认基准；workspace 身份、存储与固定写根不变，既有进程不搬迁。当前工作树明确只接受本地适配器，见 `git_worktree.md`。
 2. `inspect_path` 成功且 `exists=False` 才表示合法的新路径；权限拒绝、不可达和后端错误不能当作文件不存在，尤其不能绕过覆盖前必须先读的守门。
 3. 元数据返回 `success/path/relative_path/within_workspace/exists/is_file/is_dir/is_symlink/suffix/size/mtime`；拒绝时返回失败。元数据不代替实际内容访问时的安全检查。
-4. Host 适配器复用 FileManager 的路径、授权和 scoped_io。Docker 元数据走容器脚本，容器不可用不回读宿主镜像。
-5. `read_binary` 返回 bytes；`write_binary` 精确写原始字节，不能隐式转 UTF-8。Host 与新增容器二进制写均在截断前检查 no-follow、普通文件和硬链接限制。
-6. **现有容器文本 IO 的剩余限制**：旧 read/write 路径仍有先解析再按路径打开的 TOCTOU 风险；新增 metadata/binary 的描述符实现不能被表述为所有容器文本 IO 已无竞态。
+4. Host 适配器复用 FileManager 的路径、授权和 scoped_io。指定的执行后端返回失败时，沿原调用链返回错误。
+5. `read_binary` 返回 bytes；`write_binary` 精确写原始字节，不能隐式转 UTF-8。Host 二进制写在截断前检查 no-follow、普通文件和硬链接限制。
 
 ## 核心调用接线
 
 - 工具执行：前台／后台命令、文件／目录、终端、后台 sleep、媒体检查、网页保存、项目记忆产物及对话回顾产物走所选后端。
 - 读取：read/search/extract、技能文本、项目记忆与已读内容缓存走文件资源。已经读到全文时将 `content` 交给 ContextManager，避免隐式再从本机打开。
 - 上下文：工作区 AGENTS/CLAUDE、mtime、目录结构与深树走执行端；仍按既有机制冻结历史。树读取失败不冻结为正常空树。
-- 环境：执行侧未报告的平台、路径和配额明确未知；容器 OS 未探测不拿 Host OS 冒充。远端失败不回退控制端平台探测。
+- 环境：执行侧未报告的平台、路径和配额明确未知；远端平台只使用执行端上报的数据。远端失败不回退控制端平台探测。
 - 媒体：原始路径字节、图片转换、OCR 与上下文媒体读取使用后端文件；控制端已认证 MediaStore 内容寻址缓存仍属于控制端可信数据。
 - 服务端：后台 REST、停止、活动判定与通知经 `backend.background`；审批预览和计划读取经 `backend.files`。
 
@@ -55,9 +54,9 @@
 
 公共层不替代原有权限裁决。编排端传递已确定的只读、网络及执行模式；执行端仍须用实际 OS 沙箱强制约束，不能只相信调用方传入字符串。
 
-单次完全访问只认可**精确 LocalExecutionBackend 类型且 backend.owner 就是当前 terminal**；Fake、远端声明 `is_local=True`、Local 子类或其他 owner 的适配器均不得获得当前终端的 grant。原有任务／工具指纹／单次领取校验保持。Docker 不支持此升级。
+单次完全访问只认可**精确 LocalExecutionBackend 类型且 backend.owner 就是当前 terminal**；Fake、远端声明 `is_local=True`、Local 子类或其他 owner 的适配器均不得获得当前终端的 grant。原有任务／工具指纹／单次领取校验保持。
 
-前台取消必须回收所拥有的真实进程，不能仅取消等待；后台创建、登记与取消保持原锁握手。成功取消既要验证状态，也要验证 PID 消失。持久终端只关闭本实例持有的进程与管道，不停止其附着的用户容器。
+前台取消必须回收所拥有的真实进程，不能仅取消等待；后台创建、登记与取消保持原锁握手。成功取消既要验证状态，也要验证 PID 消失。持久终端只关闭本实例持有的进程与管道。
 
 本地子实例独立装配文件／进程／终端／后台资源，并使用 `LocalExecutionBackend(child)`；不能复用父的 owner 资源或清空后端。当前非本地父实例明确拒绝创建子执行上下文，未来需受限 `fork_child(scope)` 及持久化／恢复身份契约，不能悄悄在控制端启动子实例。
 
@@ -84,10 +83,10 @@
 - 对话迁移的工具路径别名仍使用 `conversation_transfer.assets.tool_path` 的控制端 safe_file；媒体正文读取已有字符串映射，但工具别名路径需保留无链接约束地改为执行侧验证。
 - 完整 Git baseline/checkpoint/restore，以及服务端文件浏览、上传／下载与预览等外围工作区访问仍含控制端本地假设，需逐入口接线或明确拒绝，不能回落宿主镜像。
 - 远程预览端口转发、跨设备媒体导入／导出与资源复制。
-- Linux 受限助手、Windows WSL2 与真实 Docker 的实机回归，三平台安装和生命周期验收。
+- Linux 受限助手、Windows WSL2 与 macOS 的实机回归，三平台安装和生命周期验收。
 
 当前 stdio 实验仅证明这套资源可以在独立进程驱动，且文件／命令产物落在执行侧；不验证生产公网协议、网络安全、跨机延迟或断线恢复。
 
 ## 私有工作区记忆（2026-11-07）
 
-MEMORY.md 全文读取、目标元数据与普通写工具经已绑定后端文件接口，不回读服务端源码镜像。当前外置位置解析仅信任 Local 适配器；非本地执行器明确拒绝此能力，后续 Remote 必须另行定义其私有记忆存储与授权协议。Host 的数据目录绑定属于可信资源装配，Docker 仅挂载当前工作区专属记忆目录。不能因增加记忆功能而扩大子实例固定写根或 readonly/plan 能力。详见 `docs/workspace_memory.md`。
+MEMORY.md 全文读取、目标元数据与普通写工具经已绑定后端文件接口，不回读服务端源码镜像。当前外置位置解析仅信任 Local 适配器；非本地执行器明确拒绝此能力，后续 Remote 必须另行定义其私有记忆存储与授权协议。Host 的数据目录绑定属于可信资源装配。不能因增加记忆功能而扩大子实例固定写根或 readonly/plan 能力。详见 `docs/workspace_memory.md`。

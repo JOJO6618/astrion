@@ -226,11 +226,7 @@ export const computed = {
   ...mapWritableState(useResourceStore, [
     'tokenPanelCollapsed',
     'currentContextTokens',
-    'currentConversationTokens',
-    'projectStorage',
-    'containerStatus',
-    'containerNetRate',
-    'usageQuota'
+    'currentConversationTokens'
   ]),
   ...mapWritableState(useFocusStore, ['focusedFiles']),
   ...mapWritableState(useUploadStore, ['uploading', 'mediaUploading']),
@@ -252,15 +248,12 @@ export const computed = {
     // 主任务及压缩期间均允许输入、排队和停止。
     // 空态锁定：host 模式下尚未创建/选择工作区时，发送必然失败，输入栏整体锁定
     // （textarea/语音/发送均吃 inputLocked，引导用户先创建工作区）。
-    if (this.versioningHostMode && !this.currentHostWorkspaceId) {
-      return true;
-    }
-    return false;
+    return !this.currentHostWorkspaceId;
   },
   currentWorkspaceHasRunningTask() {
     // 对话级隔离后：仅当「当前对话」有运行中任务时才拦截发送；
     // 同工作区其他对话的任务不再阻塞本对话（多对话并行）。
-    if (!(this.versioningHostMode || this.dockerProjectMode) || !this.currentHostWorkspaceId) {
+    if (!this.currentHostWorkspaceId) {
       return false;
     }
     const tasks = Array.isArray(this.runningWorkspaceTasks) ? this.runningWorkspaceTasks : [];

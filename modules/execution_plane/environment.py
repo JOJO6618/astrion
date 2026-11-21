@@ -4,13 +4,8 @@
 能力实测、平台事实）属于纯读逻辑，独立成模块便于单独测试，也让 local.py 保持
 在可读长度内。
 
-诚实边界（与 local.py 的文档一致）：
-- `host.*` 只描述**执行后端所在机器**，docker 场景不把宿主 OS 冒充成容器 OS；
-- `capabilities` 检查当前 owner 的资源与可调用实现；缺资源时为 False，
-  不验证具体路径可读性或 OS 隔离（静态声明另见 `declared_capabilities`）；
-- `case_sensitive` 只读探测 Host 工作区；容器或无可靠样本时为 null，来源 unknown；
-- 任何探测失败都写进字段（`workspace_error`）或降级为 None/False，不抛异常、
-  也不谎报能力。
+环境报告描述执行后端所在的 Host。能力检查只确认资源实现存在，不验证路径权限或 OS 隔离。
+工作区的大小写敏感性通过只读探测获得。探测失败时保留未知状态。
 
 本模块只依赖标准库，不 import Flask / APIClient / 模型栈，可在无 Agent 的
 轻量执行节点里使用。
@@ -74,8 +69,6 @@ def probe_capabilities(backend: Any) -> Dict[str, Any]:
     ops = getter("terminal_ops")
     terminals = getter("terminal_manager")
     background = getter("background_command_manager")
-    session = backend.container_session
-    docker = bool(session is not None and getattr(session, "mode", None) == "docker")
     caps: Dict[str, Any] = {
         "run_command": callable(getattr(ops, "run_command", None)),
         "persistent_terminals": callable(getattr(terminals, "open_terminal", None)),
@@ -86,7 +79,7 @@ def probe_capabilities(backend: Any) -> Dict[str, Any]:
         "files": False,
         "files_metadata": False,
         "binary_reads": False,
-        "full_access": bool(getattr(backend, "supports_full_access", False)) and not docker,
+        "full_access": bool(getattr(backend, "supports_full_access", False)),
     }
     try:
         files = backend.files
@@ -103,38 +96,23 @@ def probe_capabilities(backend: Any) -> Dict[str, Any]:
 
 def describe_environment(backend: Any) -> Dict[str, Any]:
     """构造 JSON 可序列化的环境快照（字段语义见模块文档）。"""
-    session = backend.container_session
-    docker = bool(session is not None and getattr(session, "mode", None) == "docker")
     root: Optional[Path] = None
     workspace_error: Optional[str] = None
-    if not docker:
-        try:
-            root = backend.workspace_root
-        except Exception as exc:  # noqa: BLE001 - 缺 workspace 也要能报告其它事实
-            workspace_error = str(exc)
+    try:
+        root = backend.workspace_root
+    except Exception as exc:  # noqa: BLE001 - report other facts without a workspace
+        workspace_error = str(exc)
 
-    container: Optional[Dict[str, Any]] = None
-    if docker:
-        container = {
-            "mode": "docker",
-            "container_name": getattr(session, "container_name", None),
-            "mount_path": getattr(session, "mount_path", None),
-            # 未在容器内执行 uname/release 探测，不做推测
-            "os": "unknown",
-            "cwd_in_container": getattr(session, "mount_path", None),
-        }
-
-    # 容器挂载的文件系统不一定与宿主镜像相同，不能用宿主 stat 推断其大小写规则。
-    case_sensitive = None if docker else detect_case_sensitivity(root)
-    target_root = (container or {}).get("mount_path") if docker else (str(root) if root is not None else None)
+    case_sensitive = detect_case_sensitivity(root)
+    target_root = str(root) if root is not None else None
     return {
         "backend": backend.backend_name,
         "is_local": bool(backend.is_local),
-        "supports_full_access": bool(backend.supports_full_access) and not docker,
+        "supports_full_access": bool(backend.supports_full_access),
         "platform": sys.platform,
         "case_sensitive": case_sensitive,
         "case_sensitive_source": "workspace-probe" if case_sensitive is not None else "unknown",
-        "execution_target": "docker" if docker else "host",
+        "execution_target": "host",
         "execution_mode": backend.execution_mode,
         "network_permission": backend.network_permission,
         "workspace_root": target_root,
@@ -150,11 +128,11 @@ def describe_environment(backend: Any) -> Dict[str, Any]:
             "machine": platform.machine(),
             "python": platform.python_version(),
         },
-        "container": container,
+        "container": None,
         "notes": [
-            "host.* 描述执行后端所在机器，不代表容器内 OS。",
-            "supports_full_access 表示后端能力，Docker 为 false；单次完全访问仍需权限层裁决。",
-            "case_sensitive 只读探测 Host 工作区；容器或无可靠样本时为 null。",
+            "host.* 描述执行后端所在机器。",
+            "supports_full_access 表示后端能力。单次完全访问仍需权限层裁决。",
+            "case_sensitive 通过只读探测获得，无可靠样本时为 null。",
             "capabilities 仅检查当前 owner 的资源实现，不验证路径权限或 OS 隔离；declared_capabilities 为静态声明。",
         ],
     }

@@ -84,82 +84,9 @@ export function usePersonalizationContext(options: PersonalizationContextOptions
     });
   };
 
-  // ---- 管理员 / host 判定（统一走 settings store，与原抽屉逻辑一致） ----
+  // ---- 管理员判定（统一走 settings store） ----
   const isAdmin = computed(() => settingsStore.isAdmin);
   const showMcpConfigEntry = computed(() => settingsStore.showMcpConfigEntry);
-  const isAppShell = computed(() => {
-    if (typeof window === 'undefined') return false;
-    const params = new URLSearchParams(window.location.search);
-    if (params.has('app_shell')) return true;
-    return Boolean((window as any)?.AndroidThemeBridge);
-  });
-
-  // ── 语音模型下载 ──
-  const voiceModelReady = ref(false);
-  const voiceModelPartial = ref(false); // 文件存在但不完整
-  const voiceDownloading = ref(false);
-  const voiceDownloadPercent = ref(0);
-  const voiceDownloadMsg = ref('');
-
-  const checkVoiceModel = () => {
-    const bridge = (window as any)?.AndroidVoiceBridge;
-    if (bridge) {
-      try {
-        if (typeof bridge.isModelReady === 'function') {
-          voiceModelReady.value = bridge.isModelReady();
-        }
-        if (!voiceModelReady.value && typeof bridge.isModelPartial === 'function') {
-          voiceModelPartial.value = bridge.isModelPartial();
-        }
-      } catch (_) {
-        /* ignore */
-      }
-    }
-  };
-
-  const downloadVoiceModel = () => {
-    const bridge = (window as any)?.AndroidVoiceBridge;
-    if (!bridge) {
-      alert(t('personalization.voiceAppOnlyAlert'));
-      return;
-    }
-    voiceDownloading.value = true;
-    voiceDownloadPercent.value = 0;
-    voiceDownloadMsg.value = t('personalization.voicePreparing');
-    voiceModelPartial.value = false;
-
-    (window as any).__onVoiceDownloadProgress = (pct: number, msg: string) => {
-      voiceDownloadPercent.value = pct;
-      voiceDownloadMsg.value = msg;
-      if (pct >= 100) {
-        voiceDownloading.value = false;
-        voiceModelReady.value = true;
-        voiceModelPartial.value = false;
-      }
-    };
-    (window as any).__onVoiceModelReady = () => {
-      voiceModelReady.value = true;
-      voiceDownloading.value = false;
-      voiceModelPartial.value = false;
-    };
-
-    bridge.downloadModel();
-  };
-
-  const deleteVoiceModel = () => {
-    const bridge = (window as any)?.AndroidVoiceBridge;
-    if (!bridge) return;
-    if (typeof bridge.deleteModel === 'function') {
-      bridge.deleteModel();
-    }
-    voiceModelReady.value = false;
-    voiceModelPartial.value = false;
-    voiceDownloadPercent.value = 0;
-    voiceDownloadMsg.value = '';
-  };
-
-  // 宿主组件 setup 时检查一次语音模型状态（Android bridge 同步读取，开销可忽略）
-  checkVoiceModel();
 
   // ── 自定义下拉浮层定位 ──
   const activeDropdown = ref<string | null>(null);
@@ -344,7 +271,6 @@ export function usePersonalizationContext(options: PersonalizationContextOptions
     id: PermissionModeValue;
     labelKey: string;
     descKey: string;
-    descKeyProject?: string;
   }> = [
     {
       id: 'readonly',
@@ -354,14 +280,12 @@ export function usePersonalizationContext(options: PersonalizationContextOptions
     {
       id: 'approval',
       labelKey: 'personalization.permissionApproval',
-      descKey: 'personalization.permissionApprovalDesc',
-      descKeyProject: 'personalization.permissionApprovalDescProject'
+      descKey: 'personalization.permissionApprovalDesc'
     },
     {
       id: 'auto_approval',
       labelKey: 'personalization.permissionAutoApproval',
-      descKey: 'personalization.permissionAutoApprovalDesc',
-      descKeyProject: 'personalization.permissionAutoApprovalDescProject'
+      descKey: 'personalization.permissionAutoApprovalDesc'
     },
     {
       id: 'unrestricted',
@@ -369,11 +293,8 @@ export function usePersonalizationContext(options: PersonalizationContextOptions
       descKey: 'personalization.permissionUnrestrictedDesc'
     }
   ];
-  /** 项目模式（docker/web）下优先用「项目」口径的权限说明。 */
-  const permissionDescKey = (option: { descKey: string; descKeyProject?: string }) =>
-    !settingsStore.isHostMode && option.descKeyProject ? option.descKeyProject : option.descKey;
-  /** 设置项说明：项目模式下改用同名 +Project 的文案 key（仅限已补齐双份文案的 key）。 */
-  const wsDescKey = (key: string) => (!settingsStore.isHostMode ? `${key}Project` : key);
+  const permissionDescKey = (option: { descKey: string }) => option.descKey;
+  const wsDescKey = (key: string) => key;
 
   type WorkModeValue = 'plan' | 'ask' | 'execute';
   const workModeOptions: Array<{
@@ -568,102 +489,6 @@ export function usePersonalizationContext(options: PersonalizationContextOptions
     });
   });
 
-  // ── App Shell 更新检查 ──
-  const appCurrentVersionCode = ref<number | null>(null);
-  const appCurrentVersionName = ref<string>('');
-  const appUpdateChecking = ref(false);
-  const appUpdateError = ref('');
-  const appUpdateCheckedAt = ref<string | null>(null);
-  const appUpdateInfo = ref<{
-    latestVersionCode: number;
-    latestVersionName: string;
-    apkUrl: string;
-    fileSizeBytes: number;
-    changelog?: string;
-    publishedAt?: string | null;
-    hasUpdate?: boolean | null;
-  } | null>(null);
-
-  if (typeof window !== 'undefined') {
-    const params = new URLSearchParams(window.location.search);
-    const vcRaw = params.get('app_vc') || '';
-    const vnRaw = params.get('app_vn') || '';
-    const bridge = (window as any)?.AndroidThemeBridge;
-    const bridgeVcRaw =
-      bridge && typeof bridge.getAppVersionCode === 'function'
-        ? String(bridge.getAppVersionCode() || '')
-        : '';
-    const bridgeVnRaw =
-      bridge && typeof bridge.getAppVersionName === 'function'
-        ? String(bridge.getAppVersionName() || '')
-        : '';
-    // App 端优先使用 Bridge 实时版本，避免 WebView 恢复旧 URL 参数导致显示过期版本号
-    const finalVcRaw = bridgeVcRaw || vcRaw;
-    const finalVnRaw = bridgeVnRaw || vnRaw;
-    appCurrentVersionCode.value = /^\d+$/.test(finalVcRaw) ? Number(finalVcRaw) : null;
-    appCurrentVersionName.value = finalVnRaw || '';
-  }
-
-  const hydrateAppVersionFromBridge = () => {
-    if (typeof window === 'undefined') return;
-    const bridge = (window as any)?.AndroidThemeBridge;
-    if (!bridge) return;
-    try {
-      const vcRaw =
-        typeof bridge.getAppVersionCode === 'function'
-          ? String(bridge.getAppVersionCode() || '')
-          : '';
-      const vnRaw =
-        typeof bridge.getAppVersionName === 'function'
-          ? String(bridge.getAppVersionName() || '')
-          : '';
-      if (vcRaw && /^\d+$/.test(vcRaw)) {
-        appCurrentVersionCode.value = Number(vcRaw);
-      }
-      if (vnRaw) {
-        appCurrentVersionName.value = vnRaw;
-      }
-    } catch {
-      // ignore bridge read failures
-    }
-  };
-
-  const appCurrentVersionText = computed(() => {
-    void currentLocale.value;
-    return appCurrentVersionName.value || t('personalization.appVersionUnknown');
-  });
-
-  const appHasUpdate = computed(() => {
-    if (!appUpdateInfo.value) return false;
-    if (typeof appUpdateInfo.value.hasUpdate === 'boolean') return appUpdateInfo.value.hasUpdate;
-    if (appCurrentVersionCode.value == null) return false;
-    return Number(appUpdateInfo.value.latestVersionCode || 0) > appCurrentVersionCode.value;
-  });
-
-  const appDownloadUrl = computed(() => appUpdateInfo.value?.apkUrl || '');
-
-  const appUpdateStateText = computed(() => {
-    void currentLocale.value;
-    if (!appUpdateInfo.value) return t('personalization.appUpdateNotChecked');
-    return appHasUpdate.value
-      ? t('personalization.appUpdateFound')
-      : t('personalization.appUpdateLatest');
-  });
-
-  const appUpdateCheckedText = computed(() => {
-    void currentLocale.value;
-    if (!appUpdateCheckedAt.value) return t('personalization.appUpdateNeverChecked');
-    const d = new Date(appUpdateCheckedAt.value);
-    if (Number.isNaN(d.getTime())) return t('personalization.appUpdateJustChecked');
-    const formatted = d.toLocaleString(currentLocale.value === 'en-US' ? 'en-US' : 'zh-CN', {
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-    return t('personalization.appUpdateCheckedAt', { time: formatted });
-  });
-
   const fetchUsageSummary = async () => {
     if (usageLoading.value) {
       return;
@@ -693,52 +518,8 @@ export function usePersonalizationContext(options: PersonalizationContextOptions
     }
   };
 
-  const checkAppUpdate = async () => {
-    if (appUpdateChecking.value) return;
-    hydrateAppVersionFromBridge();
-    appUpdateChecking.value = true;
-    appUpdateError.value = '';
-    try {
-      const params = new URLSearchParams();
-      if (appCurrentVersionCode.value != null) {
-        params.set('currentVersionCode', String(appCurrentVersionCode.value));
-      }
-      const suffix = params.toString() ? `?${params.toString()}` : '';
-      const resp = await fetch(`/api/app/version${suffix}`);
-      const payload = await resp.json();
-      if (!resp.ok || !payload?.success) {
-        throw new Error(payload?.error || t('personalization.appUpdateFailed'));
-      }
-      const data = payload?.data || {};
-      appUpdateInfo.value = {
-        latestVersionCode: Number(data.latestVersionCode || 0),
-        latestVersionName: String(data.latestVersionName || ''),
-        apkUrl: String(data.apkUrl || ''),
-        fileSizeBytes: Number(data.fileSizeBytes || 0),
-        changelog: String(data.changelog || ''),
-        publishedAt: data.publishedAt || null,
-        hasUpdate: typeof data.hasUpdate === 'boolean' ? data.hasUpdate : null
-      };
-      appUpdateCheckedAt.value = new Date().toISOString();
-    } catch (error: any) {
-      appUpdateError.value = error?.message || t('personalization.appUpdateFailed');
-    } finally {
-      appUpdateChecking.value = false;
-    }
-  };
-
-  const downloadLatestApp = () => {
-    const url = appDownloadUrl.value;
-    if (!url) {
-      appUpdateError.value = t('personalization.appUpdateNoUrl');
-      return;
-    }
-    window.location.href = url;
-  };
-
   onMounted(async () => {
-    hydrateAppVersionFromBridge();
-    // 会话状态（管理员/host 判定）统一由 settings store 拉取（内部去重）
+    // 会话状态（管理员判定）统一由 settings store 拉取（内部去重）
     await settingsStore.fetchSessionStatus();
   });
 
@@ -839,22 +620,12 @@ export function usePersonalizationContext(options: PersonalizationContextOptions
       if (tab === 'general') {
         // 「标题生成模型」菜单（设置页「通用」分区）复用子智能体模型库
         loadSubAgentModels();
-        // 设置页「通用」分区：App Shell 下自动做一次更新检查
-        if (isAppShell.value && !appUpdateInfo.value && !appUpdateChecking.value) {
-          checkAppUpdate();
-        }
       }
     },
     { immediate: true }
   );
 
   const startTutorial = () => {
-    fetch('/api/tutorial-status', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'same-origin',
-      body: JSON.stringify({ tutorial_completed: true })
-    }).catch(() => {});
     tutorialStore.markCompleted();
     personalization.closeDrawer();
     window.setTimeout(() => {
@@ -1118,18 +889,8 @@ export function usePersonalizationContext(options: PersonalizationContextOptions
     closeDropdown();
   };
 
-  const openAdminPanel = () => {
-    window.open('/admin/monitor', '_blank', 'noopener');
-    personalization.closeDrawer();
-  };
-
   const openCustomTools = () => {
     window.open('/admin/custom-tools', '_blank', 'noopener');
-    personalization.closeDrawer();
-  };
-
-  const openApiAdmin = () => {
-    window.open('/admin/api', '_blank', 'noopener');
     personalization.closeDrawer();
   };
 
@@ -1234,14 +995,8 @@ export function usePersonalizationContext(options: PersonalizationContextOptions
     activeDropdown,
     activeTab,
     activeTheme,
-    appCurrentVersionText,
-    appHasUpdate,
-    appUpdateCheckedText,
-    appUpdateChecking,
-    appUpdateStateText,
     blockDisplayLabel,
     blockDisplayOptions,
-    checkAppUpdate,
     closeDropdown,
     commitProjectMemoryInjectLimitInput,
     commitRecentConversationsPromptLimitInput,
@@ -1252,9 +1007,6 @@ export function usePersonalizationContext(options: PersonalizationContextOptions
     currentBlockDisplayMode,
     currentCompactMessageDisplay,
     defaultModelLabel,
-    deleteVoiceModel,
-    downloadLatestApp,
-    downloadVoiceModel,
     fetchUsageSummary,
     filteredModelOptions,
     floatingMenuStyle,
@@ -1269,7 +1021,6 @@ export function usePersonalizationContext(options: PersonalizationContextOptions
     imageCompressionLabel,
     imageCompressionOptions,
     isAdmin,
-    isAppShell,
     isEffortActive,
     isRunModeActive,
     loading,
@@ -1277,8 +1028,6 @@ export function usePersonalizationContext(options: PersonalizationContextOptions
     localeLabel,
     localeOptions,
     minimalExpandHeightLimited,
-    openAdminPanel,
-    openApiAdmin,
     openCustomTools,
     openMcpConfig,
     permissionModeLabel,
@@ -1334,11 +1083,6 @@ export function usePersonalizationContext(options: PersonalizationContextOptions
     usageSummary,
     usageUpdatedText,
     versioningBackupModeLabel,
-    voiceDownloadMsg,
-    voiceDownloadPercent,
-    voiceDownloading,
-    voiceModelPartial,
-    voiceModelReady,
     workModeLabel,
     runModeOptions,
     reasoningEffortOptions,

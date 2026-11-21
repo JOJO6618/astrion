@@ -4,7 +4,6 @@ import { useConversationTabsStore } from '../../../stores/conversationTabs';
 import { debugLog } from '../common';
 import { t } from '@/locales';
 import { beginAuxiliaryRequest } from '../auxiliaryOwnership';
-import { persistWorkspaceMode } from '../../state';
 import { usePolicyStore } from '../../../stores/policy';
 import { useModelStore } from '../../../stores/model';
 import { usePersonalizationStore } from '../../../stores/personalization';
@@ -280,9 +279,6 @@ export const socketMethods = {
   async enterWorkspaceBootstrapMode() {
     debugLog('尚未创建任何工作区，进入工作区引导模式');
     this.workspaceBootstrapActive = true;
-    this.versioningHostMode = true;
-    this.dockerProjectMode = false;
-    persistWorkspaceMode(true);
     this.isConnected = true;
     try {
       await this.fetchHostWorkspaces();
@@ -336,8 +332,6 @@ export const socketMethods = {
       this.fetchExecutionMode();
       this.fetchNetworkPermission();
       this.fetchPendingToolApprovals();
-      // 立即更新配额和运行模式，避免等待其他慢接口
-      this.fetchUsageQuota();
       // /new model settings come from the workspace preparation endpoint.
       // 拉取管理员策略
       const policyStore = usePolicyStore();
@@ -359,21 +353,9 @@ export const socketMethods = {
 
       const focusPromise = this.focusFetchFiles();
       const treePromise: Promise<any> | null = null;
-      const isHostMode = statusData?.container?.mode === 'host';
-      this.versioningHostMode = !!isHostMode;
-      this.dockerProjectMode = !isHostMode;
-      persistWorkspaceMode(!!isHostMode);
-      if (isHostMode) {
-        this.fileMarkTreeUnavailable(t('appUi.hostModeFileTreeUnavailable'));
-        await this.fetchHostWorkspaces();
-      } else {
-        this.fileMarkTreeUnavailable(t('appUi.dockerModeFilesChanged'));
-        await this.fetchHostWorkspaces();
-        this.hostWorkspaceCreatePath = '';
-        this.hostWorkspaceCreateLabel = '';
-        this.hostWorkspaceCreateError = '';
-        this.hostWorkspaceCreateSubmitting = false;
-      }
+      // Host-only：不再读取 container.mode，工作区列表直接走可信 Host 接口。
+      this.fileMarkTreeUnavailable(t('appUi.hostModeFileTreeUnavailable'));
+      await this.fetchHostWorkspaces();
 
       if (!owns()) return;
       // 获取当前对话信息

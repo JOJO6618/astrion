@@ -1,9 +1,9 @@
-"""公共文件执行层：元数据 mixin（授权先于 stat / 容器 policy-checked 动作）。
+"""公共文件执行层：元数据 mixin（授权先于 stat，Host 原生）。
 
 该 mixin 只负责 ``list_files/get_file_info/inspect_path/resolve_path`` 及其
 路径换算 helper；内容读写仍由 ``files.LocalFileSystem`` 显式转发 FileManager。
-宿主模式复用 ``_validate_path`` + ``_ensure_host_access``；容器模式经
-``_container_call`` 调用容器脚本，失败原样返回，不回退宿主镜像。
+宿主模式复用 ``_validate_path`` + ``_ensure_host_access``；主仓不再持有 Docker
+容器代理，任何容器会话在 FileManager 构造时已被明确拒绝。
 """
 from __future__ import annotations
 
@@ -27,21 +27,11 @@ class MetadataFileSystemMixin:
     # 元数据：授权先于 stat
     # ------------------------------------------------------------------
     def list_files(self, path: str = "") -> Dict[str, Any]:
-        """列出目录内容；容器模式走容器内 policy-checked list_files。"""
-        if self._is_container_mode():
-            return self._call_container(
-                "list_files", {"path": self._container_relative(path)}
-            )
-        # FileManager.list_files 先 _validate_path + _ensure_host_access 再 iterdir，
-        # 每个子项也先授权再 stat，顺序满足“不允许 peek 越界”。
+        """列出目录内容；先授权再 iterdir/stat，不允许 peek 越界。"""
         return self._file_manager.list_files(path)
 
     def get_file_info(self, path: str) -> Dict[str, Any]:
         """旧结构兼容（ISO 时间字符串）；宿主侧保证授权先于 exists/stat。"""
-        if self._is_container_mode():
-            return self._call_container(
-                "get_file_info", {"path": self._container_relative(path)}
-            )
         fm = self._file_manager
         valid, error, full_path = fm._validate_path(path)
         if not valid or full_path is None:
@@ -81,14 +71,6 @@ class MetadataFileSystemMixin:
         normalized_access = (access or "").strip().lower()
         if normalized_access not in _VALID_ACCESS:
             return {"success": False, "error": "access 仅支持 'read' 或 'write'"}
-        if self._is_container_mode():
-            return self._call_container(
-                "inspect_path",
-                {
-                    "path": self._container_relative(path),
-                    "access": normalized_access,
-                },
-            )
 
         fm = self._file_manager
         valid, error, full_path = fm._validate_path(path)
@@ -150,14 +132,6 @@ class MetadataFileSystemMixin:
         normalized_access = (access or "").strip().lower()
         if normalized_access not in _VALID_ACCESS:
             return {"success": False, "error": "access 仅支持 'read' 或 'write'"}
-        if self._is_container_mode():
-            return self._call_container(
-                "resolve_path",
-                {
-                    "path": self._container_relative(path),
-                    "access": normalized_access,
-                },
-            )
         fm = self._file_manager
         valid, error, full_path = fm._validate_path(path)
         if not valid or full_path is None:
@@ -180,54 +154,6 @@ class MetadataFileSystemMixin:
     # ------------------------------------------------------------------
     # 内部工具
     # ------------------------------------------------------------------
-    def _is_container_mode(self) -> bool:
-        """容器语义优先：docker 模式一律走容器代理，不静默回退宿主 stat。"""
-        return bool(self._file_manager._is_docker_mode())
-
-    def _call_container(self, action: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-        """调用容器代理动作；失败原样返回，绝不回退宿主实现。"""
-        try:
-            result = self._file_manager._container_call(action, payload)
-        except Exception as exc:  # 工具箱未就绪/权限/子进程异常等
-            return {"success": False, "error": str(exc)}
-        if not isinstance(result, dict):
-            return {
-                "success": False,
-                "error": f"容器文件动作 {action} 返回了非 dict 结果",
-            }
-        return result
-
-    def _container_relative(self, path: str) -> str:
-        """把宿主侧路径转换为容器根相对路径（纯字面转换，不 stat）。
-
-        相对路径先落到 ``_base_dir()``（子智能体固定工作目录 / 工作区根），
-        再相对项目根换算；否则 Docker 子智能体会把 ``foo.txt`` 误当成
-        ``/workspace/foo.txt``，而实际读写落在 ``/workspace/agent_x/foo.txt``。
-        """
-        text = (path or "").strip()
-        if not text:
-            text = "."
-        session = getattr(self._file_manager, "container_session", None)
-        mount = str(getattr(session, "mount_path", None) or "/workspace").rstrip("/")
-        if text in (mount, "/workspace"):
-            return "."
-        for prefix in (mount, "/workspace"):
-            if text.startswith(prefix + "/"):
-                return text[len(prefix) + 1:]
-        looks_absolute = (
-            text.startswith("/")
-            or text.startswith("\\")
-            or (len(text) > 1 and text[1] == ":")
-        )
-        root = str(getattr(self._file_manager, "project_path", "") or "")
-        if not root:
-            return text
-        candidate = Path(text) if looks_absolute else (self._base_dir() / text)
-        try:
-            return Path(os.path.relpath(str(candidate), root)).as_posix()
-        except (OSError, ValueError):
-            return text
-
     def _workspace_root(self) -> Path:
         scope = _current_scope()
         if scope is not None:

@@ -25,10 +25,10 @@
 | 文件 | 对应 AGENTS.md 小节 | 内容 |
 |------|-------------------|------|
 | `project_structure.md` | §1 | 完整目录职责、监控动画核心文件 |
-| `runtime_data_paths.md` | §1.5 | 路径解析、host/web 双路径、日志轮转、数据迁移、个人指令拦截 |
+| `runtime_data_paths.md` | §1.5 | 路径解析、Host 数据路径、日志轮转、数据迁移、个人指令拦截 |
 | `commands.md` | §2 | 各形态启动说明、headless 额外路由、Python 解释器探测、桌面壳打包链路 |
 | `testing.md` | §3 | 具体冒烟用例、CLI 最小验证、pytest/unittest 执行细节 |
-| `android_release.md` | §8 | Android 发布联动完整步骤 |
+| `android_release.md` | —（Docker 版本） | Android 发布联动完整步骤；随 Docker fork 维护，主仓 §8 已改为 Host 范围 |
 | `permission_and_sandbox.md` | §10 / §10.7 / §10.8 | 权限模式四档、执行环境、路径授权语义、审核智能体配置、各平台沙箱实现细节与实测记录 |
 | `work_mode.md` | §10.6 | 运行模式三档语义与完整实现清单 |
 | `multi_agent.md` | §11 | 多智能体前端类型模型、派发链路、消息池硬约束、formatter/renderer 清单、调试约定 |
@@ -36,7 +36,7 @@
 | `tool_loading.md` | §13 | 工具动态加载完整约束与 checklist |
 | `web_extract_and_search.md` | §14 | 提取链与降级链、提取商契约、新增搜索服务商 checklist |
 | `settings_and_providers.md` | §15 | 设置页分区清单、提供商 catalog 字段与协议裁决 |
-| `preview_panel.md` | §16 | 预览服务器安全模型、docker 分流与代理架构、隔离细节 |
+| `preview_panel.md` | §16 | 预览服务器安全模型、Host 文件与代理回退、隔离细节 |
 | `codegraph.md` | §17 | 代码索引安装、命令与实测踩坑 |
 | `sub_agent_access.md` | §18 | 子智能体固定权限、单次完全访问、审批面板 UI 细则 |
 | `display_snapshot.md` | §19 | 运行中对话显示快照契约与禁止旁路清单 |

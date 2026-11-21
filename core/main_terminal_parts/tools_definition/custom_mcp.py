@@ -13,10 +13,6 @@ try:
         READ_TOOL_MAX_CONTEXT_BEFORE, READ_TOOL_MAX_CONTEXT_AFTER,
         READ_TOOL_DEFAULT_MAX_MATCHES, READ_TOOL_MAX_MATCHES,
         READ_TOOL_MAX_FILE_SIZE,
-        TERMINAL_SANDBOX_MOUNT_PATH,
-        TERMINAL_SANDBOX_MODE,
-        TERMINAL_SANDBOX_CPUS,
-        TERMINAL_SANDBOX_MEMORY,
         PROJECT_MAX_STORAGE_MB,
         CUSTOM_TOOLS_ENABLED,
     )
@@ -33,10 +29,6 @@ except ImportError:
         READ_TOOL_MAX_CONTEXT_BEFORE, READ_TOOL_MAX_CONTEXT_AFTER,
         READ_TOOL_DEFAULT_MAX_MATCHES, READ_TOOL_MAX_MATCHES,
         READ_TOOL_MAX_FILE_SIZE,
-        TERMINAL_SANDBOX_MOUNT_PATH,
-        TERMINAL_SANDBOX_MODE,
-        TERMINAL_SANDBOX_CPUS,
-        TERMINAL_SANDBOX_MEMORY,
         PROJECT_MAX_STORAGE_MB,
         CUSTOM_TOOLS_ENABLED,
     )
@@ -66,7 +58,6 @@ from modules.custom_tool_executor import CustomToolExecutor
 from modules.mcp_server_registry import MCPServerRegistry, build_default_mcp_category
 
 
-from modules.container_monitor import collect_stats, inspect_state
 from core.tool_config import TOOL_CATEGORIES
 from utils.api_client import APIClient
 from utils.context_manager import ContextManager
@@ -147,27 +138,6 @@ class ToolsDefinitionCustomMcpMixin:
                         self.tool_category_states.pop(key, None)
                     self._refresh_disabled_tools()
                     self.mcp_tool_alias_map = {}
-                    return []
-                if self._is_mcp_disabled_in_docker_mode():
-                    self.mcp_tool_alias_map = {}
-                    if "mcp" in self.tool_categories_map:
-                        self.tool_categories_map["mcp"].tools = ["list_mcp_servers"]
-                    elif getattr(self, "mcp_tools_enabled", False):
-                        default_mcp_cat = build_default_mcp_category()
-                        self.tool_categories_map["mcp"] = type(next(iter(TOOL_CATEGORIES.values())))(
-                            label=default_mcp_cat["label"],
-                            tools=["list_mcp_servers"],
-                            default_enabled=True,
-                            silent_when_disabled=False,
-                        )
-                    stale_keys = [
-                        key for key in list(getattr(self, "tool_categories_map", {}).keys())
-                        if isinstance(key, str) and key.startswith("mcp_server__")
-                    ]
-                    for key in stale_keys:
-                        self.tool_categories_map.pop(key, None)
-                        self.tool_category_states.pop(key, None)
-                    self._refresh_disabled_tools()
                     return []
                 # 类别层面的禁用优先生效（即使策略里尚未填充具体工具列表）
                 mcp_cat = getattr(self, "tool_categories_map", {}).get("mcp")

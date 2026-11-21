@@ -25,8 +25,6 @@ export async function prepareInitialWorkspaceIdentity(host, owns) {
   }
   const view = result.data;
   host.composerDraftOwner = String(view.draft_owner || '');
-  host.versioningHostMode = !!view.host_mode;
-  host.dockerProjectMode = !view.host_mode;
   if (explicitWorkspace) {
     const selection = await selectWorkspaceIdentity(host, view.workspace.workspace_id, owns);
     if (!owns() || selection.superseded) return { superseded: true };

@@ -141,20 +141,7 @@ const appOptions = {
       resourceFetchConversationTokenStatistics: 'fetchConversationTokenStatistics',
       resourceSetCurrentContextTokens: 'setCurrentContextTokens',
       resourceToggleTokenPanel: 'toggleTokenPanel',
-      resourceApplyStatusSnapshot: 'applyStatusSnapshot',
-      resourceUpdateContainerStatus: 'updateContainerStatus',
-      resourceStartContainerStatsPolling: 'startContainerStatsPolling',
-      resourceStopContainerStatsPolling: 'stopContainerStatsPolling',
-      resourceStartProjectStoragePolling: 'startProjectStoragePolling',
-      resourceStopProjectStoragePolling: 'stopProjectStoragePolling',
-      resourceStartUsageQuotaPolling: 'startUsageQuotaPolling',
-      resourceStopUsageQuotaPolling: 'stopUsageQuotaPolling',
-      resourcePollContainerStats: 'pollContainerStats',
-      resourceBindContainerVisibilityWatcher: 'bindContainerVisibilityWatcher',
-      resourcePollProjectStorage: 'pollProjectStorage',
-      resourceFetchUsageQuota: 'fetchUsageQuota',
-      resourceResetTokenStatistics: 'resetTokenStatistics',
-      resourceSetUsageQuota: 'setUsageQuota'
+      resourceResetTokenStatistics: 'resetTokenStatistics'
     }),
     ...mapActions(useUploadStore, {
       uploadHandleSelected: 'handleSelectedFiles',

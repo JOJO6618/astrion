@@ -18,12 +18,7 @@ try:
         MAX_CONTEXT_SIZE,
         DATA_DIR,
         PROMPTS_DIR,
-        TERMINAL_SANDBOX_MOUNT_PATH,
-        TERMINAL_SANDBOX_CPUS,
-        TERMINAL_SANDBOX_MEMORY,
         PROJECT_MAX_STORAGE_MB,
-        TERMINAL_SANDBOX_MODE,
-        LINUX_SAFETY,
     )
     from config.model_profiles import (
         get_model_prompt_replacements,
@@ -41,12 +36,7 @@ except ImportError:
         MAX_CONTEXT_SIZE,
         DATA_DIR,
         PROMPTS_DIR,
-        TERMINAL_SANDBOX_MOUNT_PATH,
-        TERMINAL_SANDBOX_CPUS,
-        TERMINAL_SANDBOX_MEMORY,
         PROJECT_MAX_STORAGE_MB,
-        TERMINAL_SANDBOX_MODE,
-        LINUX_SAFETY,
     )
     from config.model_profiles import (
         get_model_prompt_replacements,
@@ -329,30 +319,11 @@ class MessageMixin:
                 "- **当前对话开始时间**：{conversation_start_time}\n"
                 "- **项目结构**：\n\n{file_tree}\n\n"
                 "{recent_uploads}"
-                "- **长期记忆**：{memory}"
             )
 
-        # 执行环境显示：绑定后端时用后端事实（get_environment），
-        # 无后端时保留原有本地表现（宿主机文本继续复用 _host_runtime_cache）。
-        resolve_display = getattr(self, "_resolve_runtime_display", None)
-        if callable(resolve_display):
-            display = resolve_display()
-            runtime_environment = display["runtime_environment"]
-            resource_limit = display["resource_limit"]
-            container_path = display["container_path"]
-        else:
-            is_host = self._is_host_mode_without_safety()
-            runtime_environment = (
-                self._build_host_runtime_environment()
-                if is_host
-                else f"隔离容器中（挂载目录 {self.container_mount_path or '/workspace'}），宿主机路径已隐藏"
-            )
-            resource_limit = (
-                "宿主机模式无限制"
-                if is_host
-                else f"CPU {self.container_cpu_limit} 核，内存 {self.container_memory_limit}，磁盘配额 {self.project_storage_limit}"
-            )
-            container_path = self.container_mount_path or "/workspace"
+        display = self._resolve_runtime_display()
+        runtime_environment = display["runtime_environment"]
+        resource_limit = display["resource_limit"]
 
         conversation_data = None
         conversation_id = getattr(self, "current_conversation_id", None)
@@ -379,9 +350,6 @@ class MessageMixin:
             project_name=project_name,
             runtime_environment=runtime_environment,
             resource_limit=resource_limit,
-            container_path=container_path,
-            container_cpus=self.container_cpu_limit,
-            container_memory=self.container_memory_limit,
             project_storage=self.project_storage_limit,
             conversation_start_time=conversation_start_time,
             file_tree=(

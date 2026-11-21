@@ -1,13 +1,7 @@
-"""Exercise real conversation creation, shallow compression and Git ignores."""
+"""Exercise real conversation creation, shallow compression and private storage."""
 from __future__ import annotations
 
-import os
-from pathlib import Path
-import shutil
-import subprocess
-from types import SimpleNamespace
 import unittest
-from unittest.mock import Mock
 
 import test_workspace_memory as fixtures
 from modules.workspace_memory import ENABLED_KEY, PROMPT_KEY, location, prepare_directory
@@ -53,22 +47,13 @@ class LifecycleTest(unittest.TestCase):
         self.seed("after compression")
         self.assertIn("after compression", main_prompt(self.owner))
 
-    def test_docker_private_ignore_prevents_git_add_from_collecting_memory(self):
-        target = location(str(self.project), str(self.data), docker=True)
+    def test_host_private_memory_stays_outside_the_repository(self):
+        target = location(str(self.project), str(self.data))
         prepare_directory(target)
-        self.assertEqual("*\n", (target.directory / ".gitignore").read_text())
-        # A synthetic copy models what Git sees at the bind target. No actual
-        # private file is copied to a repository in application code.
-        destination = self.project / ".astrion/astrion-memory"
-        destination.mkdir(parents=True)
-        shutil.copyfile(target.directory / ".gitignore", destination / ".gitignore")
-        (destination / "MEMORY.md").write_text("synthetic-private-content")
-        env = {**os.environ, "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_SYSTEM": "/dev/null"}
-        subprocess.run(["git", "init", "-q", str(self.project)], env=env, check=True, capture_output=True)
-        result = subprocess.run(["git", "-C", str(self.project), "check-ignore", "--no-index",
-                                 ".astrion/astrion-memory/MEMORY.md"], env=env,
-                                check=True, capture_output=True, text=True)
-        self.assertIn("MEMORY.md", result.stdout)
+        self.assertEqual(target.directory.parent, (self.data / 'memory').resolve())
+        self.assertFalse(target.directory.is_relative_to(self.project.resolve()))
+        self.assertFalse((target.directory / '.gitignore').exists())
+        self.assertFalse(target.file.exists())
 
 
 if __name__ == "__main__":

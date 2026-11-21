@@ -1,12 +1,13 @@
-"""Backend i18n message pack: server/status/* API user-visible messages.
+"""Backend i18n message pack: server/status/* user-visible messages.
 
 Domain prefixes:
 - status_file_open.      server/status/file_open.py
-- status_docker.         server/status/docker.py
 - status_host_workspace. server/status/host_workspace.py
 - status_git.            server/status/git.py
-- status_app.            server/status/app.py
 - status_base.           server/status/base.py
+
+status_docker.*（Docker 项目路由）与 status_app.*（Android APK 路由）已随
+Docker fork / Android 工程移出主仓。
 """
 
 MESSAGES = {
@@ -22,10 +23,6 @@ MESSAGES = {
     "status_file_open.workspace_not_found": {
         "zh-CN": "工作区不存在",
         "en-US": "Workspace not found",
-    },
-    "status_file_open.project_not_found": {
-        "zh-CN": "项目不存在",
-        "en-US": "Project not found",
     },
     "status_file_open.cannot_open_file_manager": {
         "zh-CN": "无法打开文件管理器",
@@ -74,10 +71,6 @@ MESSAGES = {
     "status_file_open.open_external_failed": {
         "zh-CN": "无法在系统浏览器中打开链接",
         "en-US": "Failed to open the link in the system browser",
-    },
-    "status_file_open.open_file_failed": {
-        "zh-CN": "无法用系统默认程序打开文件",
-        "en-US": "Failed to open the file with the system default application",
     },
     "status_file_open.app_icon_unavailable": {
         "zh-CN": "应用图标不可用",
@@ -134,32 +127,6 @@ MESSAGES = {
         "en-US": "Unsupported tab action",
     },
 
-    # ── server/status/docker.py ──
-    "status_docker.docker_web_only": {
-        "zh-CN": "仅 Docker Web 模式可用",
-        "en-US": "Available in Docker Web mode only",
-    },
-    "status_docker.missing_project_id": {
-        "zh-CN": "缺少项目 ID",
-        "en-US": "Missing project ID",
-    },
-    "status_docker.project_not_found": {
-        "zh-CN": "项目不存在",
-        "en-US": "Project not found",
-    },
-    "status_docker.project_name_required": {
-        "zh-CN": "项目名称不能为空",
-        "en-US": "Project name is required",
-    },
-    "status_docker.default_project_not_deletable": {
-        "zh-CN": "默认项目不能删除",
-        "en-US": "The default project cannot be deleted",
-    },
-    "status_docker.project_has_running_tasks": {
-        "zh-CN": "该项目有运行中的任务，暂不能删除",
-        "en-US": "This project has running tasks and cannot be deleted yet",
-    },
-
     # ── server/status/host_workspace.py ──
     "status_host_workspace.host_mode_only": {
         "zh-CN": "仅宿主机模式可用",
@@ -184,12 +151,6 @@ MESSAGES = {
     "status_host_workspace.workspace_id_not_found": {
         "zh-CN": "workspace_id 不存在",
         "en-US": "workspace_id does not exist",
-    },
-
-    # ── server/status/app.py ──
-    "status_app.apk_not_found": {
-        "zh-CN": "APK 不存在，请先构建 release 包",
-        "en-US": "APK not found; please build the release package first",
     },
 
     # ── server/status/base.py ──

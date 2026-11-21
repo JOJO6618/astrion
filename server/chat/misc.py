@@ -29,12 +29,12 @@ from modules.skills_manager import (
 )
 from modules.upload_security import UploadSecurityError
 from modules.host_sandbox_policy import load_policy, save_policy
-from modules.user_manager import UserWorkspace
+from modules.workspace import UserWorkspace
 from core.web_terminal import WebTerminal
 from config.model_profiles import get_model_context_window
 
-from server.auth_helpers import api_login_required, resolve_admin_policy, get_current_user_record, get_current_username
-from server.context import with_terminal, get_gui_manager, get_upload_guard, build_upload_error_response, ensure_conversation_loaded, get_or_create_usage_tracker
+from server.auth_helpers import api_login_required, resolve_admin_policy, get_current_username
+from server.context import with_terminal, get_gui_manager, get_upload_guard, build_upload_error_response, ensure_conversation_loaded
 from server.context.data_decorators import with_workspace_data
 from server.context.resources import find_runtime
 from server.security import rate_limited
@@ -139,7 +139,7 @@ def tool_settings(terminal: WebTerminal, workspace: UserWorkspace, username: str
         }), 400
 
     try:
-        policy = resolve_admin_policy(get_current_user_record())
+        policy = resolve_admin_policy()
         if policy.get("ui_blocks", {}).get("block_tool_toggle"):
             return jsonify({
                 "success": False,

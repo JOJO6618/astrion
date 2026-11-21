@@ -76,9 +76,6 @@ async def maybe_compress(runtime, sender):
     existing = select_summary(document, prefix)
     if existing and len(existing["message_ids"]) >= cutoff:
         raise RuntimeError("The remaining Chat input exceeds the model context budget")
-    allowed, quota = runtime.record_model_call(runtime.thinking_mode)
-    if not allowed:
-        raise RuntimeError(f"Chat summary quota exceeded: {quota}")
     sender("compression_state", {"in_progress": True, "conversation_id": runtime.conversation_id})
     try:
         from modules.chat_mode.summarize import summarize

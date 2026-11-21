@@ -24,10 +24,6 @@ try:
         READ_TOOL_MAX_CONTEXT_BEFORE, READ_TOOL_MAX_CONTEXT_AFTER,
         READ_TOOL_DEFAULT_MAX_MATCHES, READ_TOOL_MAX_MATCHES,
         READ_TOOL_MAX_FILE_SIZE,
-        TERMINAL_SANDBOX_MOUNT_PATH,
-        TERMINAL_SANDBOX_MODE,
-        TERMINAL_SANDBOX_CPUS,
-        TERMINAL_SANDBOX_MEMORY,
         PROJECT_MAX_STORAGE_MB,
         CUSTOM_TOOLS_ENABLED,
         READONLY_RUN_COMMAND_ALLOWED,
@@ -49,10 +45,6 @@ except ImportError:
         READ_TOOL_MAX_CONTEXT_BEFORE, READ_TOOL_MAX_CONTEXT_AFTER,
         READ_TOOL_DEFAULT_MAX_MATCHES, READ_TOOL_MAX_MATCHES,
         READ_TOOL_MAX_FILE_SIZE,
-        TERMINAL_SANDBOX_MOUNT_PATH,
-        TERMINAL_SANDBOX_MODE,
-        TERMINAL_SANDBOX_CPUS,
-        TERMINAL_SANDBOX_MEMORY,
         PROJECT_MAX_STORAGE_MB,
         CUSTOM_TOOLS_ENABLED,
         READONLY_RUN_COMMAND_ALLOWED,
@@ -102,7 +94,6 @@ from modules.custom_tool_registry import CustomToolRegistry, build_default_tool_
 from modules.custom_tool_executor import CustomToolExecutor
 
 
-from modules.container_monitor import collect_stats, inspect_state
 from core.tool_config import TOOL_CATEGORIES
 from utils.api_client import APIClient
 from utils.context_manager import ContextManager
@@ -121,7 +112,8 @@ logger = setup_logger(__name__)
 DISABLE_LENGTH_CHECK = True
 
 class MainTerminalToolsExecutionMixin:
-    _DEFAULT_DOCKER_RISK_MARKERS = {
+    # 命令风险标记用于审批决策（命中即需要审批），与运行时类型无关。
+    _DEFAULT_COMMAND_RISK_MARKERS = {
         "rm", "rmdir", "mv", "cp", "dd", "chmod", "chown", "chgrp",
         "sudo", "su", "passwd", "useradd", "userdel",
         "curl", "wget", "nc", "ncat", "scp", "rsync",
@@ -129,14 +121,10 @@ class MainTerminalToolsExecutionMixin:
         ">/", ">>", "| sh", "| bash", "| zsh",
     }
 
-    def _is_docker_runtime(self) -> bool:
-                session = getattr(self, "container_session", None)
-                return bool(session and getattr(session, "mode", None) == "docker")
-
     def _extract_command_risk_markers(self, command: Any) -> List[str]:
                 cmd = str(command or "")
                 lowered = cmd.lower()
-                markers = self._load_docker_risk_markers()
+                markers = self._load_command_risk_markers()
                 hits: List[str] = []
                 for marker in markers:
                     if marker in lowered:
@@ -151,11 +139,15 @@ class MainTerminalToolsExecutionMixin:
                     dedup.append(m)
                 return dedup
 
-    def _load_docker_risk_markers(self) -> List[str]:
-                cache = getattr(self, "_docker_risk_markers_cache", None)
+    def _load_command_risk_markers(self) -> List[str]:
+                cache = getattr(self, "_command_risk_markers_cache", None)
                 if isinstance(cache, list) and cache:
                     return cache
-                config_path = Path(__file__).resolve().parents[2] / "config" / "docker_risk_markers.json"
+                config_dir = Path(__file__).resolve().parents[2] / "config"
+                # 优先读中性名称；旧版配置文件名继续兼容。
+                config_path = config_dir / "command_risk_markers.json"
+                if not config_path.exists():
+                    config_path = config_dir / "docker_risk_markers.json"
                 markers: List[str] = []
                 try:
                     if config_path.exists():
@@ -169,17 +161,9 @@ class MainTerminalToolsExecutionMixin:
                 except Exception:
                     markers = []
                 if not markers:
-                    markers = sorted(self._DEFAULT_DOCKER_RISK_MARKERS)
-                self._docker_risk_markers_cache = markers
+                    markers = sorted(self._DEFAULT_COMMAND_RISK_MARKERS)
+                self._command_risk_markers_cache = markers
                 return markers
-
-    @staticmethod
-    def _mcp_disabled_message() -> str:
-                return tr("tools_exec.mcp_disabled_docker_mode")
-
-    def _is_mcp_disabled_in_docker_mode(self) -> bool:
-                session = getattr(self, "container_session", None)
-                return bool(session and getattr(session, "mode", None) == "docker")
 
     _TERMINAL_SERIES_TOOLS = {
         "terminal_session",
@@ -217,8 +201,8 @@ class MainTerminalToolsExecutionMixin:
         "ask_user",
         # 以下为只读/调研性质或会话状态管理类工具，只读模式（含计划模式）放行：
         # 终端会话全生命周期（terminal_input 自 2026-08-30 起放行：终端读写身份在
-        # 创建时已钉死，受限档终端为只读身份——docker 非特权 uid / 宿主机只读
-        # profile，写入由系统直接 EPERM，无需工具层再拦）
+        # 创建时已钉死，受限档终端为只读身份（宿主机只读沙箱 profile），
+        # 写入由系统直接 EPERM，无需工具层再拦）
         "terminal_session",
         "terminal_input",
         "terminal_snapshot",
@@ -255,8 +239,7 @@ class MainTerminalToolsExecutionMixin:
     }
 
     # 只读命令文本判定（启发式）：用于 approval/auto_approval 的「是否需要审批」决策。
-    # 2026-08-30 起不再是安全边界——docker 只读由非特权 uid 内核 DAC 强制
-    # （modules/docker_readonly_exec.py），宿主机由 OS 沙箱强制。已知可绕过
+    # 2026-08-30 起不再是安全边界——只读由宿主机 OS 沙箱强制。已知可绕过
     # （如 find . -delete），绕过启发式只会让命令多走一次审批，不会造成写入。
     # 扩展的只读命令白名单（包含常用管道命令）
     _READONLY_ALLOWED_EXECUTABLES = {
@@ -496,8 +479,6 @@ class MainTerminalToolsExecutionMixin:
 
                 if mode == "auto_approval":
                     if tool_name in {"write_file", "edit_file"}:
-                        if self._is_docker_runtime():
-                            return {"allowed": True, "mode": mode, "requires_approval": False}
                         path = args.get("file_path") or args.get("path") or ""
                         try:
                             info = get_execution_backend(self).files.resolve_path(str(path), access="write")
@@ -628,7 +609,7 @@ class MainTerminalToolsExecutionMixin:
                     result["summary"] = (
                         tr("tools_exec.skill_archived", skill_name=result.get('skill_name'))
                     )
-                    # 成功时不向模型/前端暴露宿主机或 Docker 内部路径。
+                    # 成功时不向模型/前端暴露执行端的内部路径。
                     result.pop("source_dir", None)
                     result.pop("target_dir", None)
                 return result
@@ -1278,16 +1259,6 @@ class MainTerminalToolsExecutionMixin:
                 is_mcp_tool_alias = bool(
                     isinstance(tool_name, str) and tool_name.startswith("mcp__")
                 )
-                if (tool_name == "list_mcp_servers" or is_mcp_tool_alias) and self._is_mcp_disabled_in_docker_mode():
-                    blocked = self._mcp_disabled_message()
-                    return json.dumps(
-                        {
-                            "success": False,
-                            "error": blocked,
-                            "message": blocked,
-                        },
-                        ensure_ascii=False,
-                    )
 
                 # Skill 强约束：未阅读对应 SKILL.md 时，阻止 terminal/sub-agent 系列工具执行
                 strict_error = self._check_skill_strict_prerequisite(tool_name, arguments)
@@ -1631,13 +1602,6 @@ class MainTerminalToolsExecutionMixin:
                         result = get_execution_backend(self).files.create_folder(arguments["path"])
 
                     elif tool_name == "web_search":
-                        allowed, quota_info = self.record_search_call()
-                        if not allowed:
-                            return json.dumps({
-                                "success": False,
-                                "error": tr("tools_exec.search_quota_exhausted", reset_at=quota_info.get('reset_at')),
-                                "quota": quota_info
-                            }, ensure_ascii=False)
                         search_response = await self.search_engine.search_with_summary(
                             query=arguments["query"],
                             max_results=arguments.get("max_results"),

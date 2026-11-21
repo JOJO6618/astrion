@@ -1,44 +1,18 @@
-# modules/terminal_ops.py - 终端操作模块（修复Python命令检测）
+# modules/terminal_ops/misc.py - 终端操作杂项（Host-only）
 
 import os
-import sys
-import asyncio
-import subprocess
-import shutil
-import time
-import signal
 import re
+import sys
 from pathlib import Path
-from typing import Dict, Optional, Tuple, TYPE_CHECKING
-from types import SimpleNamespace
+from typing import Optional
+
 try:
-    from config import (
-        TERMINAL_COMMAND_TIMEOUT,
-        OUTPUT_FORMATS,
-        MAX_RUN_COMMAND_CHARS,
-        HOST_SANDBOX_NETWORK_PERMISSION,
-    )
+    from config import OUTPUT_FORMATS
 except ImportError:
     project_root = Path(__file__).resolve().parents[1]
     if str(project_root) not in sys.path:
         sys.path.insert(0, str(project_root))
-    from config import (
-        TERMINAL_COMMAND_TIMEOUT,
-        OUTPUT_FORMATS,
-        MAX_RUN_COMMAND_CHARS,
-        HOST_SANDBOX_NETWORK_PERMISSION,
-    )
-from modules.host_sandbox_runner import (
-    HostSandboxError,
-    NETWORK_PERMISSION_RESTRICTED,
-    build_host_sandbox_plan,
-    build_host_sandbox_readonly_plan,
-    host_sandbox_enabled,
-)
-
-if TYPE_CHECKING:
-    from modules.user_container_manager import ContainerHandle
-    from modules.terminal_manager import TerminalManager
+    from config import OUTPUT_FORMATS
 
 
 class MiscMixin:

@@ -4,7 +4,6 @@ export default {
   // ── Settings row (GeneralTab) ──
   settingsTitle: 'Command blocking',
   settingsDesc: 'Stop agents from running commands that match your rules',
-  settingsDescProject: 'Stop agents from running commands that match your rules',
   manageRules: 'Manage rules',
 
   // ── Rules dialog (CommandBlockingDialog) ──
@@ -14,8 +13,6 @@ export default {
   loading: 'Loading...',
   summary:
     '{status}. Rules apply to all of your workspaces; a command is blocked when it contains any rule (case-insensitive).',
-  summaryProject:
-    '{status}. Rules apply to all of your projects; a command is blocked when it contains any rule (case-insensitive).',
   rulesLabel: 'Blocking rules',
   rulesDesc: 'Which command content gets blocked',
   rulesPlaceholder: 'One rule per line, e.g. rm -rf',

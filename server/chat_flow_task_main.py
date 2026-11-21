@@ -8,7 +8,7 @@ from config import AUTO_FIX_TOOL_CALL, AUTO_FIX_MAX_ATTEMPTS, MAX_ITERATIONS_PER
 from modules.personalization_manager import load_personalization_config, resolve_context_compression_settings
 from modules.skill_hint_manager import SkillHintManager
 from modules.i18n import tr
-from modules.user_manager import UserWorkspace
+from modules.workspace import UserWorkspace
 from modules.multi_agent.debug_logger import ma_debug
 from modules.execution_plane import get_execution_backend
 from core.web_terminal import WebTerminal
@@ -861,24 +861,6 @@ async def handle_task_with_sender(
 
         thinking_expected = web_terminal.api_client.get_current_thinking_mode()
         debug_log(f"思考模式: {thinking_expected}")
-        quota_allowed = True
-        quota_info = {}
-        if hasattr(web_terminal, "record_model_call"):
-            quota_allowed, quota_info = web_terminal.record_model_call(bool(thinking_expected))
-        if not quota_allowed:
-            quota_type = 'thinking' if thinking_expected else 'fast'
-            sender('quota_exceeded', {
-                'type': quota_type,
-                'reset_at': quota_info.get('reset_at')
-            })
-            sender('error', {
-                'message': tr("task_main.quota_exceeded"),
-                'quota': quota_info
-            })
-            finalize_user_work_timer()
-            finalize_run_versioning_checkpoint("quota_exceeded")
-            return
-        
         tool_call_limit_label = MAX_TOTAL_TOOL_CALLS if MAX_TOTAL_TOOL_CALLS is not None else "∞"
         debug_log(f"[API] 第{current_iteration}次调用 (总工具调用: {total_tool_calls}/{tool_call_limit_label})")
         

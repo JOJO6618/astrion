@@ -35,10 +35,7 @@ export const searchMethods = {
   /** 是否处于「按工作区分组」的侧边栏模式（决定搜索是否跨工作区） */
   isGroupedSidebarSearch() {
     const personalizationStore = usePersonalizationStore();
-    return (
-      !!personalizationStore?.form?.group_sidebar_by_workspace &&
-      !!(this.versioningHostMode || this.dockerProjectMode)
-    );
+    return !!personalizationStore?.form?.group_sidebar_by_workspace;
   },
 
   async startConversationSearch(query) {

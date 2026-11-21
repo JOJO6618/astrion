@@ -4,10 +4,9 @@
 在启动 Web 服务之前，于终端一次性设置好"必须在程序启动前确定"的内容，
 并写出项目根目录的 ``.env``：
 
-- 运行模式 host / web（决定数据目录与子容器策略，在 import config 时即锁定）
+- 运行模式固定为 host（主仓只交付 Host；旧 web/docker 部署继续使用对应旧版本）
 - Web 监听端口 / 地址（服务 listen 前必须确定）
-- 管理员账号（用户名 + 密码哈希，与 user_manager._ensure_admin_user 兼容）
-- 会话与 Token 密钥（自动随机生成，不打扰用户）
+- Web 会话密钥（自动随机生成，不打扰用户）
 - 基础 API 三件套（base_url / key / model_id）
 - 可选的 thinking / title 模型
 
@@ -18,7 +17,7 @@
 * **以 .env.example 为模板**：逐行读取模板，仅替换被本向导接管的键的值，
   其余行（包括全部注释与未涉及的配置项）原样保留——保证生成的 .env
   仍带完整文档，也不会丢任何配置开关。
-* **不 import config**：向导在 .env 尚不存在时运行，且模式选择会影响路径解析，
+* **不 import config**：向导在 .env 尚不存在时运行，且路径解析依赖 .env，
   因此刻意不依赖 config，避免过早锁定路径或触发 .env 加载。
 
 用法：
@@ -35,19 +34,16 @@ import secrets
 import shutil
 import sys
 import time
-from getpass import getpass
 from pathlib import Path
-
-try:
-    from werkzeug.security import generate_password_hash
-except ImportError:  # pragma: no cover - 缺依赖时给出可读提示
-    print("缺少依赖 werkzeug，请先安装：pip install -r requirements.txt")
-    sys.exit(1)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ENV_PATH = REPO_ROOT / ".env"
 ENV_EXAMPLE_PATH = REPO_ROOT / ".env.example"
+
+# 旧 web 管理员账号已从 Host 向导与交付中移除；即使旧模板里仍有这些键，
+# 也不要把它们写进新生成的 .env（Host 登录走 scripts/host_password.py）。
+_OBSOLETE_ENV_KEYS = {"AGENT_ADMIN_USERNAME", "AGENT_ADMIN_PASSWORD_HASH"}
 
 
 def _deploy_config_dir(mode: str, custom_data: str) -> Path:
@@ -97,27 +93,14 @@ def _ask_required(prompt: str, default: str = "") -> str:
         print("  此项必填，不能为空。")
 
 
-def _ask_password(prompt: str) -> str:
-    """隐藏输入密码，二次确认一致。"""
-    while True:
-        first = getpass(f"{prompt}: ")
-        if not first:
-            print("  密码不能为空。")
-            continue
-        second = getpass("再次输入确认: ")
-        if first != second:
-            print("  两次输入不一致，请重试。")
-            continue
-        return first
-
-
 # === .env 生成 =============================================================
 
 def _render_env(values: dict[str, str]) -> str:
     """以 .env.example 为模板渲染 .env：仅替换被接管键的值，其余原样保留。
 
-    被接管的键写入用户配置值；模板里未被接管的键与全部注释、空行原样保留。
-    若某接管键在模板中不存在（理论上不会），追加到末尾。
+    被接管的键写入用户配置值；模板里未被接管的键与全部注释、空行原样保留，
+    但旧管理员账号等已废弃键会被跳过。若某接管键在模板中不存在（理论上不会），
+    追加到末尾。
     """
     if not ENV_EXAMPLE_PATH.exists():
         # 没有模板时退化为按 values 直接生成（无注释）
@@ -129,6 +112,8 @@ def _render_env(values: dict[str, str]) -> str:
         stripped = raw.strip()
         if stripped and not stripped.startswith("#") and "=" in stripped:
             key = stripped.split("=", 1)[0].strip()
+            if key in _OBSOLETE_ENV_KEYS:
+                continue
             if key in remaining:
                 out_lines.append(f"{key}={remaining.pop(key)}")
                 continue
@@ -221,22 +206,20 @@ def run_wizard(force: bool = False) -> int:
 
     values: dict[str, str] = {}
 
-    # --- 1. 运行模式 ---
-    print("\n[1/5] 运行模式")
+    # --- 1. 运行模式（主仓固定 host）---
+    print("\n[1/3] 运行模式")
     print("  host = 单机本地模式，命令直接在宿主机沙箱执行")
-    print("  web  = 多用户模式，每个用户分配独立 Docker 子容器")
-    mode = _ask_choice("选择运行模式", ["host", "web"], "host")
+    mode = "host"
     values["TERMINAL_SANDBOX_MODE"] = mode
-    default_host = "127.0.0.1" if mode == "host" else "0.0.0.0"
 
     # --- 2. Web 服务 ---
-    print("\n[2/5] Web 服务监听")
+    print("\n[2/3] Web 服务监听")
     values["WEB_SERVER_PORT"] = _ask("监听端口", "8091")
-    print("  监听地址：单机本地建议 127.0.0.1（只听本机）；多用户/服务器用 0.0.0.0")
-    values["WEB_SERVER_HOST"] = _ask("监听地址", default_host)
+    print("  监听地址：单机本地建议 127.0.0.1（只听本机）")
+    values["WEB_SERVER_HOST"] = _ask("监听地址", "127.0.0.1")
 
     # --- 3. 数据目录（可选覆盖）---
-    print("\n[3/5] 数据目录")
+    print("\n[3/3] 数据目录")
     default_data = "~/.astrion/astrion"
     print(f"  运行态数据（对话/用户/记忆/日志）默认存放在 {default_data}")
     custom_data = _ask("自定义数据根目录（留空用默认）", "")
@@ -244,15 +227,8 @@ def run_wizard(force: bool = False) -> int:
         # 数据根变量：ASTRION_DATA_ROOT
         values["ASTRION_DATA_ROOT"] = custom_data
 
-    # --- 4. 管理员账户 ---
-    print("\n[4/5] 管理员账户")
-    admin_user = _ask("管理员用户名", "admin")
-    admin_pw = _ask_password("管理员密码")
-    values["AGENT_ADMIN_USERNAME"] = admin_user
-    values["AGENT_ADMIN_PASSWORD_HASH"] = generate_password_hash(admin_pw)
-
-    # --- 5. 模型配置（写入部署级配置目录 ~/.astrion/astrion/config/custom_models.json）---
-    print("\n[5/5] 模型配置")
+    # --- 补充：模型配置（写入部署级配置目录 ~/.astrion/astrion/config/custom_models.json）---
+    print("\n[补充] 模型配置")
     print("  配置一个可用模型（写入 ~/.astrion/astrion/config/custom_models.json）。")
     print("  启动后还可在后台页面继续增删模型。")
     model_name = _ask_required("模型显示名（界面上看到的名字）", "默认模型")
@@ -273,7 +249,6 @@ def run_wizard(force: bool = False) -> int:
 
     # --- 自动生成密钥 ---
     values["WEB_SECRET_KEY"] = secrets.token_hex(32)
-    values["API_TOKEN_SECRET"] = secrets.token_hex(32)
 
     # --- 写出 ---
     rendered = _render_env(values)
@@ -297,12 +272,11 @@ def run_wizard(force: bool = False) -> int:
     print(f"  模型配置：{custom_models_path}")
     if models_backup:
         print(f"  原模型配置已备份：{models_backup}")
-    print(f"  运行模式：{mode}")
+    print(f"  运行模式：{mode}（Host）")
     print(f"  监听地址：{values['WEB_SERVER_HOST']}:{values['WEB_SERVER_PORT']}")
     print(f"  数据目录：{custom_data or default_data}")
-    print(f"  管理员：  {admin_user}")
     print(f"  模型：    {model_name}（{model_id}）@ {model_url}")
-    print(f"  密钥：    已自动生成 WEB_SECRET_KEY / API_TOKEN_SECRET")
+    print(f"  密钥：    已自动生成 WEB_SECRET_KEY")
     print()
     print("  下一步启动服务：")
     print("    python -m server.app")
