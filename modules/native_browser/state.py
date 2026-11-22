@@ -21,6 +21,11 @@ def browser_tools_enabled(terminal: Any) -> bool:
     return _metadata(terminal).get(BROWSER_ENABLED_META_KEY) is True
 
 
+def browser_calls_allowed(terminal: Any) -> bool:
+    metadata = _metadata(terminal)
+    return metadata.get(BROWSER_ENABLED_META_KEY) is True and metadata.get(BROWSER_PENDING_META_KEY) != BROWSER_MODE_OFF
+
+
 def browser_mode(terminal: Any) -> str:
     return BROWSER_MODE_ON if browser_tools_enabled(terminal) else BROWSER_MODE_OFF
 

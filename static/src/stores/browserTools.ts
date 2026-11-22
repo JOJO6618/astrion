@@ -1,11 +1,14 @@
 import { defineStore } from 'pinia';
 import { workspaceScopedFetch as fetch } from '@/app/methods/workspaceRequestScope';
+import { t } from '@/locales';
+import { useUiStore } from './ui';
 
 interface BrowserToolsResponse {
   success: boolean;
   supported?: boolean;
   enabled?: boolean;
   pending?: 'on' | 'off' | null;
+  release_failed?: boolean;
   error?: string;
 }
 
@@ -59,6 +62,9 @@ export const useBrowserToolsStore = defineStore('browserTools', {
         if (!response.ok || !data.success) throw new Error(data.error || 'failed');
         if (!data.pending) this.enabled = data.enabled === true;
         this.pending = data.pending || '';
+        if (data.release_failed) {
+          useUiStore().pushToast({ message: t('browser.releaseFailed'), type: 'warning' });
+        }
       } catch (error) {
         this.error = String((error as Error).message || error);
       } finally {

@@ -1,6 +1,8 @@
 """macOS 内置浏览器 AI 工具：对话级开关与站点授权管理接口。"""
 from __future__ import annotations
 
+import logging
+
 from flask import jsonify, request
 
 from server.chat import chat_bp
@@ -11,7 +13,9 @@ from server.context.resources import find_runtime
 from server.security import rate_limited
 from modules.native_browser.availability import native_browser_supported
 from modules.native_browser.state import BROWSER_ENABLED_META_KEY, BROWSER_PENDING_META_KEY
-from modules.native_browser import site_permissions
+from modules.native_browser import client, site_permissions
+
+logger = logging.getLogger(__name__)
 
 
 @chat_bp.route('/api/browser-retention', methods=['GET'])
@@ -68,14 +72,21 @@ def update_browser_tools(terminal, workspace, username: str):
     conversation_id = getattr(terminal.context_manager, "current_conversation_id", None)
     if not conversation_id:
         return jsonify({"success": False, "error": "对话尚未创建"}), 409
-    target = "on" if data["enabled"] else "off"
-    if _conversation_running(username, conversation_id):
-        # 运行中：完整工具批次后生效并插入切换通知。
-        terminal._persist_runtime_mode_metadata({BROWSER_PENDING_META_KEY: target})
-        return jsonify({"success": True, "enabled": data["enabled"], "pending": target})
-    # 空闲：直接生效；通知由基线漂移机制在下一条用户消息时补发。
-    terminal._persist_runtime_mode_metadata({BROWSER_ENABLED_META_KEY: data["enabled"], BROWSER_PENDING_META_KEY: None})
-    return jsonify({"success": True, "enabled": data["enabled"], "pending": None})
+    enabled = data["enabled"]
+    pending = ("on" if enabled else "off") if _conversation_running(username, conversation_id) else None
+    if pending:
+        # 主任务在工具批次边界消费模式切换通知。
+        terminal._persist_runtime_mode_metadata({BROWSER_PENDING_META_KEY: pending})
+    else:
+        terminal._persist_runtime_mode_metadata({BROWSER_ENABLED_META_KEY: enabled, BROWSER_PENDING_META_KEY: None})
+    result = {"success": True, "enabled": enabled, "pending": pending}
+    if not enabled:
+        try:
+            client.release_owner(username, workspace.workspace_id, conversation_id)
+        except client.BridgeError as exc:
+            logger.warning("Unable to release desktop browser pages: %s", exc)
+            result["release_failed"] = True
+    return jsonify(result)
 
 
 @chat_bp.route('/api/browser-site-permissions', methods=['GET'])

@@ -1,90 +1,53 @@
-"""Focused policy regressions, synthetic identities and clocks only."""
+"""Browser group capacity and explicit close regressions."""
 import sys
 import unittest
+from dataclasses import replace
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from modules.native_browser.retention import BrowserRetention, IDLE_MS, AI_PROTECTION_MS
-
-NOW = 10_000_000
-
-
-def tab(owner, *, selected=True, last=None, ai=0, busy=False):
-    return {"id": owner, "owner": owner, "selected": selected,
-            "lastActive": NOW if last is None else last, "lastAi": ai, "busy": busy}
+from modules.native_browser.retention import BrowserGroup, decide_retention
 
 
 class RetentionTest(unittest.TestCase):
-    def setUp(self):
-        self.policy = BrowserRetention()
+    def test_running_groups_count_toward_limit_and_can_exceed_it(self):
+        groups = {str(index): BrowserGroup(index) for index in range(1, 5)}
+        self.assertEqual(decide_retention(groups)["release"], ["1"])
+        groups.pop("1")
+        groups.update({str(index): BrowserGroup(index, running=True) for index in range(5, 9)})
+        self.assertEqual(decide_retention(groups)["release"], ["2", "3", "4"])
+        groups = {key: groups[key] for key in "5678"}
+        self.assertEqual(decide_retention(groups)["release"], [])
+        groups["7"] = replace(groups["7"], running=False)
+        self.assertEqual(decide_retention(groups)["release"], ["7"])
+        groups = {key: replace(groups[key], running=False) for key in "568"}
+        self.assertEqual(decide_retention(groups)["release"], [])
 
-    def decide(self, statuses, tabs, now=NOW):
-        return self.policy.decide("synthetic", statuses, tabs, now)
+    def test_close_releases_below_capacity_as_soon_as_main_task_ends(self):
+        groups = {"A": BrowserGroup(1, closed=True, running=True)}
+        self.assertEqual(decide_retention(groups)["release"], [])
+        groups["A"] = replace(groups["A"], running=False)
+        self.assertEqual(decide_retention(groups)["release"], ["A"])
+        groups["A"] = replace(groups["A"], closed=False)
+        self.assertEqual(decide_retention(groups)["release"], [])
 
-    def test_all_foregrounds_plus_three_backgrounds(self):
-        owners = {name: {"front": name in "AB"} for name in "ABCDEF"}
-        result = self.decide(owners, [tab(name) for name in owners])
-        self.assertEqual(len(result["retained"]), 5)
-        self.assertTrue({"A", "B"} <= set(result["retained"]))
-        self.assertEqual(len(result["release"]), 1)
+    def test_closing_a_group_frees_a_slot_before_capacity_eviction(self):
+        groups = {key: BrowserGroup(index) for index, key in enumerate("ABCD")}
+        groups["D"] = replace(groups["D"], closed=True)
+        self.assertEqual(decide_retention(groups)["release"], ["D"])
 
-    def test_background_limit_overrides_selection_and_ai_hour(self):
-        owners = {name: {} for name in "ABCD"}
-        rows = [tab(name, ai=NOW) for name in owners]
-        self.assertEqual(self.decide(owners, rows)["release"], ["A"])
+    def test_lru_follows_access_order_not_task_finish_order(self):
+        groups = {"A": BrowserGroup(5), "B": BrowserGroup(2), "C": BrowserGroup(3), "D": BrowserGroup(4)}
+        self.assertEqual(decide_retention(groups)["release"], ["B"])
 
-    def test_selected_and_ai_protection_then_thirty_minutes(self):
-        rows = [tab("A", last=1), tab("A", selected=False, last=NOW-IDLE_MS+1),
-                tab("A", selected=False, last=1, ai=NOW-AI_PROTECTION_MS+1),
-                tab("A", selected=False, last=1, ai=NOW-AI_PROTECTION_MS)]
-        for i, row in enumerate(rows): row["id"] = str(i)
-        self.assertEqual(self.decide({"A": {"front": True}}, rows)["release"], ["3"])
-        self.assertEqual(self.decide({"A": {"front": True}}, rows, NOW+1)["release"], ["1", "2", "3"])
+    def test_metadata_only_groups_do_not_take_slots(self):
+        groups = {"A": BrowserGroup(None, closed=True), "B": BrowserGroup(None, running=True),
+                  "C": BrowserGroup(3), "D": BrowserGroup(4), "E": BrowserGroup(5)}
+        self.assertEqual(decide_retention(groups)["release"], [])
 
-    def test_running_to_background_gets_newest_slot(self):
-        owners = {name: {"front": name=="A"} for name in "ABCDE"}
-        rows = [tab(name) for name in owners]
-        self.decide(owners, rows)
-        owners["A"]["front"] = False
-        self.assertIn("A", self.decide(owners, rows)["retained"])
-
-    def test_recently_viewed_background_and_polling_do_not_reorder(self):
-        owners = {name: {"front": name=="A"} for name in "ABCD"}
-        rows = [tab(name) for name in owners]
-        self.decide(owners, rows)
-        owners["A"]["front"] = False
-        owners["B"]["front"] = True
-        self.decide(owners, rows)
-        owners["B"]["front"] = False
-        result = self.decide(owners, rows)
-        self.assertEqual(result["release"], ["C"])
-        self.assertEqual(result, self.decide(owners, rows, NOW+1000))
-
-    def test_unknown_does_not_mean_deleted(self):
-        result = self.decide({"A": {"unknown": True}}, [tab("A")])
-        self.assertEqual(result["deleted"], [])
-        self.assertIn("A", result["retained"])
-
-    def test_deleted_overrides_all_protection(self):
-        result = self.decide({"A": {"exists": False, "front": True}}, [tab("A", ai=NOW)])
-        self.assertEqual(result["deleted"], ["A"])
-        self.assertEqual(result["release"], ["A"])
-
-    def test_busy_tab_is_not_idle_evicted(self):
-        self.assertEqual(self.decide({"A": {"front": True}},
-                         [tab("A", selected=False, last=1, busy=True)])["release"], [])
-
-    def test_metadata_only_owners_do_not_take_slots(self):
-        result = self.decide({name: {} for name in "ABCDE"}, [tab("A")])
-        self.assertEqual(result["retained"], ["A"])
-        self.assertEqual(result["release"], [])
-
-    def test_fast_visits_between_polls_keep_actual_order(self):
-        owners = {name: {"viewed": at} for name, at in [("Z", 1), ("A", 2), ("Y", 3), ("B", 4)]}
-        result = self.decide(owners, [tab(name) for name in owners])
-        self.assertEqual(result["release"], ["Z"])
-        owners["Z"]["viewed"] = 5
-        self.assertEqual(self.decide(owners, [tab(name) for name in owners])["release"], ["A"])
+    def test_unknown_existence_protects_pages_and_deletion_releases_saved_records(self):
+        groups = {"A": BrowserGroup(1, closed=True, exists=None),
+                  "B": BrowserGroup(2, running=True, exists=False), "C": BrowserGroup(None, exists=False)}
+        self.assertEqual(decide_retention(groups), {"deleted": ["B", "C"], "release": []})
 
 
 if __name__ == "__main__":

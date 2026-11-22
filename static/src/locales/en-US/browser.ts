@@ -53,6 +53,8 @@ export default {
   go: 'Go',
   retry: 'Retry',
   loadFailed: 'Unable to load page',
+  pageReleased: 'Page released from memory',
+  releaseFailed: 'Browser tools are off, but the pages could not be released',
   dismiss: 'Dismiss',
   reveal: 'Show in Finder',
   cancelDownload: 'Cancel download',

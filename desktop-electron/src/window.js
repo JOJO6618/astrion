@@ -166,7 +166,10 @@ ipcMain.handle('shell:identity', (event) => (fromContentView(event) ? views.iden
 // 快照由 chrome（500ms 轮询）或任一受管内容视图（命令响应）转交；ViewManager 只接受更高 revision。
 ipcMain.on('shell:tabs-forward', (event, state) => {
   if (!fromContentView(event) && !fromChrome(event)) return;
-  try { views.handleSnapshot(state, event.sender); } catch (err) { console.error('[astrion-desktop] 快照处理失败:', err); }
+  try {
+    const previous = views.snapshot;
+    if (views.handleSnapshot(state, event.sender)) nativeBrowser?.navigationChanged(previous, state);
+  } catch (err) { console.error('[astrion-desktop] 快照处理失败:', err); }
 });
 ipcMain.on('shell:sidebar-width', (event, width) => {
   if (!fromChrome(event) || !Number.isFinite(width)) return;

@@ -44,6 +44,13 @@ def call(payload: Dict[str, Any], timeout: float = 120.0) -> Dict[str, Any]:
     return _post("/browser/call", payload, timeout)
 
 
+def release_owner(username: str, workspace_id: str, conversation_id: str) -> None:
+    identity = {"username": username, "workspace_id": workspace_id, "conversation_id": conversation_id}
+    result = _post("/browser/release", {"identity": identity}, 2.0)
+    if not result.get("success"):
+        raise BridgeError(str(result.get("error") or "内置浏览器未能释放网页。"))
+
+
 def cancel(call_id: str) -> None:
     try:
         _post("/browser/cancel", {"call_id": call_id}, 5.0)

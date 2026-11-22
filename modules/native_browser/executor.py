@@ -14,7 +14,7 @@ from urllib.request import url2pathname
 from modules.native_browser import client
 from modules.native_browser.availability import native_browser_supported
 from modules.native_browser.site_permissions import allowed_sites
-from modules.native_browser.state import browser_tools_enabled, snapshot_epoch
+from modules.native_browser.state import browser_calls_allowed, snapshot_epoch
 from modules.native_browser.tools import ALWAYS_APPROVE_OPS, is_action, op_of
 from utils.logger import setup_logger
 
@@ -58,7 +58,7 @@ def preflight(terminal: Any, arguments: Dict[str, Any]) -> Dict[str, Any]:
 
 def evaluate_permission(terminal: Any, tool_name: str, arguments: Dict[str, Any], mode: str) -> Dict[str, Any]:
     """返回与 evaluate_tool_permission 同结构的结果。读取类不审批；动作类按站点审批。"""
-    if not native_browser_supported() or not browser_tools_enabled(terminal):
+    if not native_browser_supported() or not browser_calls_allowed(terminal):
         # 执行时会返回明确错误，不在这里弹审批。
         return {"allowed": True, "mode": mode}
     pre: Dict[str, Any] = {}
@@ -142,7 +142,7 @@ def _save_screenshot(terminal: Any, data: str) -> str:
 async def execute(terminal: Any, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
     if not native_browser_supported():
         return {"success": False, "code": "browser_unsupported", "error": UNSUPPORTED_MESSAGE}
-    if not browser_tools_enabled(terminal):
+    if not browser_calls_allowed(terminal):
         return {"success": False, "code": "browser_disabled", "error": DISABLED_MESSAGE}
     from modules.execution_scope import current_execution_scope
     scope = current_execution_scope()
@@ -198,6 +198,8 @@ async def execute(terminal: Any, tool_name: str, arguments: Dict[str, Any]) -> D
         payload["readable_paths"] = readable
     if op in ALWAYS_APPROVE_OPS and mode not in {"unrestricted"} and not approved:
         return {"success": False, "code": "approval_required", "error": f"{tool_name} 每次都需要审批。"}
+    if not browser_calls_allowed(terminal):
+        return {"success": False, "code": "browser_disabled", "error": DISABLED_MESSAGE}
     try:
         result = await asyncio.to_thread(client.call, payload, 150.0)
     except asyncio.CancelledError:

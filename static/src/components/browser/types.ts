@@ -21,6 +21,7 @@ export interface BrowserTab {
   favicon?: string;
   loading: boolean;
   pending?: boolean;
+  suspended?: boolean;
   error: string;
   canGoBack: boolean;
   canGoForward: boolean;

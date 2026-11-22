@@ -75,7 +75,9 @@ export class BrowserAI {
     if (!driver) {
       driver = new TabDriver(tab);
       this.drivers.set(tab.id, driver);
-      tab.view.webContents.once('destroyed', () => { this.drivers.delete(tab.id); });
+      tab.view.webContents.once('destroyed', () => {
+        if (this.drivers.get(tab.id) === driver) this.drivers.delete(tab.id);
+      });
     }
     const bounds = tab.view.getBounds();
     const panel = this.panelBounds(tab.owner);
@@ -93,8 +95,14 @@ export class BrowserAI {
     this.drivers.clear();
   }
   cancel(callId) { this.calls.get(callId)?.abort(); return this.calls.has(callId); }
-  deleteOwner(owner) {
+  isActive(owner) {
+    return [...this.calls.values()].some(controller => controller.owner === owner && !controller.signal.aborted);
+  }
+  cancelOwner(owner) {
     for (const controller of this.calls.values()) if (controller.owner === owner) controller.abort();
+  }
+  deleteOwner(owner) {
+    this.cancelOwner(owner);
     this.state.delete(owner);
   }
   tabInfo(owner, tab) {
@@ -155,29 +163,33 @@ export class BrowserAI {
     if (tab.section) throw new BrowserToolError('internal_page', '该标签是浏览器管理页，不能由 AI 操作。');
     if (tab.suspended) TabDriver.checkFileURL(tab.url, payload.file_urls);
     tab = manager.retention?.resume(tab) || tab;
-    const restored = !!tab.restored;
-    if (restored && tab.view.webContents.isLoading()) await this.waitLoad(tab, signal, () => {});
-    tab.lastActive = tab.lastAi = Date.now();
+    const restored = !!tab.restored, wc = tab.view.webContents;
+    manager.retention?.visit(owner);
+    if (restored && wc.isLoading()) await this.waitLoad(tab, signal, () => {});
+    signal.throwIfAborted();
     const driver = this.driver(tab);
     return driver.run(async () => {
+      signal.throwIfAborted();
       await driver.attach();
+      signal.throwIfAborted();
       this.ownerState(owner).current = tab.id;
       // 跟随开启时，任何一次操作都把用户视图带到这次操作的标签；关闭时这里不写 selected。
       // 先跟随再修正视口：标签已可见时 fixViewport 直接用真实尺寸，不再反复设置/清除模拟视口。
       manager.follow(owner, tab);
-      const panel = this.panelBounds(owner), zoom = tab.view.webContents.getZoomFactor() || 1;
+      const panel = this.panelBounds(owner), zoom = wc.getZoomFactor() || 1;
       await driver.fixViewport(panel ? { width: panel.width / zoom, height: panel.height / zoom } : null);
+      signal.throwIfAborted();
       this.reveal(owner, tab, payload);
       if (ACTION_OPS.has(op)) this.guardSite(tab, payload);
       const previousDownload = tab.aiDownload;
       const download = payload.download_dir && DOWNLOAD_OPS.has(op) ? { dir: payload.download_dir, until: Infinity, items: [] } : null;
       if (download) tab.aiDownload = download;
-      tab.aiBusy = true;
       let result;
       try {
         result = await this.operate(op, args, { owner, profile, tab, driver, payload, signal, download });
+        signal.throwIfAborted();
       } catch (error) {
-        const pageClosed = tab.retiredDownload || tab.view.webContents.isDestroyed();
+        const pageClosed = tab.retiredDownload || wc.isDestroyed();
         if (signal.aborted || error.code === 'path_not_allowed' || !pageClosed || !download?.items.length) throw error;
         result = { notes: [DOWNLOAD_WITHOUT_SNAPSHOT] };
       } finally {
@@ -186,7 +198,6 @@ export class BrowserAI {
           download.until = trackDelayedDownloads ? Date.now() + DOWNLOAD_GRACE_MS : 0;
           if (!download.until && tab.aiDownload === download) tab.aiDownload = previousDownload;
         }
-        tab.aiBusy = false; tab.lastActive = tab.lastAi = Date.now();
       }
       if (restored) { result.notes = [...(result.notes || []), '该标签已在内存回收后重新加载，原页面运行状态已丢失。']; tab.restored = false; }
       if (download?.items.length) {
@@ -194,7 +205,7 @@ export class BrowserAI {
         result.downloads = features ? download.items.map(row => features.downloadInfo(row, true)) : download.items.slice();
       }
       if (driver.fileChooser && op !== 'file_upload') result.notes = [...(result.notes || []), '页面打开了文件选择框，请调用 browser_file_upload 提供文件（paths 为空数组表示取消）。'];
-      if (!result.tab && !tab.retiredDownload && !tab.view.webContents.isDestroyed()) result.tab = this.tabInfo(owner, tab);
+      if (!result.tab && !tab.retiredDownload && !wc.isDestroyed()) result.tab = this.tabInfo(owner, tab);
       return { success: true, ...result };
     }, payload.file_urls);
   }
@@ -229,13 +240,16 @@ export class BrowserAI {
     if (action === 'select') {
       if (tab.suspended) TabDriver.checkFileURL(tab.url, payload.file_urls);
       tab = manager.retention?.resume(tab) || tab;
+      manager.retention?.visit(owner);
       if (tab.restored && tab.view.webContents.isLoading()) await this.waitLoad(tab, signal, () => {});
-      tab.lastActive = tab.lastAi = Date.now();
+      signal.throwIfAborted();
       state.current = tab.id;
       manager.follow(owner, tab);
       const driver = this.driver(tab);
       return driver.run(async () => {
+        signal.throwIfAborted();
         await driver.attach();
+        signal.throwIfAborted();
         const snapshot = await this.snapshotFor(tab, driver, payload, { explicit: false });
         return { success: true, tab: this.tabInfo(owner, tab), snapshot, message: '已切换当前标签。' };
       }, payload.file_urls);

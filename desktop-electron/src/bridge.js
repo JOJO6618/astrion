@@ -270,7 +270,7 @@ export function startBridge(ctx) {
       });
       return;
     }
-    if (req.method === 'POST' && (pathname === '/browser/call' || pathname === '/browser/cancel')) {
+    if (req.method === 'POST' && ['/browser/call', '/browser/cancel', '/browser/release'].includes(pathname)) {
       let body = '';
       let tooLarge = false;
       req.on('data', (chunk) => {

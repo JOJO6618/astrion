@@ -15,7 +15,7 @@ export class BrowserTabs {
     let tab = !options.duplicate && [...manager.tabs.values()].find(row => row.owner === owner && row.section === section);
     if (!tab) {
       if ([...manager.tabs.values()].filter(tab => tab.owner === owner).length >= 48) throw new Error('browser_tab_limit');
-      tab = { id: randomUUID(), owner, profile, section, url, title: '', lastActive: Date.now(), previousId: manager.selected.get(owner) };
+      tab = { id: randomUUID(), owner, profile, section, url, title: '', previousId: manager.selected.get(owner) };
       manager.tabs.set(tab.id, tab);
     }
     manager.selected.set(owner, tab.id);
@@ -32,6 +32,7 @@ export class BrowserTabs {
     const siblings = [...manager.tabs.values()].filter(row => row.owner === tab.owner);
     const index = siblings.indexOf(tab);
     manager.tabs.delete(tab.id); manager.credentials?.remove(tab);
+    if (tab.view) manager.retention.residencyChanged();
     if (manager.selected.get(tab.owner) === tab.id) {
       const previous = manager.tabs.get(tab.previousId);
       const next = previous?.owner === tab.owner ? previous : siblings[index - 1] || siblings[index + 1];
@@ -61,7 +62,7 @@ export class BrowserTabs {
     view.setVisible(false);
     view.setBackgroundColor(manager.surfaceColor);
     const tab = { id: options.id || randomUUID(), owner, profile, view, title: '', favicon: '', url: url || options.targetURL || 'about:blank', error: '', find: null,
-      lastActive: Date.now(), lastAi: 0, suspended: false, textDocument: false,
+      suspended: false, textDocument: false,
       pendingURL: options.targetURL || '', committedDocument: false, retiredDownload: false,
       closeOnDownload: !!options.nativeOptions || (!!url && url !== 'about:blank'),
       openingDownload: options.openingDownload,
@@ -69,6 +70,8 @@ export class BrowserTabs {
     const wc = view.webContents;
     manager.tabs.set(tab.id, tab); manager.attach(tab);
     view.setBounds(manager.boundsFor(owner) || { x: 0, y: 0, width: 1280, height: 800 });
+    if (!options.nativeOptions) manager.retention.visit(owner);
+    manager.retention.residencyChanged();
     if (options.select !== false) manager.selected.set(owner, tab.id);
     const update = () => {
       if (wc.isDestroyed() || manager.disposed || tab.retiredDownload) return;
@@ -121,6 +124,7 @@ export class BrowserTabs {
     wc.on('will-attach-webview', event => event.preventDefault());
     wc.on('input-event', (_event, input) => {
       if (!tab.aiSendingInput && ['mouseDown', 'rawKeyDown', 'keyDown', 'touchStart'].includes(input.type)) {
+        manager.retention.visit(tab.owner);
         this.clearDownloadAttribution(tab);
       }
     });
@@ -177,6 +181,7 @@ export class BrowserTabs {
     }
     tab.retiredDownload = true;
     manager.tabs.delete(tab.id);
+    manager.retention.residencyChanged();
     tab.view.setVisible(false);
     manager.detach(tab);
     manager.downloadViews.add(tab.view);
@@ -212,7 +217,7 @@ export class BrowserTabs {
     const manager = this.manager, owner = host.owner, profile = host.profile;
     if ([...manager.tabs.values()].some(tab => tab.owner === owner)) return;
     const saved = profile.data.owners[owner];
-    const urls = Array.isArray(saved?.urls) ? saved.urls.slice(0, Math.min(12, 48 - manager.tabs.size)) : [];
+    const urls = Array.isArray(saved?.urls) ? saved.urls.slice(0, 12) : [];
     if (!urls.length) { this.create('about:blank', { owner, profile }); return; }
     const created = [];
     for (const url of urls) { try { created.push(this.create(internalSection(url) ? url : manualNavigationURL(url), { owner, profile })); } catch { /* Invalid saved URLs never become navigable. */ } }

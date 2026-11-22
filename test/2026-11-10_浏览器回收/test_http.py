@@ -1,4 +1,4 @@
-"""Test the real response builder with synthetic navigation/storage dependencies."""
+"""Test the retention response with synthetic navigation, tasks and storage."""
 import importlib.util
 import json
 import sys
@@ -11,8 +11,6 @@ from flask import Flask
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
-from modules.native_browser.retention import BrowserRetention
-
 spec = importlib.util.spec_from_file_location("retention_http_fixture", ROOT / "server/browser_retention.py")
 handler = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(handler)
@@ -30,50 +28,61 @@ class ResponseTest(unittest.TestCase):
         self.path = Mock()
         self.manager = Mock()
         self.manager._get_conversation_file_path.return_value = self.path
-        self.running = Mock(return_value=True)
+        self.tasks = Mock()
+        self.tasks.list_tasks.return_value = []
         self.navigation = Mock()
-        self.navigation.snapshot.return_value = {"tabs": [], "active_key": "", "navigation": {}}
+        self.navigation.snapshot.return_value = {"tabs": []}
         self.modules = {
             "server.auth_helpers": module(get_current_username=lambda: "synthetic"),
             "server.conversation_tabs": module(navigation=self.navigation,
-                _active_run_conversation_ids=lambda *_: set(), _conversation_is_running=self.running),
+                _normalized_conversation_ids=lambda value: [value]),
             "server.context.workspace": module(request_identity=lambda: "trusted"),
             "server.context.data": module(get_workspace_data=lambda *_args, **_kw: module(manager=lambda: self.manager)),
+            "server.tasks": module(task_manager=self.tasks),
         }
 
-    def request(self, *, raw=None):
-        state = {"owners": [self.scope], "tabs": [{"id": "page", "owner": self.key,
-            "selected": True, "lastActive": 0, "lastAi": 0}]}
-        with patch.dict(sys.modules, self.modules), patch.object(handler, "browser_retention", BrowserRetention()):
-            with self.app.test_request_context(headers={"X-Astrion-Browser-State": raw or json.dumps(state)}):
-                result = handler.retention_response()
-                if isinstance(result, tuple): return result[0].get_json(), result[1]
-                return result.get_json(), 200
+    def set_task(self, status, workspace="ws"):
+        self.tasks.list_tasks.return_value = [module(status=status, workspace_id=workspace,
+            conversation_id="conv_fixture", principal=module(conversation_kind="agent"),
+            has_running_sub_agents=True, has_running_background_commands=True)]
 
-    def test_closed_desktop_tab_still_protected_by_running_task(self):
-        result, status = self.request()
-        self.assertEqual(status, 200)
-        self.assertEqual(result["retained"], [self.key])
-        self.assertEqual(result["release"], [])
+    def request(self, *, raw=None):
+        state = {"owners": [{"scope": self.scope, "visit": 1, "closed": True}]}
+        with patch.dict(sys.modules, self.modules):
+            with self.app.test_request_context(headers={"X-Astrion-Browser-State": raw or json.dumps(state)}):
+                return self.app.make_response(handler.retention_response())
+
+    def test_closed_tab_uses_main_task_status_and_ignores_background_work(self):
+        self.set_task("running")
+        self.assertEqual(self.request().get_json()["release"], [])
         self.navigation.snapshot.assert_called_once_with("synthetic")
         self.manager.read_conversation.assert_not_called()
         self.path.stat.assert_called_once()
+        self.set_task("completed")
+        self.assertEqual(self.request().get_json()["release"], [self.key])
+
+    def test_different_workspace_task_does_not_protect_this_scope(self):
+        self.set_task("pending", workspace="other")
+        self.assertEqual(self.request().get_json()["release"], [self.key])
+
+    def test_newly_reopened_scope_does_not_accept_old_close(self):
+        self.navigation.snapshot.return_value = {"tabs": [{"kind": "conv", "workspace_id": "ws",
+            "conversation_id": "conv_fixture", "key": "new-key"}]}
+        self.assertEqual(self.request().get_json()["release"], [])
 
     def test_confirmed_missing_file_deletes_restoration(self):
         self.path.stat.side_effect = FileNotFoundError()
-        result, _ = self.request()
-        self.assertEqual(result["deleted"], [self.key])
-        self.assertEqual(result["release"], ["page"])
+        self.assertEqual(self.request().get_json()["deleted"], [self.key])
 
-    def test_permission_failure_does_not_mean_deletion(self):
+    def test_permission_failure_does_not_mean_deletion_or_eviction(self):
         self.path.stat.side_effect = PermissionError()
-        result, _ = self.request()
+        result = self.request().get_json()
         self.assertEqual(result["deleted"], [])
         self.assertEqual(result["release"], [])
 
     def test_invalid_state_is_rejected(self):
-        _, status = self.request(raw='{"owners":["invalid"],"tabs":[]}')
-        self.assertEqual(status, 400)
+        self.assertEqual(self.request(raw='{"owners":["invalid"]}').status_code, 400)
 
 
-if __name__ == "__main__": unittest.main()
+if __name__ == "__main__":
+    unittest.main()

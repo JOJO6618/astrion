@@ -39,7 +39,7 @@
 
 错误码：409 `navigation_superseded`（标签已关、detached 不可 activate/reorder、renderer 不匹配、attach 缺失标签、已删除对话）；400（非法页面、detach 非对话标签、git 无工作区）；400 `no_workspace`（零工作区）。GET 仅存储损坏时 503。
 
-CrossPet 聚焦：create/open/workspace/activate/page/focus/detach/dock/close 之后按「最近聚焦标签（仍存在）否则 active」上报。浏览器回收前台集合 = 主窗口 active 对话 + 所有 detached 对话（`server/browser_retention.py foreground_scopes`）。
+CrossPet 聚焦：create/open/workspace/activate/page/focus/detach/dock/close 之后按「最近聚焦标签（仍存在）否则 active」上报。Electron 比较相邻已提交快照，检测对话标签关闭和重开，并交由浏览器回收模块处理。
 
 ## 壳层与视图角色（`desktop-electron/src/views/`）
 
@@ -62,7 +62,7 @@ CrossPet 聚焦：create/open/workspace/activate/page/focus/detach/dock/close �
 
 ## 关闭、删除与恢复
 
-关闭命令在点击时即提交，230ms 动画只投影展示；关闭不停止任务。真实删除成功后服务端移除匹配标签（含 detached，壳层随快照关闭独立窗口）；标签同步失败不能把已成功的删除报告为失败。对话工作区迁移仅服务端 `relocated`，保留 key、顺序、placement。GET 启动时及最多每 5 秒轻量核验：确认对话文件不存在才移除；工作区不可访问保留 `workspace_unavailable`；页面标签跳过核验（Git 核验工作区）。
+关闭命令在点击时即提交，230ms 动画只投影展示；关闭不停止任务。关闭后销毁对话内容视图，并触发内置网页回收。主智能体仍在运行时，网页回收等到主任务结束，见 `docs/native_browser.md`。真实删除成功后服务端移除匹配标签（含 detached，壳层随快照关闭独立窗口）；标签同步失败不能把已成功的删除报告为失败。对话工作区迁移仅服务端 `relocated`，保留 key、顺序、placement。GET 启动时及最多每 5 秒轻量核验：确认对话文件不存在才移除；工作区不可访问保留 `workspace_unavailable`；页面标签跳过核验（Git 核验工作区）。
 
 ## 零工作区（2026-11-13，仍适用）
 

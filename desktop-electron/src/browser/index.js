@@ -246,6 +246,15 @@ export class NativeBrowser {
   byContents(wc) { return [...this.tabs.values()].find(tab => tab.view?.webContents === wc); }
   profileFeatures(profile) { return this.features.get(profile.key); }
   layout() { this.registry.layout(); }
+  navigationChanged(previous, state) {
+    this.retention.navigationChanged(previous, state);
+    if (previous?.active_key === state.active_key) return;
+    const host = this.viewHosts.get(this.views.getActiveView());
+    if (host?.presented && host.visible && !host.detached) {
+      this.retention.visit(host.owner);
+      this.retention.resume(host.active());
+    }
+  }
   /** 跟随智能体：AI 每操作一个标签就把用户视图交给它。跟随关闭时整条链路都不写 selected。 */
   follow(owner, tab) {
     if (this.disposed || tab?.owner !== owner) return;
@@ -263,7 +272,7 @@ export class NativeBrowser {
       tabs: detached ? [] : [...this.tabs.values()].filter(tab => tab.owner === host.owner).map(tab => {
         if (tab.section) return internalSnapshot(tab);
         const wc = tab.view?.webContents;
-        return { id: tab.id, url: tab.url, title: tab.title, favicon: tab.favicon || '', loading: (wc?.isLoading() || false) || !!tab.pendingURL, pending: !!tab.pendingURL, error: tab.error,
+        return { id: tab.id, url: tab.url, title: tab.title, favicon: tab.favicon || '', loading: (wc?.isLoading() || false) || !!tab.pendingURL, pending: !!tab.pendingURL, error: tab.error, suspended: tab.suspended,
           canGoBack: wc?.navigationHistory.canGoBack() || false, canGoForward: wc?.navigationHistory.canGoForward() || false, zoom: Math.round((wc?.getZoomFactor() || tab.zoom || 1) * 100), find: tab.find };
       }),
       history: profile?.data.history || [],
@@ -301,7 +310,6 @@ export class NativeBrowser {
       this.credentials.invalidate(host);
       const alias = scopeAlias(scope);
       if (alias) this.adoptOwner(profile, `${profile.key}:${alias}`, `${profile.key}:${scopeId}`);
-      this.retention.visit(host.owner);
       host.profile = profile; host.owner = `${profile.key}:${scopeId}`;
     }
     host.lease = randomUUID(); host.layoutSequence = 0;
@@ -309,7 +317,7 @@ export class NativeBrowser {
     host.menuLabels = contextMenuLabels(labels);
     this.features.forEach(feature => feature.denyStale());
     if (!host.detached) { this.registry.restore(host); this.retention.resume(host.active()); }
-    this.layout(); void this.retention.poll(); return this.snapshot(host);
+    this.layout(); this.retention.requestPoll(); return this.snapshot(host);
   }
   tab(host, id) {
     const tab = this.tabs.get(id || this.selected.get(host.owner));
@@ -321,9 +329,8 @@ export class NativeBrowser {
     if (WINDOW_ACTIONS.has(action)) { this.windowCommand(host, action); return this.snapshot(host); }
     if (host.detached && !PROFILE_ACTIONS.has(action)) throw new Error('browser_detached');
     const owner = host.owner, profile = host.profile;
-    const previous = host.active();
-    if (previous) previous.lastActive = Date.now();
-    if (!['close', 'reorder', 'duplicate'].includes(action)) {
+    if (!PROFILE_ACTIONS.has(action)) this.retention.visit(owner);
+    if (!['close', 'reorder', 'duplicate', 'new', 'internal'].includes(action) && !PROFILE_ACTIONS.has(action)) {
       const target = this.tabs.get(id || this.selected.get(owner));
       if (target?.owner === owner) this.retention.resume(target);
     }

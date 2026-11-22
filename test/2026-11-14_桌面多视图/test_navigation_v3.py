@@ -416,19 +416,18 @@ class ReconcileTests(Base):
         self.assertEqual((self.keys(state), state["active_key"]), (["tab_A"], "tab_A"))
 
 
-class RetentionForegroundTests(Base):
-    def test_foreground_is_active_plus_detached_conversations(self):
-        from server.browser_retention import foreground_scopes
+class RetentionNavigationTests(Base):
+    def test_scope_remains_open_when_hidden_or_detached_until_closed(self):
+        from server.browser_retention import navigation_scopes
         self.open("a", "tab_A")
         self.open("b", "tab_B")
-        self.open("c", "tab_C")
         self.command("detach", {"key": "tab_A"})
         self.command("page", {"page": "/settings"})
-        scopes = foreground_scopes(self.state())
-        self.assertEqual(scopes, [["agent", "ws1", "conv_a"]])  # active 是页面：不算对话
-        self.command("activate", {"key": "tab_B"})
-        scopes = foreground_scopes(self.state())
-        self.assertCountEqual(scopes, [["agent", "ws1", "conv_a"], ["agent", "ws1", "conv_b"]])
+        self.assertEqual(navigation_scopes(self.state()), {
+            ("agent", "ws1", "conv_a"), ("agent", "ws1", "conv_b"),
+        })
+        self.command("close", {"key": "tab_B"})
+        self.assertEqual(navigation_scopes(self.state()), {("agent", "ws1", "conv_a")})
 
 
 if __name__ == "__main__":

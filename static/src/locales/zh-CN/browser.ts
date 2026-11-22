@@ -53,6 +53,8 @@ export default {
   go: '前往',
   retry: '重试',
   loadFailed: '网页加载失败',
+  pageReleased: '网页已释放',
+  releaseFailed: '浏览器工具已关闭，但未能释放网页',
   dismiss: '关闭提示',
   reveal: '在访达中显示',
   cancelDownload: '取消下载',

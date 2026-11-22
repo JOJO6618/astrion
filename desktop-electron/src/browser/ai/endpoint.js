@@ -1,6 +1,7 @@
 // 控制桥上的 AI 浏览器端点：校验桌面壳下发给后端的随机 token，再交给当前窗口的 BrowserAI。
 import { timingSafeEqual } from 'node:crypto';
 import { BrowserToolError } from './driver.js';
+import { aiOwner } from './controller.js';
 
 let activeBrowser = null;
 let expectedToken = '';
@@ -24,6 +25,10 @@ export async function handleBrowserRequest(pathname, headers, payload) {
   if (!browser || browser.disposed) return [200, { success: false, code: 'browser_unavailable', error: '内置浏览器不可用：Astrion 主窗口未打开或不是 macOS 桌面版。' }];
   if (pathname === '/browser/cancel') return [200, { success: true, cancelled: browser.ai.cancel(String(payload?.call_id || '')) }];
   try {
+    if (pathname === '/browser/release') {
+      browser.retention.releaseOwner(aiOwner(payload?.identity).owner);
+      return [200, { success: true }];
+    }
     return [200, await browser.ai.call(payload || {})];
   } catch (error) {
     if (error instanceof BrowserToolError) return [200, { success: false, code: error.code, error: error.message, ...(error.extra || {}) }];

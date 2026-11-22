@@ -1,67 +1,128 @@
 // Native residency: metadata survives suspension, Chromium views do not.
-import { profileKey } from './policy.js';
+import { ownerScopeId, popoutScopeId, profileKey } from './policy.js';
 
 export class BrowserRetention {
   constructor(manager) {
     this.manager = manager;
-    this.timer = setInterval(() => { void this.poll(); }, 2000);
+    this.timer = setInterval(() => this.requestPoll(), 2000);
     this.timer.unref?.();
     this.pending = false;
+    this.queued = false;
     this.visits = new Map();
+    this.closed = new Set();
+    this.clock = 0;
+    this.generation = 0;
   }
-  visit(owner) { if (owner) this.visits.set(this.scope(owner), Date.now()); }
+  visit(owner) { if (owner) this.visits.set(owner, ++this.clock); }
   dispose() { clearInterval(this.timer); }
-  scope(owner) { return owner.slice(owner.indexOf(':') + 1); }
+  navigationChanged(previous, state) {
+    const keys = new Set(state.tabs.map(tab => tab.key));
+    let changed = false;
+    for (const tab of previous?.tabs || []) {
+      const scope = popoutScopeId(tab);
+      if (!scope || keys.has(tab.key)) continue;
+      this.closed.add(scope);
+      changed = true;
+    }
+    for (const tab of state.tabs) {
+      if (this.closed.delete(popoutScopeId(tab))) changed = true;
+    }
+    if (changed) this.residencyChanged();
+  }
+  residencyChanged() {
+    this.generation++;
+    this.requestPoll();
+  }
+  requestPoll() {
+    if (this.queued) return;
+    this.queued = true;
+    if (!this.pending) queueMicrotask(() => { if (this.queued) void this.poll(); });
+  }
   async poll() {
-    const manager = this.manager;
-    if (this.pending || manager.disposed || !manager.profiles.size || !manager.anySession()) return;
-    this.pending = true;
+    if (this.pending) return;
+    this.queued = false;
+    const manager = this.manager, session = manager.anySession();
+    if (manager.disposed || !manager.profiles.size || !session) return;
+    const requested = new Map();
+    for (const profile of manager.profiles.values()) {
+      for (const owner of Object.keys(profile.data.owners)) requested.set(owner, null);
+    }
+    for (const tab of manager.tabs.values()) {
+      if (tab.view && !tab.view.webContents.isDestroyed()) requested.set(tab.owner, this.visits.get(tab.owner) || 0);
+    }
+    if (!requested.size) return;
+    const owners = [...requested].map(([owner, visit]) => {
+      const key = ownerScopeId(owner);
+      return { scope: JSON.parse(key), visit, closed: this.closed.has(key) };
+    });
+    const generation = this.generation;
     const sequence = manager.connectSequence;
+    this.pending = true;
     try {
-      const owners = new Set();
-      for (const profile of manager.profiles.values()) for (const owner of Object.keys(profile.data.owners)) owners.add(this.scope(owner));
-      const tabs = [...manager.tabs.values()].map(tab => {
-        owners.add(this.scope(tab.owner));
-        return { id: tab.id, owner: this.scope(tab.owner), selected: manager.selected.get(tab.owner) === tab.id,
-          lastActive: tab.lastActive || Date.now(), lastAi: tab.lastAi || 0, busy: !!tab.aiBusy };
-      });
-      // 已弹出到独立窗口的对话正在被查看，与主窗口当前对话同样算前台。
-      const presented = [...manager.popouts.keys()].map(owner => this.scope(owner)).filter(scope => owners.has(scope));
-      const response = await manager.anySession().fetch(`${manager.origin}/api/browser-retention`, {
-        headers: { 'X-Astrion-Browser-State': JSON.stringify({ owners: [...owners].map(key => JSON.parse(key)), tabs, visits: Object.fromEntries(this.visits), presented: presented.map(key => JSON.parse(key)) }) },
+      const state = JSON.stringify({ owners }).replace(/[^\x20-\x7e]/g, char => `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`);
+      const response = await session.fetch(`${manager.origin}/api/browser-retention`, {
+        headers: { 'X-Astrion-Browser-State': state },
         credentials: 'include', cache: 'no-store', signal: AbortSignal.timeout(5000)
       });
       if (!response.ok) return;
       const result = await response.json();
-      if (manager.disposed || sequence !== manager.connectSequence || !result.success) return;
-      const key = profileKey(result.username);
-      this.apply(result, key, tabs);
+      if (manager.disposed || generation !== this.generation || sequence !== manager.connectSequence || !result.success) return;
+      this.apply(result, profileKey(result.username), requested);
     } catch { /* A failed status query never turns running work into idle work. */ }
-    finally { this.pending = false; }
+    finally {
+      this.pending = false;
+      if (this.queued && !manager.disposed) queueMicrotask(() => { if (this.queued) void this.poll(); });
+    }
   }
-  apply(result, profile, requested = []) {
+  apply(result, profile, requested) {
     const manager = this.manager;
-    const deleted = new Set(result.deleted.map(scope => `${profile}:${scope}`));
-    for (const owner of deleted) {
-      // 对话已删除：先关掉它的独立窗口（视图挪回主窗口），再移除标签。
-      const popout = manager.popouts.get(owner);
-      if (popout && !popout.window.isDestroyed()) popout.window.close();
+    let changed = false;
+    for (const scope of result.deleted) {
+      const owner = `${profile}:${scope}`;
+      if (!requested.has(owner)) continue;
       manager.ai.deleteOwner(owner);
-      for (const tab of [...manager.tabs.values()]) if (tab.owner === owner) this.remove(tab);
-      for (const value of manager.profiles.values()) if (value.key === profile) { delete value.data.owners[owner]; value.save(); }
+      for (const tab of manager.tabs.values()) if (tab.owner === owner) this.remove(tab);
+      this.closePopout(owner);
+      for (const value of manager.profiles.values()) {
+        if (value.key === profile && Object.hasOwn(value.data.owners, owner)) {
+          delete value.data.owners[owner];
+          value.save();
+        }
+      }
       manager.selected.delete(owner);
+      this.visits.delete(owner);
+      this.closed.delete(scope);
+      changed = true;
     }
-    const before = new Map(requested.map(tab => [tab.id, tab]));
-    for (const id of result.release) {
-      const tab = manager.tabs.get(id), previous = before.get(id);
-      if (!tab || tab.profile.key !== profile || tab.section || tab.aiBusy) continue;
-      if (previous && ((tab.lastActive || 0) > previous.lastActive || (tab.lastAi || 0) > previous.lastAi)) continue;
-      this.suspend(tab);
+    for (const scope of result.release) {
+      const owner = `${profile}:${scope}`;
+      if (requested.get(owner) !== (this.visits.get(owner) || 0)) continue;
+      // A new browser call can start after the backend took its main-task snapshot.
+      if (manager.ai.isActive(owner)) continue;
+      if (this.suspendOwner(owner)) changed = true;
+      if (this.closed.has(scope)) this.closePopout(owner);
     }
-    manager.layout(); manager.publish();
+    if (changed) { manager.layout(); manager.publish(); }
+  }
+  closePopout(owner) {
+    const popout = this.manager.popouts.get(owner);
+    if (popout && !popout.window.isDestroyed()) popout.window.close();
+  }
+  releaseOwner(owner) {
+    this.manager.ai.cancelOwner(owner);
+    if (!this.suspendOwner(owner)) return;
+    this.residencyChanged();
+    this.manager.layout(); this.manager.publish();
+  }
+  suspendOwner(owner) {
+    let changed = false;
+    for (const tab of this.manager.tabs.values()) {
+      if (tab.owner === owner && this.suspend(tab)) changed = true;
+    }
+    return changed;
   }
   suspend(tab) {
-    if (!tab.view || tab.view.webContents.isDestroyed()) return;
+    if (!tab.view || tab.view.webContents.isDestroyed()) return false;
     const manager = this.manager, view = tab.view;
     tab.zoom = view.webContents.getZoomFactor();
     tab.view = null; tab.suspended = true; tab.pendingURL = ''; tab.find = null; tab.ai = undefined;
@@ -69,24 +130,23 @@ export class BrowserRetention {
     manager.detach(tab, view);
     view.webContents.close({ waitForBeforeUnload: false });
     manager.profileFeatures(tab.profile).denyStale();
+    return true;
   }
   resume(tab) {
     if (!tab?.suspended) return tab;
-    const manager = this.manager, selected = manager.selected.get(tab.owner);
-    const fresh = manager.registry.create(tab.url, { id: tab.id, owner: tab.owner, profile: tab.profile, select: false });
-    Object.assign(fresh, { title: tab.title, favicon: tab.favicon, lastActive: Date.now(), lastAi: tab.lastAi,
-      restored: true, zoom: tab.zoom || 1 });
+    const fresh = this.manager.registry.create(tab.url, { id: tab.id, owner: tab.owner, profile: tab.profile, select: false });
+    Object.assign(fresh, { title: tab.title, favicon: tab.favicon, restored: true, zoom: tab.zoom || 1 });
     fresh.view.webContents.setZoomFactor(fresh.zoom);
-    if (selected) manager.selected.set(tab.owner, selected);
     return fresh;
   }
   remove(tab) {
-    const manager = this.manager;
+    const manager = this.manager, view = tab.view;
     manager.tabs.delete(tab.id);
     manager.credentials.remove(tab); manager.ai.release(tab);
-    if (tab.view && !tab.view.webContents.isDestroyed()) {
+    if (view && !view.webContents.isDestroyed()) {
       manager.detach(tab);
-      tab.view.webContents.close({ waitForBeforeUnload: false });
+      tab.view = null;
+      view.webContents.close({ waitForBeforeUnload: false });
     }
   }
 }

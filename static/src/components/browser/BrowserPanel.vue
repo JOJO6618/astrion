@@ -57,6 +57,18 @@
           v-else-if="store.navigationPending || store.active?.pending"
           class="nb-navigation-blank"
         ></div>
+        <div
+          v-else-if="store.active?.suspended && store.active.url !== 'about:blank'"
+          class="nb-load-error"
+        >
+          <p>{{ $t('browser.pageReleased') }}</p>
+          <button
+            class="nb-text-button"
+            @click="store.command('select', undefined, store.active?.id)"
+          >
+            {{ $t('browser.reload') }}
+          </button>
+        </div>
         <div v-else-if="store.active?.error" class="nb-load-error">
           <BrowserIcon name="globe" />
           <h2>{{ $t('browser.loadFailed') }}</h2>
