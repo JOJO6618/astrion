@@ -25,6 +25,9 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+// 每次 writeBundle 后顺带清理 dist/assets 中已无 manifest 引用的历史产物
+// （产物带内容哈希且 emptyOutDir=false，不清会无限累积，详见该脚本头部说明）。
+import { pruneStaleAssets } from './prune_dist_assets.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const distDir = path.join(repoRoot, 'static', 'dist');
@@ -182,6 +185,14 @@ function main() {
   }
 
   writeAssemblyMap(assemblies);
+
+  // 产物引用集合此时已确定：删除本轮未被引用的历史哈希文件。
+  // 放在最后，保证任何失败都不会先丢掉仍被引用的产物。
+  try {
+    pruneStaleAssets();
+  } catch (error) {
+    console.error(`[generate_entry_styles] 陈旧产物清理失败（不影响本次构建）：${error.message}`);
+  }
 }
 
 main();
