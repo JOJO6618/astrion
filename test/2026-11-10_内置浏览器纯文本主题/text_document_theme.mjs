@@ -77,7 +77,7 @@ app.whenReady().then(async () => {
 
   // 生成脚本必须是可解析的 JS，且不夹带未替换的模板残留
   const script = textDocumentScript(manager);
-  check('脚本模板完整', script.includes('__astrion_text_document_theme') && !script.includes('undefined'), '');
+  check('脚本模板完整', typeof new Function(script) === 'function' && !script.includes('undefined'), '');
 
   const failed = results.filter(row => !row.ok);
   console.log(`SUMMARY ${results.length - failed.length}/${results.length} passed`);

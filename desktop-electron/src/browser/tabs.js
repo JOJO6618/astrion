@@ -60,7 +60,7 @@ export class BrowserTabs {
     // 先给出真实尺寸再隐藏：隐藏后再 setBounds 不会传到渲染进程，后台标签（AI 操作）的视口会是 0×0。
     view.setBounds(manager.boundsFor(owner) || { x: 0, y: 0, width: 1280, height: 800 });
     view.setVisible(false);
-    view.setBackgroundColor(manager.surfaceColor);
+    // 网页使用 Chromium 的默认画布，透明页面不会透出应用主题底色。
     const tab = { id: options.id || randomUUID(), owner, profile, view, title: '', favicon: '', url: url || options.targetURL || 'about:blank', error: '', find: null,
       suspended: false, textDocument: false,
       pendingURL: options.targetURL || '', committedDocument: false, retiredDownload: false,

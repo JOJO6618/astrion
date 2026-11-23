@@ -15,7 +15,7 @@
 //   - window.open 一律拦截：http(s) 转系统浏览器（预览面板「外部打开」按钮由此
 //     在桌面端真正可用，Tauri 壳下是静默失败的）。
 
-import { app, BaseWindow, ipcMain, screen, shell, WebContentsView } from 'electron';
+import { app, BaseWindow, ipcMain, nativeTheme, screen, shell, WebContentsView } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -153,6 +153,7 @@ ipcMain.on('shell:theme', (event, key) => {
   const changed = key !== currentThemeKey();
   saveThemeKey(key);
   if (changed) {
+    nativeTheme.themeSource = key === 'dark' ? 'dark' : 'light';
     views?.broadcastTheme(key, event.sender);
     broadcastConversationNotificationTheme(key);
   }
@@ -376,6 +377,7 @@ export function createMainWindow(port, route = '/') {
   const origin = `http://127.0.0.1:${port}`;
   const chromeUrl = `${origin}/chrome`;
 
+  nativeTheme.themeSource = currentThemeKey() === 'dark' ? 'dark' : 'light';
   surfaceColor = loadSurfaceColor();
   mainWindow = new BaseWindow({
     backgroundColor: surfaceColor,
