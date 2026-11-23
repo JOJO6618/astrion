@@ -35,11 +35,20 @@ class VerifiedCopy:
     source: Path
     destination: Path
     digest: str
-    source_identity: tuple[int, int, int, int, int]
+    source_identity: tuple[int, ...]
 
 
-def _identity(info: os.stat_result) -> tuple[int, int, int, int, int]:
-    return info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns
+# Windows CRT reports st_ctime as the last-write time for handle-based fstat,
+# while path-based stat/lstat reports the creation time. The same file can then
+# never match across the two APIs, so ctime must stay out of the identity there.
+# Copied content is still compared by digest and the remaining fields
+# (volume, file index, size, mtime) pin the file itself.
+_CTIME_IN_IDENTITY = os.name != "nt"
+
+
+def _identity(info: os.stat_result) -> tuple[int, ...]:
+    fields = info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns
+    return fields if not _CTIME_IN_IDENTITY else fields + (info.st_ctime_ns,)
 
 
 def _fingerprint(path: Path) -> tuple[str, os.stat_result]:
