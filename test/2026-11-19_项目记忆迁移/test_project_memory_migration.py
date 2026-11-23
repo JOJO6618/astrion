@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 from modules.execution_plane.local import LocalExecutionBackend
 from modules.file_manager import FileManager
+from modules import project_memory_migration
 from modules.project_memory import NOTICE_NAME, legacy_files, scan_index, tool_directory
 from modules.project_memory_migration import WorkspaceMemories, clean_workspace, copy_workspace, verify_workspace
 from modules.workspace_memory_context import owner_location
@@ -126,6 +127,36 @@ class MigrationTest(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             owner_location(owner)
         self.assertFalse((self.data / 'memory').exists())
+
+    def test_windows_identity_drops_only_the_unstable_ctime_field(self):
+        # Windows reports st_ctime as last-write time for fstat and as creation
+        # time for path stat, so a ctime difference alone must not look like a
+        # changed file; size, mtime and inode identity must still be enforced.
+        base = dict(st_dev=1, st_ino=2, st_size=3, st_mtime_ns=4, st_ctime_ns=5)
+        other_ctime = SimpleNamespace(**dict(base, st_ctime_ns=9))
+        other_mtime = SimpleNamespace(**dict(base, st_mtime_ns=9))
+        other_size = SimpleNamespace(**dict(base, st_size=9))
+        # Windows: ctime is excluded from the identity tuple.
+        with patch.object(project_memory_migration, '_CTIME_IN_IDENTITY', False):
+            identity = project_memory_migration._identity
+            self.assertEqual(identity(SimpleNamespace(**base)), identity(other_ctime))
+            self.assertNotEqual(identity(SimpleNamespace(**base)), identity(other_mtime))
+            self.assertNotEqual(identity(SimpleNamespace(**base)), identity(other_size))
+        # POSIX: the same difference must still be treated as a changed file.
+        with patch.object(project_memory_migration, '_CTIME_IN_IDENTITY', True):
+            identity = project_memory_migration._identity
+            self.assertNotEqual(identity(SimpleNamespace(**base)), identity(other_ctime))
+
+    def test_cleanup_still_aborts_when_source_is_replaced_with_same_content(self):
+        workspace = self.workspace()
+        copies = self.copy(workspace)
+        replacement = self.legacy / 'replacement.md'
+        replacement.write_bytes(self.source.read_bytes())
+        os.replace(replacement, self.source)
+        os.utime(self.source, ns=(copies[0].source_identity[3], copies[0].source_identity[3]))
+        with self.assertRaisesRegex(OSError, '发生变化'):
+            clean_workspace(workspace, copies)
+        self.assertTrue(self.source.exists())
 
 
 if __name__ == '__main__':

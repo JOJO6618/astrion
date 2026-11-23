@@ -41,6 +41,7 @@
 - 专题位于 `MEMORY.md` 同级的 `topics/`，复用该工作区的精确路径授权。主子索引按同一工作区身份解析专题名称。Git 工作树和子智能体目录决定执行位置。
 - 启动检查已登记的工作区，每个后端进程至多主动提示一次。暂缓后可在「设置 → 上下文与记忆」继续。运行时直接使用外置位置。
 - 每个工作区先无覆盖复制并保留修改时间，再逐文件核验内容和源身份。目标同名同内容可复用，内容不同则按内容摘要另存。清理前写入 `00_READ_ME_项目记忆已迁移.md`。只清理已核验的一级 Markdown 记忆。遇到变更、权限错误或中断，可对剩余文件重试。
+- 文件身份按 `st_dev`／`st_ino`／`st_size`／`st_mtime_ns` 比较；Windows 额外排除 `st_ctime_ns`——同一文件在句柄 `fstat` 与路径 `stat`/`lstat` 下分别取到最后写入时间和创建时间，纳入比较会让清理必然中止（macOS/POSIX 两者同源，仍参与比较）。
 - 迁移不更新已有对话的 `frozen_system_prompt` 或子智能体已保存的系统提示词。专题名称读取在运行时解析，本轮不会要求用户重建对话。
 - 实现入口为 `modules/project_memory.py`、`modules/project_memory_migration.py`、`server/project_memory_migration.py` 和 `ProjectMemoryMigrationDialog.vue`。
 
