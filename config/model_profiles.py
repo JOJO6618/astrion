@@ -127,6 +127,7 @@ def _build_custom_profile(item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         "hidden": not bool(item.get("visible", True)),
         "multimodal": _normalize_multimodal(item.get("multimodal")),
         "context_window": context_window,
+        "max_context_window": context_window,
         "fast": fast_config,
         "supports_thinking": bool(flags["supports_thinking"]),
         "fast_only": bool(flags["fast_only"]),
@@ -306,10 +307,7 @@ def get_model_prompt_replacements(key: str) -> dict:
 
 
 def get_model_context_window(key: str) -> Optional[int]:
-    """
-    获取模型的最大上下文窗口（token 数）。
-    优先使用 profile.context_window，其次回退到 fast.context_window。
-    """
+    """获取当前使用的总上下文窗口，优先取 profile，再回退到 fast 配置。"""
     profile = get_model_profile(key)
     ctx = profile.get("context_window")
     if ctx:

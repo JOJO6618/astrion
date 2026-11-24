@@ -1,0 +1,67 @@
+{
+  "definitions": {
+    "providers": [{"id": "fixture-provider", "name": "Fixture Provider", "modelsdev_key": "openai"}]
+  },
+  "discovery": {
+    "data": [
+      {"id": "expanded", "context_window": 128000, "max_context_length": 1000000, "max_prompt_tokens": 900000, "max_output_tokens": 64000},
+      {"id": "gpt-5.4"},
+      {"id": "default-only", "context_window": 128000, "default_context_window": 128000, "max_context_window": 0, "max_input_tokens": true, "max_tokens": -1},
+      {"id": "discovered", "context_length": 256000},
+      {"id": "input-output-only", "max_input_tokens": 200000}
+    ]
+  },
+  "stored_models": [
+    {"id": "expanded", "context_length": 1000000, "default_context_window": 128000, "max_context_window": 1000000, "max_input_tokens": 900000, "max_output_tokens": 64000},
+    {"id": "gpt-5.4"},
+    {"id": "default-only", "default_context_window": 128000},
+    {"id": "discovered", "context_length": 256000, "max_context_window": 256000},
+    {"id": "input-output-only", "max_input_tokens": 200000},
+    {"id": "legacy", "context_length": 128000},
+    {"id": "legacy-only", "context_length": 131072}
+  ],
+  "upstream": {
+    "openai": {
+      "npm": "@ai-sdk/openai",
+      "models": {
+        "expanded": {"limit": {"context": 128000, "input": 96000, "output": 32000}},
+        "gpt-5.4": {"limit": {"context": 1050000, "input": 922000, "output": 128000}},
+        "discovered": {"limit": {"context": 128000, "output": 32000}},
+        "input-output-only": {"limit": {"context": 0, "input": 100000, "output": 32000}},
+        "legacy": {"limit": {"context": 524288, "output": 65536}}
+      }
+    }
+  },
+  "cache": {
+    "version": 3,
+    "providers": {
+      "openai": {
+        "npm": "@ai-sdk/openai",
+        "models": {
+          "expanded": {"context": 128000, "max_input": 96000, "max_output": 32000},
+          "gpt-5.4": {"context": 1050000, "max_input": 922000, "max_output": 128000},
+          "discovered": {"context": 128000, "max_output": 32000},
+          "input-output-only": {"max_input": 100000, "max_output": 32000},
+          "legacy": {"context": 524288, "max_output": 65536}
+        }
+      }
+    }
+  },
+  "codex": {
+    "models": [
+      {"slug": "gpt-5.6-sol", "visibility": "list", "supported_in_api": true, "context_window": 272000, "max_context_window": 872000, "effective_context_window_percent": 95},
+      {"slug": "legacy-codex", "visibility": "list", "supported_in_api": true, "context_window": 200000}
+    ]
+  },
+  "expected": {
+    "fixture/expanded": [1000000, 128000, 1000000, 900000, 64000],
+    "fixture/gpt-5.4": [1050000, null, 1050000, 922000, 128000],
+    "fixture/default-only": [128000, 128000, null, null, null],
+    "fixture/discovered": [256000, null, 256000, null, 32000],
+    "fixture/input-output-only": [null, null, null, 200000, 32000],
+    "fixture/legacy": [524288, null, 524288, null, 65536],
+    "fixture/legacy-only": [131072, null, 131072, null, null],
+    "openai-codex/gpt-5.6-sol": [872000, 272000, 872000, null, null],
+    "openai-codex/legacy-codex": [200000, 200000, null, null, null]
+  }
+}

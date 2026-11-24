@@ -22,6 +22,7 @@ from typing import Any, Dict, List, Optional
 
 import httpx
 
+from config.model_limits import effective_context_window, positive_token_limit
 from utils.api_client.codex.auth import CodexAuthManager, get_auth_manager
 from utils.api_client.codex.settings import (
     API_BASE,
@@ -64,7 +65,9 @@ def _profile_from_model_info(
     """把端点 ModelInfo 转换为 astrion 模型 profile 形态。"""
     input_modalities = info.get("input_modalities") or []
     supports_image = "image" in input_modalities
-    context_window = info.get("context_window")
+    default_context = positive_token_limit(info.get("context_window"))
+    max_context = positive_token_limit(info.get("max_context_window"))
+    context_window = effective_context_window(default_context, max_context)
     levels = info.get("supported_reasoning_levels") or []
     from utils.api_client.codex.service_tier import supports_fast_mode
 
@@ -101,6 +104,8 @@ def _profile_from_model_info(
         "hidden": False,
         "multimodal": "image" if supports_image else "none",
         "context_window": context_window,
+        "default_context_window": default_context,
+        "max_context_window": max_context,
         "fast": dict(base),
         "thinking": dict(base),
         "supports_thinking": True,

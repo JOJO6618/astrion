@@ -8,9 +8,12 @@
 
 两者同为瘦身结构::
 
-    {"version": 1, "source": ..., "fetched_at": ...,
+    {"version": 3, "source": ..., "fetched_at": ...,
      "providers": {"<modelsdev_key>": {"npm": ..., "models": {
-        "<model_id>": {"npm"?, "reasoning"?, "modalities_input"?, "context"?, "max_output"?}}}}}
+        "<model_id>": {"npm"?, "reasoning"?, "modalities_input"?, "context"?,
+                       "max_input"?, "max_output"?}}}}}
+
+``context`` 是总窗口上限。旧缓存仍可读，缺失的输入上限保持未知。
 
 协议裁决仅对 catalog 里显式标注 ``protocol_source="models.dev"`` 的多协议网关启用
 （单协议 provider 一律 chat_completions——openai 官方在 models.dev 标 @ai-sdk/openai、
@@ -25,10 +28,12 @@ import threading
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
+from config.model_limits import positive_token_limit
 from config.paths import DATA_DIR
 
 _SNAPSHOT_PATH = Path(__file__).resolve().parent.parent / "config" / "modelsdev_snapshot.json"
 _CACHE_FILENAME = "modelsdev_cache.json"
+_CACHE_VERSION = 3
 _API_URL = "https://models.dev/api.json"
 _FETCH_TIMEOUT = 60
 # 在线缓存新鲜期：connect/refresh_models 顺带刷新时，新鲜期内跳过（避免每次拉 4.9MB 全量）
@@ -133,7 +138,7 @@ def resolve_protocol(catalog_entry: Dict[str, Any], model_id: str) -> str:
 # ------------------------------------------------------------ 能力 enrich
 
 def get_model_meta(catalog_entry: Dict[str, Any], model_id: str) -> Optional[Dict[str, Any]]:
-    """取模型能力元数据：{reasoning, modalities_input, context, max_output}；未收录返回 None。"""
+    """取模型能力、价格及三类 token 上限；未收录返回 None。"""
     pdata = get_provider_data(str(catalog_entry.get("modelsdev_key") or ""))
     if not pdata:
         return None
@@ -145,10 +150,9 @@ def get_model_meta(catalog_entry: Dict[str, Any], model_id: str) -> Optional[Dic
         meta["reasoning"] = bool(model.get("reasoning"))
     if isinstance(model.get("modalities_input"), list):
         meta["modalities_input"] = model["modalities_input"]
-    if model.get("context"):
-        meta["context"] = model["context"]
-    if model.get("max_output"):
-        meta["max_output"] = model["max_output"]
+    for field in ("context", "max_input", "max_output"):
+        if (value := positive_token_limit(model.get(field))) is not None:
+            meta[field] = value
     if isinstance(model.get("cost"), dict):
         from modules.api_pricing import clean_rates
         data = _current_data()
@@ -182,12 +186,13 @@ def slim_full_dump(full: Dict[str, Any], md_keys: set[str]) -> Dict[str, Any]:
             modalities = (m.get("modalities") or {}).get("input")
             if isinstance(modalities, list):
                 entry["modalities_input"] = modalities
-            limit = m.get("limit") or {}
+            limit = m.get("limit")
             if isinstance(limit, dict):
-                if limit.get("context"):
-                    entry["context"] = limit["context"]
-                if limit.get("output"):
-                    entry["max_output"] = limit["output"]
+                for field, cached_field in (
+                    ("context", "context"), ("input", "max_input"), ("output", "max_output")
+                ):
+                    if (value := positive_token_limit(limit.get(field))) is not None:
+                        entry[cached_field] = value
             if isinstance(m.get("cost"), dict):
                 from modules.api_pricing import clean_rates
                 entry["cost"] = clean_rates(m["cost"])
@@ -196,7 +201,7 @@ def slim_full_dump(full: Dict[str, Any], md_keys: set[str]) -> Dict[str, Any]:
     from datetime import datetime, timezone
 
     return {
-        "version": 2,
+        "version": _CACHE_VERSION,
         "source": _API_URL,
         "fetched_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "providers": providers,
@@ -215,9 +220,9 @@ def refresh_cache(
 
     global _memory, _source_sig
     if not force:
-        cached = _load_file(_store_path())
-        fetched_at = str((cached or {}).get("fetched_at") or "")
-        if fetched_at:
+        cached = _load_file(_store_path()) or {}
+        fetched_at = str(cached.get("fetched_at") or "")
+        if cached.get("version") == _CACHE_VERSION and fetched_at:
             try:
                 from datetime import datetime, timezone
 

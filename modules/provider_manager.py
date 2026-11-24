@@ -46,6 +46,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
 
+from config.model_limits import effective_context_window, positive_token_limit
 from config.paths import DATA_DIR
 
 _CATALOG_PATH = Path(__file__).resolve().parent.parent / "config" / "providers_catalog.json"
@@ -83,7 +84,7 @@ def _mask_key(api_key: Optional[str]) -> Optional[str]:
 
 
 def parse_models_payload(body: Any) -> List[Dict[str, Any]]:
-    """兼容三种 /models 响应形状，统一输出 [{id, name, context_length}]。
+    """兼容三种 /models 响应形状并保留明确标注的上下文、输入和输出限制。
 
     - 标准 OpenAI：``{"object": "list", "data": [...]}``
     - Mistral 裸数组：``[...]``
@@ -115,21 +116,43 @@ def parse_models_payload(body: Any) -> List[Dict[str, Any]]:
         ).strip()
         if display and display != model_id:
             entry["name"] = display
-        # 上下文窗口：OpenRouter/xAI = context_length；Mistral = max_context_length；
-        # 部分兼容网关直接给 context_window
-        ctx = (
-            item.get("context_length")
-            or item.get("max_context_length")
-            or item.get("context_window")
-        )
-        try:
-            ctx_int = int(ctx) if ctx is not None else None
-        except (TypeError, ValueError):
-            ctx_int = None
-        if ctx_int and ctx_int > 0:
-            entry["context_length"] = ctx_int
+        # OpenRouter/xAI 的 context_length 是发现接口报告的总窗口。
+        maximum = _reported_max_context(item) or positive_token_limit(item.get("context_length"))
+        default = _reported_default_context(item, maximum)
+        # 旧读者使用 context_length。仅有 context_window 时语义未明确，保留作回退。
+        context = maximum or (positive_token_limit(item.get("context_window")) if default is None else None)
+        limits = {
+            "context_length": context,
+            "default_context_window": default,
+            "max_context_window": maximum,
+            "max_input_tokens": _reported_max_input(item),
+            "max_output_tokens": _reported_max_output(item),
+        }
+        entry.update({name: value for name, value in limits.items() if value is not None})
         output.append(entry)
     return output
+
+
+def _reported_max_context(item: Dict[str, Any]) -> Optional[int]:
+    return positive_token_limit(
+        item.get("max_context_window_tokens"), item.get("max_context_window"), item.get("max_context_length")
+    )
+
+
+def _reported_default_context(item: Dict[str, Any], maximum: Optional[int]) -> Optional[int]:
+    return positive_token_limit(
+        item.get("default_context_window"),
+        item.get("default_context_length"),
+        item.get("context_window") if maximum is not None else None,
+    )
+
+
+def _reported_max_input(item: Dict[str, Any]) -> Optional[int]:
+    return positive_token_limit(item.get("max_input_tokens"), item.get("max_prompt_tokens"))
+
+
+def _reported_max_output(item: Dict[str, Any]) -> Optional[int]:
+    return positive_token_limit(item.get("max_output_tokens"), item.get("max_completion_tokens"), item.get("max_tokens"))
 
 
 class ProviderManager:
@@ -864,7 +887,6 @@ class ProviderManager:
                 model_id = str(model.get("id") or "").strip()
                 if not model_id:
                     continue
-                ctx = model.get("context_length")
                 model_display_name = str(model.get("name") or model_id)
 
                 # ── 协议裁决与能力 enrich（models.dev，命中才覆盖）──
@@ -899,9 +921,17 @@ class ProviderManager:
                 else:
                     # 未知时保持原默认：provider 同步模型默认全能（用户拍板）
                     multimodal = "image,video"
-                if meta.get("context"):
-                    ctx = meta["context"]
-                max_output = meta.get("max_output")
+                reported_max = _reported_max_context(model)
+                default_context = _reported_default_context(model, reported_max)
+                # 旧缓存混用了 context_length、max_context_length 和 context_window。
+                legacy_context = positive_token_limit(
+                    model.get("context_length"),
+                    model.get("context_window") if default_context is None else None,
+                )
+                max_context = positive_token_limit(reported_max, meta.get("context"), legacy_context)
+                ctx = effective_context_window(default_context, max_context)
+                max_input = positive_token_limit(_reported_max_input(model), meta.get("max_input"))
+                max_output = positive_token_limit(_reported_max_output(model), meta.get("max_output"))
 
                 profile: Dict[str, Any] = {
                     "name": model_display_name,
@@ -916,6 +946,9 @@ class ProviderManager:
                     "hidden": False,
                     "multimodal": multimodal,
                     "context_window": ctx,
+                    "default_context_window": default_context,
+                    "max_context_window": max_context,
+                    "max_input_tokens": max_input,
                     "supports_reasoning_effort": supports_reasoning_effort,
                     "fast": {
                         "base_url": base_url,

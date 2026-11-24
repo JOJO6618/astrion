@@ -37,6 +37,9 @@ def list_models_api():
             "supports_chatgpt_fast_mode": profile.get("supports_chatgpt_fast_mode", False),
             "multimodal": multimodal,
             "context_window": profile.get("context_window"),
+            "default_context_window": profile.get("default_context_window"),
+            "max_context_window": profile.get("max_context_window"),
+            "max_input_tokens": profile.get("max_input_tokens"),
             "max_output_tokens": (profile.get("fast") or {}).get("max_tokens"),
             # 协议标识（2026-09-25 泛化）：前端按它区分 chat / responses 行为
             "api_protocol": profile.get("api_protocol") or "chat_completions",
