@@ -1,0 +1,235 @@
+{
+  "label": "biz-small-verify",
+  "root": "/Users/jojo/Desktop/agents/正在修复中/agents/.astrion/worktrees/migration-rust-backend-d5f6ae5a/test/2026-11-26_Rust启动性能/.tmp/biz-small",
+  "probe": "/api/runtime/sessions",
+  "expect_total": 12,
+  "python": "/opt/homebrew/bin/python3.11",
+  "rust": "/Users/jojo/Desktop/agents/正在修复中/agents/.astrion/worktrees/migration-rust-backend-d5f6ae5a/backend-rust/target-master/debug/astrion-headless",
+  "rust_meta": {
+    "path": "/Users/jojo/Desktop/agents/正在修复中/agents/.astrion/worktrees/migration-rust-backend-d5f6ae5a/backend-rust/target-master/debug/astrion-headless",
+    "size": 78299664,
+    "sha256": "07043b0323ef15a2ce0991e97715cdb0eb2eb8bc43ebbed1f58c839b484b8be0"
+  },
+  "rounds": 3,
+  "warmup": 1,
+  "summary": {
+    "python": {
+      "runs": 3,
+      "p50_ms": 1312.8,
+      "min_ms": 1260.6,
+      "max_ms": 1840.0,
+      "all_ms": [
+        1312.8,
+        1840.0,
+        1260.6
+      ],
+      "p50_rss_kb": 113024,
+      "all_rss_kb": [
+        113024,
+        113344,
+        110496
+      ],
+      "ready_status": [
+        200,
+        200,
+        200
+      ],
+      "first_ready_body": {
+        "keys": [
+          "conversations",
+          "has_more",
+          "limit",
+          "offset",
+          "success",
+          "total"
+        ],
+        "list_key": "conversations",
+        "items": 12,
+        "total": 12,
+        "has_token": true
+      }
+    },
+    "rust": {
+      "runs": 3,
+      "p50_ms": 27.6,
+      "min_ms": 18.3,
+      "max_ms": 35.3,
+      "all_ms": [
+        35.3,
+        27.6,
+        18.3
+      ],
+      "p50_rss_kb": 21152,
+      "all_rss_kb": [
+        21152,
+        21328,
+        20960
+      ],
+      "ready_status": [
+        200,
+        200,
+        200
+      ],
+      "first_ready_body": {
+        "keys": [
+          "conversations",
+          "has_more",
+          "limit",
+          "offset",
+          "success",
+          "total"
+        ],
+        "list_key": "conversations",
+        "items": 12,
+        "total": 12,
+        "has_token": true
+      }
+    }
+  },
+  "runs": [
+    {
+      "kind": "python",
+      "ready_ms": 1312.8,
+      "ready_status": 200,
+      "ready_body": {
+        "keys": [
+          "conversations",
+          "has_more",
+          "limit",
+          "offset",
+          "success",
+          "total"
+        ],
+        "list_key": "conversations",
+        "items": 12,
+        "total": 12,
+        "has_token": true
+      },
+      "rss_kb": 113024,
+      "error": null,
+      "log": "/Users/jojo/Desktop/agents/正在修复中/agents/.astrion/worktrees/migration-rust-backend-d5f6ae5a/test/2026-11-26_Rust启动性能/.tmp/logs/python-063153-63317.log",
+      "round": 1,
+      "order": "python->rust"
+    },
+    {
+      "kind": "rust",
+      "ready_ms": 35.3,
+      "ready_status": 200,
+      "ready_body": {
+        "keys": [
+          "conversations",
+          "has_more",
+          "limit",
+          "offset",
+          "success",
+          "total"
+        ],
+        "list_key": "conversations",
+        "items": 12,
+        "total": 12,
+        "has_token": true
+      },
+      "rss_kb": 21152,
+      "error": null,
+      "log": "/Users/jojo/Desktop/agents/正在修复中/agents/.astrion/worktrees/migration-rust-backend-d5f6ae5a/test/2026-11-26_Rust启动性能/.tmp/logs/rust-063154-63442.log",
+      "round": 1,
+      "order": "python->rust"
+    },
+    {
+      "kind": "rust",
+      "ready_ms": 27.6,
+      "ready_status": 200,
+      "ready_body": {
+        "keys": [
+          "conversations",
+          "has_more",
+          "limit",
+          "offset",
+          "success",
+          "total"
+        ],
+        "list_key": "conversations",
+        "items": 12,
+        "total": 12,
+        "has_token": true
+      },
+      "rss_kb": 21328,
+      "error": null,
+      "log": "/Users/jojo/Desktop/agents/正在修复中/agents/.astrion/worktrees/migration-rust-backend-d5f6ae5a/test/2026-11-26_Rust启动性能/.tmp/logs/rust-063154-63447.log",
+      "round": 2,
+      "order": "rust->python"
+    },
+    {
+      "kind": "python",
+      "ready_ms": 1840.0,
+      "ready_status": 200,
+      "ready_body": {
+        "keys": [
+          "conversations",
+          "has_more",
+          "limit",
+          "offset",
+          "success",
+          "total"
+        ],
+        "list_key": "conversations",
+        "items": 12,
+        "total": 12,
+        "has_token": true
+      },
+      "rss_kb": 113344,
+      "error": null,
+      "log": "/Users/jojo/Desktop/agents/正在修复中/agents/.astrion/worktrees/migration-rust-backend-d5f6ae5a/test/2026-11-26_Rust启动性能/.tmp/logs/python-063154-63452.log",
+      "round": 2,
+      "order": "rust->python"
+    },
+    {
+      "kind": "python",
+      "ready_ms": 1260.6,
+      "ready_status": 200,
+      "ready_body": {
+        "keys": [
+          "conversations",
+          "has_more",
+          "limit",
+          "offset",
+          "success",
+          "total"
+        ],
+        "list_key": "conversations",
+        "items": 12,
+        "total": 12,
+        "has_token": true
+      },
+      "rss_kb": 110496,
+      "error": null,
+      "log": "/Users/jojo/Desktop/agents/正在修复中/agents/.astrion/worktrees/migration-rust-backend-d5f6ae5a/test/2026-11-26_Rust启动性能/.tmp/logs/python-063156-63555.log",
+      "round": 3,
+      "order": "python->rust"
+    },
+    {
+      "kind": "rust",
+      "ready_ms": 18.3,
+      "ready_status": 200,
+      "ready_body": {
+        "keys": [
+          "conversations",
+          "has_more",
+          "limit",
+          "offset",
+          "success",
+          "total"
+        ],
+        "list_key": "conversations",
+        "items": 12,
+        "total": 12,
+        "has_token": true
+      },
+      "rss_kb": 20960,
+      "error": null,
+      "log": "/Users/jojo/Desktop/agents/正在修复中/agents/.astrion/worktrees/migration-rust-backend-d5f6ae5a/test/2026-11-26_Rust启动性能/.tmp/logs/rust-063157-63666.log",
+      "round": 3,
+      "order": "python->rust"
+    }
+  ]
+}

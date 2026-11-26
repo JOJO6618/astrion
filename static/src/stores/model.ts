@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { t } from '@/locales';
+import { readModelLimits, type ModelLimits } from '@/utils/modelLimits';
 
 export type ModelKey = string;
 
@@ -8,7 +9,7 @@ export interface ReasoningLevel {
   description: string;
 }
 
-export interface ModelOption {
+export interface ModelOption extends ModelLimits {
   key: ModelKey;
   label: string;
   description: string;
@@ -16,8 +17,6 @@ export interface ModelOption {
   multimodal?: string;
   supportsImage?: boolean;
   supportsVideo?: boolean;
-  contextWindow?: number | null;
-  maxOutputTokens?: number | null;
   fastOnly: boolean;
   supportsThinking: boolean;
   thinkingOnly?: boolean;
@@ -119,9 +118,7 @@ export const useModelStore = defineStore('model', {
             supportsImage,
             supportsVideo,
             apiProtocol: item.api_protocol || 'chat_completions',
-            contextWindow: typeof item.context_window === 'number' ? item.context_window : null,
-            maxOutputTokens:
-              typeof item.max_output_tokens === 'number' ? item.max_output_tokens : null,
+            ...readModelLimits(item),
             fastOnly: !!item.fast_only,
             supportsThinking: !!item.supports_thinking,
             thinkingOnly: !!item.thinking_only,

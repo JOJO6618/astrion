@@ -4,8 +4,7 @@
 #   → 上传服务器 → 重新生成更新清单
 #
 # 前置条件：
-#   1. 代码签名证书 "Astrion Local Sign" 在钥匙串中（同 Tauri 壳；
-#      electron-builder 经 electron-builder.yml mac.identity 引用）
+#   1. electron-builder.yml 的 mac.identity 对应签名证书在钥匙串中
 #   2. 服务器 SSH 免密（同 Tauri 发布脚本）
 #   3. 更新日志 desktop-electron/DESKTOP_CHANGELOG.md 顶部已写好本版本小节
 #
@@ -46,16 +45,11 @@ echo "==> 发布版本: $VERSION"
 [ -f "$CHANGELOG" ] || { echo "!! 缺少更新日志: $CHANGELOG"; exit 1; }
 [ -d "$DESKTOP_DIR/node_modules/electron" ] || { echo "!! 未安装依赖，先运行: cd desktop-electron && npm install"; exit 1; }
 
-# ── 1) 前端构建（壳加载的是后端 serve 的 static/dist） ──
-# 桌面打包会复制整个 static/dist，用 Vite 的清理选项排除历次构建的旧哈希文件。
-echo "==> 构建 Web 前端"
-(cd "$REPO_ROOT" && npm run build --silent -- --emptyOutDir 2>&1 | tail -n 5)
-
-# ── 2) 桌面端构建（prepare_backend + electron-builder） ──
-echo "==> 构建桌面端（electron-builder）"
+# ── 1) 构建 Rust 后端、Web 前端与 macOS 安装包 ──
+echo "==> 构建桌面端、Rust 后端与 Web 前端"
 (cd "$DESKTOP_DIR" && npm run build)
 
-# ── 3) 校验产物 ──
+# ── 2) 校验产物 ──
 DMG="$DIST_DIR/Astrion-${VERSION}-arm64.dmg"
 ZIP="$DIST_DIR/Astrion-${VERSION}-arm64-mac.zip"
 YML="$DIST_DIR/latest-mac.yml"
@@ -65,7 +59,7 @@ done
 echo "==> 产物就绪:"
 ls -lh "$DMG" "$ZIP" "$YML" | awk '{print "    " $5 "  " $9}'
 
-# ── 4) 提取本版本更新说明（首个 ## 小节，到第二个 ## 为止） ──
+# ── 3) 提取本版本更新说明（首个 ## 小节，到第二个 ## 为止） ──
 NOTES_FILE="$(mktemp -t astrion-release-notes)"
 # mktemp 默认 0600，scp 会把权限带到服务器，导致 release-notes-macos.txt 被 nginx 403
 # （2026-10-07 实测；补 644 后与 Windows 的 txt 一致）
@@ -81,7 +75,7 @@ awk -v ver="$VERSION" '
 ' "$CHANGELOG" | sed '/^$/N;/^\n$/D' > "$NOTES_FILE"
 [ -s "$NOTES_FILE" ] || { echo "!! 未能从 CHANGELOG 提取更新说明"; exit 1; }
 
-# ── 5) 上传安装包 + 更新清单 + 更新说明 → 服务器重新生成清单 ──
+# ── 4) 上传安装包 + 更新清单 + 更新说明 → 服务器重新生成清单 ──
 # 更新说明按平台分文件（2026-09-29 起 win/mac 两套版本号与日志分开维护）：
 # mac → release-notes-macos.txt，Windows → release-notes-windows.txt
 # （服务器 regen_manifest.py 各取各的，平台文件缺失时才回退共享的 release-notes.txt）

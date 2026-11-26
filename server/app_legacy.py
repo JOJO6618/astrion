@@ -41,7 +41,7 @@ from server.storage_stats import storage_stats_bp
 from server.project_memory_migration import project_memory_migration_bp
 from server.status import status_bp
 from server.tasks.web import get_tasks_blueprint
-from server.host_startup import initialize_host, start_background_jobs
+from server.host_startup import hold_backend_instance_lock, initialize_host, start_background_jobs
 from server.model_catalog import model_catalog_bp
 from server.multi_agent import multi_agent_bp
 from server.workflow_page import workflow_page_bp
@@ -799,8 +799,8 @@ def run_server(path: str, thinking_mode: bool = False, port: int = DEFAULT_PORT,
         # 同一台机器同时启动 8091/8092 等多个实例时，若都使用默认 "session"，
         # 登录 Cookie 会互相覆盖，表现为两个端口无法同时保持登录。
         app.config['SESSION_COOKIE_NAME'] = f"agents_session_{port}"
-    initialize_system(path, thinking_mode)
-    if not debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
+    if hold_backend_instance_lock(use_reloader=debug):
+        initialize_system(path, thinking_mode)
         start_background_jobs()
     # Socket.IO 已移除，直接使用 Werkzeug 内建服务器（threaded 以支持并发轮询）
     app.run(

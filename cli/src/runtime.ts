@@ -56,6 +56,22 @@ export class ChatRuntime {
     this.destroyed = true;
   }
 
+  async sendGuidance(text: string): Promise<boolean> {
+    const taskId = this.taskId;
+    if (!taskId || !this.running || this.destroyed) return false;
+    try {
+      await this.gw.sendGuidance(taskId, text);
+      if (this.destroyed || this.taskId !== taskId) return false;
+      this.cb.api.addGuide(text);
+      return true;
+    } catch (error) {
+      if (!this.destroyed && this.taskId === taskId) {
+        this.cb.onSystemMessage(`${this.cb.tr('runtime.sendFailed')}${error instanceof Error ? error.message : String(error)}`);
+      }
+      return false;
+    }
+  }
+
   /** /new（对齐 web 端 /new 页面语义）：进入空对话草稿状态——不立即创建会话，
    *  清空时间线并置空 conversationId；下一条 send 不带 cid，服务端惰性创建。 */
   enterNewSession(): void {

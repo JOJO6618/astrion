@@ -1,12 +1,16 @@
 <template>
   <AppShell :download-file="unavailableDownload" :download-folder="unavailableDownload">
     <ProjectMemoryMigrationDialog />
+    <ConversationStorageMigrationDialog
+      :check-on-mount="!persistentDesktopSidebar"
+      @migrated="refreshAfterConversationMigration"
+    />
     <div class="main-container">
       <ConversationSidebar
         v-if="!persistentDesktopSidebar && !isMobile"
         chat-mode
         :icon-style="iconStyle"
-        :current-conversation-id="chat.cid"
+        :current-conversation-id="chat.incompatibleId || chat.cid"
         :current-task-in-progress="chat.running"
         :host-workspace-enabled="false"
         :group-by-workspace="false"
@@ -38,7 +42,7 @@
           <ConversationModelHeader
             :mobile="isMobile"
             :header-menu-open="headerMenuOpen"
-            :is-connected="!!chat.settings"
+            :is-connected="!!chat.settings && !chat.incompatibleId"
             :current-model-label="currentModel?.label || $t('appCore.modelNotSelected')"
             :header-effort-label="
               chat.thinking && currentModel?.supportsThinking
@@ -84,7 +88,9 @@
             </template>
           </ConversationModelHeader>
         </div>
+        <ConversationMigrationRequired v-if="chat.incompatibleId" />
         <ChatArea
+          v-show="!chat.incompatibleId"
           ref="area"
           chat-mode
           :messages="messages"
@@ -197,7 +203,10 @@
             </button>
           </template>
         </ChatArea>
-        <div v-if="!messages.length && !chat.loading" class="blank-hero-overlay">
+        <div
+          v-if="!chat.incompatibleId && !messages.length && !chat.loading"
+          class="blank-hero-overlay"
+        >
           <StatusAvatar
             v-if="personalization.form.show_status_avatar !== false"
             mode="idle"
@@ -208,7 +217,11 @@
             {{ modelOptions.length ? $t('chatMode.empty') : $t('chatMode.noModels') }}
           </p>
         </div>
-        <div class="composer-container" :class="{ 'blank-hero-mode': !messages.length }">
+        <div
+          v-show="!chat.incompatibleId"
+          class="composer-container"
+          :class="{ 'blank-hero-mode': !messages.length }"
+        >
           <InputComposer
             ref="composer"
             :key="draft.identity"
@@ -220,7 +233,7 @@
             :input-is-focused="inputFocused"
             :is-connected="!!chat.settings"
             :streaming-message="chat.running"
-            :input-locked="chat.loading || !draft.ready || saving"
+            :input-locked="!!chat.incompatibleId || chat.loading || !draft.ready || saving"
             :uploading="uploading"
             :media-uploading="uploading"
             :thinking-mode="chat.thinking"
@@ -292,7 +305,7 @@
             chat-mode
             :collapsed="false"
             :icon-style="iconStyle"
-            :current-conversation-id="chat.cid"
+            :current-conversation-id="chat.incompatibleId || chat.cid"
             :current-task-in-progress="chat.running"
             :host-workspace-enabled="false"
             :group-by-workspace="false"
@@ -314,6 +327,8 @@
 </template>
 <script setup lang="ts">
 import ProjectMemoryMigrationDialog from '@/components/overlay/ProjectMemoryMigrationDialog.vue';
+import ConversationStorageMigrationDialog from '@/components/overlay/ConversationStorageMigrationDialog.vue';
+import ConversationMigrationRequired from '@/components/chat/ConversationMigrationRequired.vue';
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import AppShell from '@/components/shell/AppShell.vue';
 import ConversationSidebar from '@/components/sidebar/ConversationSidebar.vue';
@@ -422,6 +437,7 @@ const {
   versions,
   versionIndex,
   navigate,
+  refreshAfterConversationMigration,
   send,
   upload,
   saveEdit,

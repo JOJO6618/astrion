@@ -5,7 +5,7 @@ export default {
   'boot.connectFailed': '无法连接本地 Astrion 服务（{url}）。请先启动服务后重试。',
   'boot.starting': '未发现运行中的服务，正在为你启动本地 Astrion 服务（首次启动需要几秒）…',
   'boot.staleServer': '检测到服务正在运行，但其版本不支持 CLI 接入（未生成 host token）。请重启该服务后重试。',
-  'boot.startTimeout': '本地服务启动超时。请手动启动服务（python -m server.app）后重试。',
+  'boot.startTimeout': '本地服务启动超时。请启动本机 Astrion Gateway 后重试。',
   'boot.workspace.title': '工作区',
   'boot.workspace.notRegistered': '当前目录还不是 Astrion 工作区：',
   'boot.workspace.askCreate': '是否将其创建为工作区？',

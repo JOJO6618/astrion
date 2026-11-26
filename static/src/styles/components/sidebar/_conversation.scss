@@ -504,6 +504,12 @@ body[data-theme='dark'] .conversation-sidebar .conversation-item.active:focus-wi
   text-overflow: ellipsis;
 }
 
+.conversation-sidebar .conversation-migration-label {
+  margin-inline-start: 4px;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
 .conversation-sidebar .conversation-action-wrap {
   position: relative;
   /* 宽度必须与条目第二列（32px）一致：40px 会向右溢出 8px，

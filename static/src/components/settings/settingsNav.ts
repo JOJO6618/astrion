@@ -180,6 +180,7 @@ const SEARCH_ENTRIES: SearchEntry[] = [
   ...entries('tools', [
     [`${P}silentToolDisableTitle`, `${P}silentToolDisableDesc`],
     [`${P}toolIntentTitle`, `${P}toolIntentDesc`],
+    [`${P}readBeforeEditTitle`, `${P}readBeforeEditDesc`],
     [`${P}skillHintsTitle`, `${P}skillHintsDesc`],
     `${P}strictSkillTitle`,
     `${P}availableSkillsTitle`,

@@ -346,7 +346,12 @@
                               )
                             "
                           >
-                            <div class="conversation-title">{{ conv.title }}</div>
+                            <div class="conversation-title">
+                              {{ conv.title }}
+                              <span v-if="conv.incompatible" class="conversation-migration-label">
+                                {{ $t('appMessages.storageMigration.pendingLabel') }}
+                              </span>
+                            </div>
                             <div
                               class="conversation-action-wrap"
                               :class="{ 'menu-open': openActionMenuId === conv.id }"
@@ -521,7 +526,12 @@
                           )
                         "
                       >
-                        <div class="conversation-title">{{ conv.title }}</div>
+                        <div class="conversation-title">
+                          {{ conv.title }}
+                          <span v-if="conv.incompatible" class="conversation-migration-label">
+                            {{ $t('appMessages.storageMigration.pendingLabel') }}
+                          </span>
+                        </div>
                         <div
                           class="conversation-action-wrap"
                           :class="{ 'menu-open': openActionMenuId === conv.id }"
@@ -681,7 +691,12 @@
                   handleWorkspaceConversationClick(conv.id, String(currentWorkspaceId || ''));
                 "
               >
-                <div class="conversation-title">{{ conv.title }}</div>
+                <div class="conversation-title">
+                  {{ conv.title }}
+                  <span v-if="conv.incompatible" class="conversation-migration-label">
+                    {{ $t('appMessages.storageMigration.pendingLabel') }}
+                  </span>
+                </div>
                 <div
                   class="conversation-action-wrap"
                   :class="{ 'menu-open': openActionMenuId === conv.id }"

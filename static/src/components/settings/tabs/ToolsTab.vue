@@ -73,6 +73,18 @@ const toggleDeferredCategory = (cat: { tools: string[] }, checked: boolean) => {
       <span class="stg-section-divider__label">{{ $t('settings.toolsTitle') }}</span>
     </div>
     <div class="stg-card">
+      <label class="stg-toggle-row">
+        <span class="stg-row-copy">
+          <span class="stg-row-title">{{ $t('personalization.readBeforeEditTitle') }}</span>
+          <span class="stg-row-desc">{{ $t('personalization.readBeforeEditDesc') }}</span>
+        </span>
+        <input
+          type="checkbox"
+          :checked="form.require_read_before_edit"
+          @change="personalization.updateField({ key: 'require_read_before_edit', value: $event.target.checked })"
+        />
+        <UiSwitch decorative :checked="form.require_read_before_edit" />
+      </label>
       <label class="stg-toggle-row"
         ><span class="stg-row-copy"
           ><span class="stg-row-title">{{ $t('personalization.silentToolDisableTitle') }}</span

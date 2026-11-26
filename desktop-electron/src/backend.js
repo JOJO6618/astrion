@@ -7,15 +7,18 @@
 
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
-import http from 'node:http';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { app } from 'electron';
 import { credentialTransport } from './backend-transport.js';
 import { backendLaunch } from './windows/backend-guardian.js';
+import { windowsHelper } from './windows/native-helper.js';
+import { rustGuardianLaunch, watchGuardedPid } from './windows/rust-guardian.js';
 import { desktopUpdateIdentity } from './update-policy.js';
+import { isRustBackendReady, rustDesktopLaunch, RUST_PROBE_PATH } from './rust-backend.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -23,6 +26,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BACKEND_READY_TIMEOUT_MS = 60_000;
 /** 就绪轮询间隔 */
 const READY_POLL_INTERVAL_MS = 200;
+const RUST_STOP_GRACE_MS = 5_000;
+const RUST_STOP_FORCE_MS = 1_000;
 
 /** @type {import('node:child_process').ChildProcess | null} */
 let backendChild = null;
@@ -224,13 +229,32 @@ export function spawnBackend({ python, backendDir, port, bridgePort, browserToke
   Object.assign(env, transport.env);
   const launch = backendLaunch({
     python,
-    args: ['-m', 'server.app', '--port', String(port), '--path', defaultWs],
+    args: ['-m', 'server.app', '--backend', 'python', '--port', String(port), '--path', defaultWs],
     helperPath: path.join(__dirname.replace(/app\.asar(?=[\\/])/, 'app.asar.unpacked'), 'windows/backend-guardian.py')
   });
-  const child = spawn(launch.command, launch.args, {
-    cwd: backendDir, env, stdio: transport.stdio, windowsHide: true
-  });
+  const child = spawnTracked(launch, { cwd: backendDir, env, stdio: transport.stdio });
   transport.write(child);
+  return child;
+}
+
+export function spawnRustBackend(runtime, options) {
+  const launch = rustDesktopLaunch(runtime, { ...options, identity: desktopUpdateIdentity() });
+  if (process.platform === 'win32') {
+    const guarded = rustGuardianLaunch({ ...launch, guardian: windowsHelper() });
+    const child = spawnTracked(guarded, { cwd: launch.cwd, env: guarded.env, stdio: guarded.stdio }, 'rust');
+    child.guarded = true;
+    watchGuardedPid(child);
+    return child;
+  }
+  const child = spawnTracked(launch, { cwd: launch.cwd, env: launch.env, stdio: ['ignore', 'pipe', 'pipe'] }, 'rust');
+  child.backendPid = child.pid;
+  return child;
+}
+
+function spawnTracked(launch, options, backend = 'python') {
+  if (backendChild) throw new Error('后端进程仍在运行');
+  const child = spawn(launch.command, launch.args, { ...options, windowsHide: true });
+  child.backend = backend;
 
   // 后端 stdout/stderr 转发（dev 终端可见；release 无控制台，后端日志走自身 logs/ 文件）
   child.stdout?.on('data', (chunk) => {
@@ -243,61 +267,75 @@ export function spawnBackend({ python, backendDir, port, bridgePort, browserToke
     console.error('[astrion-desktop] 后端进程启动失败:', error.message);
     child.startupError = error;
   });
-  child.on('exit', (code, signal) => {
-    console.error(`[astrion-desktop] 后端进程退出: code=${code} signal=${signal}`);
+  child.stopped = new Promise(resolve => child.once('close', (code, signal) => {
+    console.info(`[astrion-desktop] 后端进程退出: code=${code} signal=${signal}`);
     if (backendChild === child) backendChild = null;
-  });
+    resolve({ code, signal });
+  }));
 
   backendChild = child;
   return child;
 }
 
-/** 轮询无鉴权端点直到后端就绪。 */
-export function waitBackendReady(port, child = backendChild) {
-  const deadline = Date.now() + BACKEND_READY_TIMEOUT_MS;
-  return new Promise((resolve, reject) => {
-    const poll = () => {
-      if (child?.startupError) { reject(child.startupError); return; }
-      if (child && (child.exitCode !== null || child.signalCode !== null)) {
-        reject(new Error(`后端在就绪前退出 (${child.exitCode ?? child.signalCode})`));
-        return;
-      }
-      const req = http.get(
-        { host: '127.0.0.1', port, path: '/api/host-mode-enabled', timeout: 800 },
-        (res) => {
-          res.resume();
-          if (res.statusCode === 200 || res.statusCode === 204) {
-            resolve();
-          } else {
-            scheduleNext();
-          }
-        }
-      );
-      req.on('timeout', () => {
-        req.destroy();
-        scheduleNext();
-      });
-      req.on('error', scheduleNext);
-    };
-    const scheduleNext = () => {
-      if (Date.now() > deadline) {
-        reject(new Error(`后端 ${BACKEND_READY_TIMEOUT_MS / 1000}s 内未就绪（127.0.0.1:${port}）`));
-      } else {
-        setTimeout(poll, READY_POLL_INTERVAL_MS);
-      }
-    };
-    poll();
-  });
+async function probePython(port) {
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}${RUST_PROBE_PATH}`, {
+      redirect: 'error', signal: AbortSignal.timeout(800)
+    });
+    if (response.status === 204) return true;
+    if (response.status !== 200) return false;
+    const payload = await response.json().catch(() => null);
+    return payload?.backend !== 'rust';
+  } catch {
+    return false;
+  }
 }
 
-/** 退出时 kill 后端子进程（SIGKILL 兜底，防止孤儿进程残留）。 */
-export function shutdownBackend() {
-  if (backendChild && !backendChild.killed) {
-    try {
-      backendChild.kill('SIGKILL');
-    } catch {
-      /* 进程可能已退出 */
+/** 轮询无鉴权端点直到后端就绪。 */
+export async function waitBackendReady(port, child = backendChild, backend = 'python') {
+  const deadline = Date.now() + BACKEND_READY_TIMEOUT_MS;
+  while (Date.now() <= deadline) {
+    if (child?.startupError) throw child.startupError;
+    if (child && (child.exitCode !== null || child.signalCode !== null)) {
+      throw new Error(`后端在就绪前退出 (${child.exitCode ?? child.signalCode})`);
     }
+    const ready = backend === 'rust' ? await isRustBackendReady(port, child?.backendPid) : await probePython(port);
+    if (ready) return;
+    await delay(READY_POLL_INTERVAL_MS);
   }
-  backendChild = null;
+  throw new Error(`后端 ${BACKEND_READY_TIMEOUT_MS / 1000}s 内未就绪（127.0.0.1:${port}）`);
+}
+
+function signalBackend(child, signal) {
+  if (!child.pid || child.exitCode !== null || child.signalCode !== null) return true;
+  try { return child.kill(signal); }
+  catch (error) {
+    console.error('[astrion-desktop] 无法停止后端:', error.message);
+    return false;
+  }
+}
+
+async function waitForStop(child, timeoutMs) {
+  const timer = new AbortController();
+  try { return await Promise.race([child.stopped, delay(timeoutMs, false, { signal: timer.signal })]); }
+  finally { timer.abort(); }
+}
+
+async function stopRust(child) {
+  if (child.guarded) child.stdin.end();
+  else signalBackend(child, 'SIGTERM');
+  const graceful = await waitForStop(child, RUST_STOP_GRACE_MS);
+  if (graceful) return graceful;
+  console.warn('[astrion-desktop] Rust 后端退出超时，强制停止');
+  if (!signalBackend(child, 'SIGKILL')) return false;
+  return waitForStop(child, RUST_STOP_FORCE_MS);
+}
+
+/** Stop the managed child before starting a replacement. */
+export function shutdownBackend() {
+  const child = backendChild;
+  if (!child) return;
+  if (child.backend === 'rust') return child.stopping ??= stopRust(child);
+  if (!child.killed && !signalBackend(child, 'SIGKILL')) return false;
+  return child.stopped;
 }

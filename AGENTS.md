@@ -68,8 +68,8 @@
 
 ## 1) 当前项目结构（按代码现状）
 
-- **入口**：`main.py`（统一入口，默认 Host Web + thinking）；`server/app.py`（推荐 Web，转发 `app_legacy.py`）；`server/headless_app.py`（CLI 自启动，无站点路由面）；`web_server.py`（deprecated 兼容）。full/headless 共用 `server/host_startup.py`，各自装配 Flask 路由。
-- **`server/`**：Flask 业务主线，子包 `chat/` `status/` `tasks/` `context/`；`server/runtime/` 是 RuntimeContext + RuntimeService（契约 `docs/runtime_contract.md`）。**REST 任务轮询是唯一实时通道**
+- **入口**：`main.py`、`server/app.py`（推荐 Host Web）和兼容脚本 `web_server.py` 默认启动 Rust。CLI 默认自启 Rust headless，由同一个 `backend-rust/src/main.rs` 按启动形态挂载路由。显式 `--backend python` 可启动旧 Flask Web，`server/headless_app.py` 保留旧 Python headless 对照入口。
+- **后端**：`backend-rust/` 为 1.0 主线。`server/` 保留 Flask 实现，`server/runtime/` 是旧版 RuntimeContext + RuntimeService（契约 `docs/runtime_contract.md`）。**REST 任务轮询是唯一实时通道**。
 - **`core/`**：终端与工具编排（`main_terminal_parts/` 按 base + mixin 拆分）；**`modules/`**：可复用能力模块，其中 `execution_plane/` 是公共执行边界，**已绑定后端失败不得回退控制端**（契约 `docs/execution_contract.md`）
 - **`config/`**：配置拆分（api/limits/terminal/paths…），`config/__init__.py` 聚合 + 加载 `.env`；**`utils/`**：api_client、日志、上下文与对话工具
 - **前端**：`static/src/`（Vue 3 + TS）；`cli/src/`（opentui + React 19，旧 Ink 存档 `cli/legacy-ink-src/`）
@@ -92,8 +92,8 @@
 | 用途 | 命令 |
 |------|------|
 | 依赖 | `pip install -r requirements.txt` ／ `npm install` |
-| Web 启动（推荐） | `python -m server.app`（可加 `--path ./project --port 8091 --debug --thinking-mode`） |
-| Headless 启动（CLI 自启动） | `python -m server.headless_app --path <cwd> --port 8091 --thinking-mode` |
+| Host Web（Rust） | `./start.sh` 或 `python3 -m server.app`（可加 `--path ./project --port 8091 --thinking-mode`）；Python 对照加 `--backend python` |
+| Rust 后端构建 | `cargo build --locked --release --manifest-path backend-rust/Cargo.toml`（CLI 默认自启 Rust headless） |
 | 前端构建 / lint | `npm run build --silent 2>&1 \| tail -n 5` ／ `npm run lint` |
 | CLI 开发 | `bun cli/src/main.tsx`（bun ≥1.3）；类型检查 `cd cli && ./node_modules/.bin/tsc --noEmit` |
 | 桌面壳（macOS） | `cd desktop-electron && npm install && npm run dev`；发布 `bash desktop-electron/scripts/release_mac.sh [版本]` |
@@ -270,7 +270,7 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 - **名称与工具**：`modules/sub_agent/definitions.py` 是唯一签名来源，`named.py` 分派。name 同对话 casefold 唯一、1–80 字符、**终结后不复用**；内部编号不对模型暴露。主侧 6 工具＝create/send/status/stop/terminate/answer，子侧 ask_master/ask_other_agent/answer_other_agent/status。工具结果不返回 task_id/conversation_id（前端运行视图保留）。模型用 intelligence 选；**不提供**角色工具、finish_task、强制交付文件、子等待 sleep、公开 run_in_background。
 - **保留与复用**：完成后默认保留 idle 并优先复用原实例及上下文。**本轮完成、暂时无任务、准备最终回复都不是终结理由**，不例行清理、不预防性释放名额。只在用户明确要求、实例发生不可恢复错误、或严重违反明确指令且纠正后仍偏离时才 terminate；达到实例上限且无实例可复用又确需新建时，可终结不再需要的空闲实例。**发现正在或即将执行未经授权的破坏性操作立即 stop。** 普通报错/可恢复故障/理解偏差不构成终结理由；停止与终结都不能撤销已发生操作。
 - **轮次**：全部后台，自然最终回复进 idle 并保留上下文。`timeout_seconds` 省略即不限时；**预算到期必须完成当前模型响应与整批工具并真实回填后，才阻止下一次模型请求**。stop 即时取消：半截响应不提交，已提交调用的缺失结果补写「被主智能体取消」（界面停止为「被用户取消」），已完成结果保留；停止后 idle、`end_reason=stopped` 且可继续。terminate 是吸收态并优先于 stop。运行中消息安全入队，**不能插到 assistant/tool 中间**。
-- **持久化**：`persistence.py` 按工作区 data_dir 共享注册表，查询不得覆盖活动记录；新状态只写 `sub_agent_runtime.json`（version=1），上下文在 `sub_agent_tasks/<task_id>/conversation.json`，**不读旧 sub_agents.json**。保存 pending_work、pending_master_messages、work_paused；stop 暂停排队消费，新消息再解除。恢复校验原模型、固定权限、项目身份与工作目录，**不隐式重跑旧任务**。
+- **持久化**：共享注册表的查询不得覆盖活动记录。Python 写 `sub_agent_runtime.json`（version=1）和 `sub_agent_tasks/<task_id>/conversation.json`。Rust 写 `sub_agents.sqlite3`，v1 文件仅由迁移作业读取。**不读旧 sub_agents.json**。保存 pending_work、pending_master_messages、work_paused；stop 暂停排队消费，新消息再解除。恢复校验原模型、固定权限、项目身份与工作目录，**不隐式重跑旧任务**。详见 `AD/multi_agent.md`。
 - **通知与单写者**：中间输出留子记录，每轮只把最终回复作为 user 消息通知主；子子通信同时报告主。生产端只入队；主运行中在完整工具批次后按序消费，主空闲时 poll 预占门闸并经 RuntimeService 移交 token。**有消息立即消费，不等 running 全部退出**（避免 ask_master 互锁）。目标暂停策略不被自动通知解除。
 - **显示契约**：`auto_message_type=multi_agent_*`、`visibility=chat`、`starts_work=false` 是协作消息协议；持久化与事件共用 message_id，恢复只走显示快照；传输字段 `has_running_multi_agent` 不是对话类型。
 - **MCP 与权限**：每子实例独立 MCPClientManager，复用全局服务注册表，按子智能体名单独立注入和调用。默认 Playwright profile 加稳定 actor_id；MCP 不套内置目录写权限沙箱；四档权限见 §18。

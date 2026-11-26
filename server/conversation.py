@@ -61,6 +61,7 @@ from modules.upload_security import UploadSecurityError
 from server.security import rate_limited
 from modules.workspace import UserWorkspace
 from modules.sub_agent import TERMINAL_STATUSES
+from modules.sub_agent.activity import read_activity_chunk
 from modules.versioning_manager import ConversationVersioningManager, VersioningError
 from modules.shallow_versioning import ShallowVersioningManager
 from modules.host_workspace_manager import resolve_host_workspace
@@ -1567,34 +1568,63 @@ def get_sub_agent_activity(task_id: str, terminal: WebTerminal, workspace: UserW
             if task_root:
                 progress_file = str(Path(task_root) / "progress.jsonl")
 
-        entries: List[Dict[str, Any]] = []
-        # 默认返回足够多的记录，确保历史工具调用完整展示；同时保留上限防止异常大文件拖垮响应。
-        limit = request.args.get("limit", "100000")
-        try:
-            limit_num = max(1, min(int(limit), 100000))
-        except Exception:
-            limit_num = 100000
-
-        if progress_file and Path(progress_file).exists():
+        # offset 是上一响应返回的字节游标，before 是向前翻页的起始边界。
+        # 字节游标只读取新增/相邻页，避免每 2 秒重读并解析整个 progress.jsonl。
+        raw_offset = request.args.get("offset")
+        offset: Optional[int] = None
+        if raw_offset not in (None, ""):
             try:
-                lines = Path(progress_file).read_text(encoding="utf-8").splitlines()
-                if limit_num:
-                    lines = lines[-limit_num:]
-                for line in lines:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        entries.append(json.loads(line))
-                    except Exception:
-                        continue
-            except Exception as exc:
-                return jsonify({"success": False, "error": tr("conversation.read_progress_failed", error=str(exc))}), 500
+                offset = int(raw_offset)
+            except (TypeError, ValueError):
+                return jsonify({"success": False, "error": "invalid offset"}), 400
+            if offset < 0:
+                return jsonify({"success": False, "error": "invalid offset"}), 400
+
+        raw_before = request.args.get("before")
+        before: Optional[int] = None
+        if raw_before not in (None, ""):
+            try:
+                before = int(raw_before)
+            except (TypeError, ValueError):
+                return jsonify({"success": False, "error": "invalid before"}), 400
+            if before < 0:
+                return jsonify({"success": False, "error": "invalid before"}), 400
+        if offset is not None and before is not None:
+            return jsonify({"success": False, "error": "offset and before are mutually exclusive"}), 400
+
+        # 新客户端：增量/翻页页大小 limit=200（最大 500）。
+        # 兼容旧客户端：完全不带游标且不带 limit 时仍返回尾部 100000 行。
+        raw_limit = request.args.get("limit")
+        has_cursor = offset is not None or before is not None
+        try:
+            if raw_limit in (None, ""):
+                limit_num = 200 if has_cursor else 100000
+            else:
+                limit_num = int(raw_limit)
+                upper = 500 if has_cursor else 100000
+                limit_num = max(1, min(limit_num, upper))
+        except Exception:
+            limit_num = 200 if has_cursor else 100000
+
+        chunk = read_activity_chunk(
+            Path(progress_file) if progress_file else None,
+            offset=offset,
+            before=before,
+            limit=limit_num,
+        )
 
         payload = {
             "task_id": task_id,
             "status": task.get("status"),
-            "entries": entries,
+            "entries": chunk.entries,
+            "start_offset": chunk.start_offset,
+            "next_offset": chunk.next_offset,
+            "file_size": chunk.file_size,
+            "reset": chunk.reset,
+            "truncated": chunk.truncated,
+            "has_more_before": chunk.has_more_before,
+            "has_more_after": chunk.has_more_after,
+            "partial_tail": chunk.partial_tail,
         }
         return jsonify({"success": True, "data": payload})
     except Exception as exc:

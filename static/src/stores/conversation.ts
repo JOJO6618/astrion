@@ -9,6 +9,7 @@ export interface ConversationSummary {
   updated_at: string | number;
   total_messages?: number;
   total_tools?: number;
+  incompatible?: boolean;
 }
 
 export interface WorkspaceConversationGroup {

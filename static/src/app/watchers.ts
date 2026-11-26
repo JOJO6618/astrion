@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { debugLog, traceLog } from './methods/common';
 import { useConversationStore } from '../stores/conversation';
+import { useConversationStorageMigrationStore } from '@/stores/conversationStorageMigration';
 import { useQuickDockStore } from '../stores/quickDock';
 import { usePreviewStore } from '../stores/preview';
 import { useFileStore } from '../stores/file';
@@ -61,7 +62,12 @@ export const watchers = {
         useConversationStore().setCurrentConversationId(newValue || null);
         if (!newValue) {
           const session = currentConversationSession(this);
-          if (session?.conversationId && !this.historyLoading) this.leaveConversationView();
+          if (
+            session?.conversationId &&
+            !this.historyLoading &&
+            !useConversationStorageMigrationStore().blockedAgent
+          )
+            this.leaveConversationView();
         }
         const quickDock = useQuickDockStore();
         // 关闭详情/预览/菜单等瞬态（必须立即）

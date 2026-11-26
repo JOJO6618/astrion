@@ -16,16 +16,14 @@ files:
   - src/**
   - package.json
 
-# 内嵌 Python 运行时（复用 Tauri 壳 prepare_backend.py 的产出，目录结构一致：
-# runtime/python = python-build-standalone + 预装依赖；runtime/backend = 源码）。
-# 主进程 backend.js::resolveEmbeddedRuntime 按 resourcesPath/runtime/... 解析。
+# macOS 包从同一 staging 目录装入 Rust 后端、静态资源和公开配置。
 extraResources:
   - from: ../static/src/locales/zh-CN/updatePolicy.json
     to: update-policy-locales/zh-CN.json
   - from: ../static/src/locales/en-US/updatePolicy.json
     to: update-policy-locales/en-US.json
-  - from: ../desktop/src-tauri/runtime
-    to: runtime
+  - from: .cache/rust-app/build/runtime
+    to: runtime/rust
   - from: .cache/quick-entry-listener
     to: quick-entry-listener
   - from: .cache/quick-entry-capture
@@ -39,12 +37,6 @@ mac:
   # （CSSMERR_TP_NOT_TRUSTED）会被 electron-builder 跳过导致包未签名、自动更新不可用。
   # 故改用钥匙串里的 Apple Development 证书（公证待办落地后再换 Developer ID）。
   identity: "Apple Development: 8613991190618 (LUX53G96H4)"
-  # 内嵌 Python 运行时不参与逐文件签名：八千多个文件（zoneinfo/pyc/脚本）
-  # 逐个 codesign 需要 45 分钟且会对不可签文件重试失败。顶层 bundle 封签
-  # 已覆盖资源完整性；默认 entitlements 含 disable-library-validation，
-  # 未签名的 python dylib 可正常加载。
-  signIgnore:
-    - "Resources/runtime/"
   target:
     - dmg
     - zip

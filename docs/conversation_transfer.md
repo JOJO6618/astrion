@@ -47,5 +47,7 @@ ZIP 格式 version=1：
 ## 实现与验证
 
 - 后端：`modules/conversation_transfer/`，`server/conversation_transfer.py`，`server/conversation_transfer_support.py`。ZIP 读取通过只读流适配器支持 Python 3.9 缺少 seekable 的 SpooledTemporaryFile，不额外复制整个上传包；未预期异常的完整堆栈写入 debug_stream.log。
+- Rust Host 使用 `backend-rust/src/conversation_transfer/` 和 `runtime/transfer.rs`。导入在媒体与材料恢复后提交 SQLite 对话和列表摘要。内部迁移按照桌面导航锁到 Runtime Store 的顺序同步目标提交、稳定标签重定位、旧渲染器解绑、源备份和退役。重启后通过 `conversation_transfer_receipts/` 中的回执校验相同操作。原生保存沿用已授权文件句柄和平台保存对话框。
 - 前端：共用侧栏、对话菜单导出／迁移及 `ConversationTransferDialog.vue`。按工作区分组时，导入放各工作区的“…”菜单，搜索旁不重复展示；打开文件选择器时捕获菜单目标，后续导航不改写导入范围。非分组模式及 Chat 保留搜索旁入口，Chat 不展示工作区迁移。
 - 回归与运行命令：`test/2026-10-27_对话迁移/README.md` 及 `test/2026-10-27_对话迁移_02/README.md`。生产构建和离线测试不能替代真实跨机器导入、模型续聊、原生另存和视觉验收。
+- Rust Host 的本机隔离 HTTP 回归在 `test/2026-11-26_Rust会话传输/transfer_http.py`。覆盖 Agent 与 Chat 的 ZIP 校验、Python 读取 Rust 再导出的文件、材料和媒体、内部迁移失败重试、稳定标签、普通 Agent 用原路径续读材料，以及生成中拒绝迁移。原生保存对话框由桌面验收。

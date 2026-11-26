@@ -25,7 +25,7 @@ export const systemCommandMethods = {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ command })
+        body: JSON.stringify({ command, conversation_id: this.currentConversationId || undefined })
       });
 
       const payload = await response.json().catch(() => ({}));

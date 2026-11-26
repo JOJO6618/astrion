@@ -4,6 +4,20 @@
 //         static/src/app/methods/conversation/{action,load,state}.ts
 //         static/src/app/methods/history.ts、static/src/app/methods/versioning.ts
 export default {
+  storageMigration: {
+    title: '迁移旧版对话记录',
+    pending: '发现 {count} 条旧版对话记录。迁移后才能在 Astrion 1.0 打开这些对话。',
+    running: '正在迁移旧版对话记录…',
+    result: '已迁移 {migrated} 条，失败 {failed} 条。',
+    later: '稍后',
+    start: '开始迁移',
+    open: '迁移对话记录',
+    requestFailed: '无法获取对话迁移状态，请重试。',
+    upToDate: '没有待迁移的对话记录。',
+    incompatible: '不兼容的对话记录',
+    incompatibleDescription: '请先迁移旧版对话记录，再打开此对话。',
+    pendingLabel: '待迁移'
+  },
   // ── 消息：清空/压缩对话（message/chat.ts） ──
   clearChatTitle: '清除对话',
   clearChatConfirmMessage: '确定要清除所有对话记录吗？该操作不可撤销。',

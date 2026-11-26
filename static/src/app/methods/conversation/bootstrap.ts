@@ -7,6 +7,10 @@ import { useTaskStore } from '../../../stores/task';
 import { useQuickDockStore } from '../../../stores/quickDock';
 import { usePreviewStore } from '../../../stores/preview';
 import { useConversationStore } from '../../../stores/conversation';
+import {
+  requiresConversationMigration,
+  useConversationStorageMigrationStore
+} from '../../../stores/conversationStorageMigration';
 import { useWorkflowStore } from '../../../stores/workflow';
 import { useConversationTabsStore } from '../../../stores/conversationTabs';
 import { useFileStore } from '../../../stores/file';
@@ -40,6 +44,7 @@ export const bootstrapMethods = {
   },
   leaveConversationView() {
     leaveConversationSession(this);
+    useConversationStorageMigrationStore().blockedAgent = null;
     useTaskStore().clearTask();
     this.historyLoading = false;
     this.historyLoadingFor = null;
@@ -114,7 +119,30 @@ export const bootstrapMethods = {
       ]);
       const result = await response.json();
       if (!owns()) return { success: false, superseded: true };
+      const migration = useConversationStorageMigrationStore();
+      if (requiresConversationMigration(response.status, result.code)) {
+        if (options.navigationReady) commitWorkspaceIdentity(this, workspaceId, prepared[0]);
+        useTaskStore().clearTask();
+        this.stopRunningStateReconcile?.();
+        this.clearLocalTaskUiState?.(`migration-required:${conversationId}`);
+        this.messages = [];
+        this.currentConversationId = null;
+        this.currentConversationTitle = '';
+        this.titleTypingText = '';
+        this.titleReady = true;
+        this.suppressTitleTyping = false;
+        migration.blockedAgent = { id: conversationId, workspaceId: session.workspaceId };
+        if (urlMode === 'push') {
+          history.pushState(
+            { conversationId, workspaceId: session.workspaceId },
+            '',
+            `/${this.stripConversationPrefix(conversationId)}`
+          );
+        }
+        return { success: false, migrationRequired: true };
+      }
       if (!response.ok || !result.success) return result;
+      migration.blockedAgent = null;
       const data = result.data || {};
       const meta = data.meta || {};
       const normalizedId = data.conversation_id || conversationId;

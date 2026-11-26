@@ -1,0 +1,450 @@
+{
+  "label": "biz-large",
+  "root": "/Users/jojo/Desktop/agents/正在修复中/agents/.astrion/worktrees/migration-rust-backend-d5f6ae5a/test/2026-11-26_Rust启动性能/.tmp/biz-large",
+  "probe": "/api/runtime/sessions",
+  "python": "/opt/homebrew/bin/python3.11",
+  "rust": "/Users/jojo/Desktop/agents/正在修复中/agents/.astrion/worktrees/migration-rust-backend-d5f6ae5a/backend-rust/target-master/debug/astrion-headless",
+  "rust_meta": {
+    "path": "/Users/jojo/Desktop/agents/正在修复中/agents/.astrion/worktrees/migration-rust-backend-d5f6ae5a/backend-rust/target-master/debug/astrion-headless",
+    "size": 77679072,
+    "sha256": "9b4f3e8c7417d55dc7bcb9a658f9afe1bce87188f0da292e49a299941b65f72c"
+  },
+  "rounds": 7,
+  "warmup": 1,
+  "summary": {
+    "python": {
+      "runs": 7,
+      "p50_ms": 1050.0,
+      "min_ms": 1039.9,
+      "max_ms": 1066.9,
+      "all_ms": [
+        1056.4,
+        1042.1,
+        1053.4,
+        1039.9,
+        1049.1,
+        1066.9,
+        1050.0
+      ],
+      "p50_rss_kb": 113232,
+      "all_rss_kb": [
+        113232,
+        116112,
+        116000,
+        109232,
+        112560,
+        115696,
+        110096
+      ],
+      "ready_status": [
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200
+      ],
+      "first_ready_body": {
+        "keys": [
+          "conversations",
+          "has_more",
+          "limit",
+          "offset",
+          "success",
+          "total"
+        ],
+        "list_key": "conversations",
+        "items": 50,
+        "total": 240,
+        "has_token": true
+      }
+    },
+    "rust": {
+      "runs": 7,
+      "p50_ms": 32.7,
+      "min_ms": 29.1,
+      "max_ms": 33.9,
+      "all_ms": [
+        33.3,
+        32.7,
+        33.9,
+        33.9,
+        29.7,
+        29.1,
+        32.4
+      ],
+      "p50_rss_kb": 21776,
+      "all_rss_kb": [
+        21760,
+        21552,
+        21776,
+        21456,
+        22400,
+        22288,
+        22032
+      ],
+      "ready_status": [
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200
+      ],
+      "first_ready_body": {
+        "keys": [
+          "conversations",
+          "has_more",
+          "limit",
+          "offset",
+          "success",
+          "total"
+        ],
+        "list_key": "conversations",
+        "items": 50,
+        "total": 240,
+        "has_token": true
+      }
+    }
+  },
+  "runs": [
+    {
+      "kind": "python",
+      "ready_ms": 1056.4,
+      "ready_status": 200,
+      "ready_body": {
+        "keys": [
+          "conversations",
+          "has_more",
+          "limit",
+          "offset",
+          "success",
+          "total"
+        ],
+        "list_key": "conversations",
+        "items": 50,
+        "total": 240,
+        "has_token": true
+      },
+      "rss_kb": 113232,
+      "error": null,
+      "log": "/Users/jojo/Desktop/agents/正在修复中/agents/.astrion/worktrees/migration-rust-backend-d5f6ae5a/test/2026-11-26_Rust启动性能/.tmp/logs/python-061740-58014.log",
+      "round": 1,
+      "order": "python->rust"
+    },
+    {
+      "kind": "rust",
+      "ready_ms": 33.3,
+      "ready_status": 200,
+      "ready_body": {
+        "keys": [
+          "conversations",
+          "has_more",
+          "limit",
+          "offset",
+          "success",
+          "total"
+        ],
+        "list_key": "conversations",
+        "items": 50,
+        "total": 240,
+        "has_token": true
+      },
+      "rss_kb": 21760,
+      "error": null,
+      "log": "/Users/jojo/Desktop/agents/正在修复中/agents/.astrion/worktrees/migration-rust-backend-d5f6ae5a/test/2026-11-26_Rust启动性能/.tmp/logs/rust-061741-58079.log",
+      "round": 1,
+      "order": "python->rust"
+    },
+    {
+      "kind": "rust",
+      "ready_ms": 32.7,
+      "ready_status": 200,
+      "ready_body": {
+        "keys": [
+          "conversations",
+          "has_more",
+          "limit",
+          "offset",
+          "success",
+          "total"
+        ],
+        "list_key": "conversations",
+        "items": 50,
+        "total": 240,
+        "has_token": true
+      },
+      "rss_kb": 21552,
+      "error": null,
+      "log": "/Users/jojo/Desktop/agents/正在修复中/agents/.astrion/worktrees/migration-rust-backend-d5f6ae5a/test/2026-11-26_Rust启动性能/.tmp/logs/rust-061741-58083.log",
+      "round": 2,
+      "order": "rust->python"
+    },
+    {
+      "kind": "python",
+      "ready_ms": 1042.1,
+      "ready_status": 200,
+      "ready_body": {
+        "keys": [
+          "conversations",
+          "has_more",
+          "limit",
+          "offset",
+          "success",
+          "total"
+        ],
+        "list_key": "conversations",
+        "items": 50,
+        "total": 240,
+        "has_token": true
+      },
+      "rss_kb": 116112,
+      "error": null,
+      "log": "/Users/jojo/Desktop/agents/正在修复中/agents/.astrion/worktrees/migration-rust-backend-d5f6ae5a/test/2026-11-26_Rust启动性能/.tmp/logs/python-061741-58087.log",
+      "round": 2,
+      "order": "rust->python"
+    },
+    {
+      "kind": "python",
+      "ready_ms": 1053.4,
+      "ready_status": 200,
+      "ready_body": {
+        "keys": [
+          "conversations",
+          "has_more",
+          "limit",
+          "offset",
+          "success",
+          "total"
+        ],
+        "list_key": "conversations",
+        "items": 50,
+        "total": 240,
+        "has_token": true
+      },
+      "rss_kb": 116000,
+      "error": null,
+      "log": "/Users/jojo/Desktop/agents/正在修复中/agents/.astrion/worktrees/migration-rust-backend-d5f6ae5a/test/2026-11-26_Rust启动性能/.tmp/logs/python-061742-58143.log",
+      "round": 3,
+      "order": "python->rust"
+    },
+    {
+      "kind": "rust",
+      "ready_ms": 33.9,
+      "ready_status": 200,
+      "ready_body": {
+        "keys": [
+          "conversations",
+          "has_more",
+          "limit",
+          "offset",
+          "success",
+          "total"
+        ],
+        "list_key": "conversations",
+        "items": 50,
+        "total": 240,
+        "has_token": true
+      },
+      "rss_kb": 21776,
+      "error": null,
+      "log": "/Users/jojo/Desktop/agents/正在修复中/agents/.astrion/worktrees/migration-rust-backend-d5f6ae5a/test/2026-11-26_Rust启动性能/.tmp/logs/rust-061743-58206.log",
+      "round": 3,
+      "order": "python->rust"
+    },
+    {
+      "kind": "rust",
+      "ready_ms": 33.9,
+      "ready_status": 200,
+      "ready_body": {
+        "keys": [
+          "conversations",
+          "has_more",
+          "limit",
+          "offset",
+          "success",
+          "total"
+        ],
+        "list_key": "conversations",
+        "items": 50,
+        "total": 240,
+        "has_token": true
+      },
+      "rss_kb": 21456,
+      "error": null,
+      "log": "/Users/jojo/Desktop/agents/正在修复中/agents/.astrion/worktrees/migration-rust-backend-d5f6ae5a/test/2026-11-26_Rust启动性能/.tmp/logs/rust-061743-58210.log",
+      "round": 4,
+      "order": "rust->python"
+    },
+    {
+      "kind": "python",
+      "ready_ms": 1039.9,
+      "ready_status": 200,
+      "ready_body": {
+        "keys": [
+          "conversations",
+          "has_more",
+          "limit",
+          "offset",
+          "success",
+          "total"
+        ],
+        "list_key": "conversations",
+        "items": 50,
+        "total": 240,
+        "has_token": true
+      },
+      "rss_kb": 109232,
+      "error": null,
+      "log": "/Users/jojo/Desktop/agents/正在修复中/agents/.astrion/worktrees/migration-rust-backend-d5f6ae5a/test/2026-11-26_Rust启动性能/.tmp/logs/python-061743-58215.log",
+      "round": 4,
+      "order": "rust->python"
+    },
+    {
+      "kind": "python",
+      "ready_ms": 1049.1,
+      "ready_status": 200,
+      "ready_body": {
+        "keys": [
+          "conversations",
+          "has_more",
+          "limit",
+          "offset",
+          "success",
+          "total"
+        ],
+        "list_key": "conversations",
+        "items": 50,
+        "total": 240,
+        "has_token": true
+      },
+      "rss_kb": 112560,
+      "error": null,
+      "log": "/Users/jojo/Desktop/agents/正在修复中/agents/.astrion/worktrees/migration-rust-backend-d5f6ae5a/test/2026-11-26_Rust启动性能/.tmp/logs/python-061744-58270.log",
+      "round": 5,
+      "order": "python->rust"
+    },
+    {
+      "kind": "rust",
+      "ready_ms": 29.7,
+      "ready_status": 200,
+      "ready_body": {
+        "keys": [
+          "conversations",
+          "has_more",
+          "limit",
+          "offset",
+          "success",
+          "total"
+        ],
+        "list_key": "conversations",
+        "items": 50,
+        "total": 240,
+        "has_token": true
+      },
+      "rss_kb": 22400,
+      "error": null,
+      "log": "/Users/jojo/Desktop/agents/正在修复中/agents/.astrion/worktrees/migration-rust-backend-d5f6ae5a/test/2026-11-26_Rust启动性能/.tmp/logs/rust-061745-58331.log",
+      "round": 5,
+      "order": "python->rust"
+    },
+    {
+      "kind": "rust",
+      "ready_ms": 29.1,
+      "ready_status": 200,
+      "ready_body": {
+        "keys": [
+          "conversations",
+          "has_more",
+          "limit",
+          "offset",
+          "success",
+          "total"
+        ],
+        "list_key": "conversations",
+        "items": 50,
+        "total": 240,
+        "has_token": true
+      },
+      "rss_kb": 22288,
+      "error": null,
+      "log": "/Users/jojo/Desktop/agents/正在修复中/agents/.astrion/worktrees/migration-rust-backend-d5f6ae5a/test/2026-11-26_Rust启动性能/.tmp/logs/rust-061745-58335.log",
+      "round": 6,
+      "order": "rust->python"
+    },
+    {
+      "kind": "python",
+      "ready_ms": 1066.9,
+      "ready_status": 200,
+      "ready_body": {
+        "keys": [
+          "conversations",
+          "has_more",
+          "limit",
+          "offset",
+          "success",
+          "total"
+        ],
+        "list_key": "conversations",
+        "items": 50,
+        "total": 240,
+        "has_token": true
+      },
+      "rss_kb": 115696,
+      "error": null,
+      "log": "/Users/jojo/Desktop/agents/正在修复中/agents/.astrion/worktrees/migration-rust-backend-d5f6ae5a/test/2026-11-26_Rust启动性能/.tmp/logs/python-061745-58339.log",
+      "round": 6,
+      "order": "rust->python"
+    },
+    {
+      "kind": "python",
+      "ready_ms": 1050.0,
+      "ready_status": 200,
+      "ready_body": {
+        "keys": [
+          "conversations",
+          "has_more",
+          "limit",
+          "offset",
+          "success",
+          "total"
+        ],
+        "list_key": "conversations",
+        "items": 50,
+        "total": 240,
+        "has_token": true
+      },
+      "rss_kb": 110096,
+      "error": null,
+      "log": "/Users/jojo/Desktop/agents/正在修复中/agents/.astrion/worktrees/migration-rust-backend-d5f6ae5a/test/2026-11-26_Rust启动性能/.tmp/logs/python-061746-58402.log",
+      "round": 7,
+      "order": "python->rust"
+    },
+    {
+      "kind": "rust",
+      "ready_ms": 32.4,
+      "ready_status": 200,
+      "ready_body": {
+        "keys": [
+          "conversations",
+          "has_more",
+          "limit",
+          "offset",
+          "success",
+          "total"
+        ],
+        "list_key": "conversations",
+        "items": 50,
+        "total": 240,
+        "has_token": true
+      },
+      "rss_kb": 22032,
+      "error": null,
+      "log": "/Users/jojo/Desktop/agents/正在修复中/agents/.astrion/worktrees/migration-rust-backend-d5f6ae5a/test/2026-11-26_Rust启动性能/.tmp/logs/rust-061747-58460.log",
+      "round": 7,
+      "order": "python->rust"
+    }
+  ]
+}

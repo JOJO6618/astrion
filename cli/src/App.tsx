@@ -149,6 +149,8 @@ export function App({ boot }: { boot: BootResult }) {
   const [expanded, setExpanded] = useState(false);
   const [queue, setQueue] = useState<string[]>([]);
   const [running, setRunning] = useState(false);
+  const [sendingGuide, setSendingGuide] = useState(false);
+  const guideInFlight = useRef(false);
 
   const elapsedRef = useRef(0);
   elapsedRef.current = elapsed;
@@ -327,14 +329,15 @@ export function App({ boot }: { boot: BootResult }) {
 
   // 运行结束后，提前输入队列逐条自动发送
   useEffect(() => {
-    if (running || queue.length === 0) return;
+    if (running || sendingGuide || queue.length === 0) return;
     const timer = setTimeout(() => {
+      if (guideInFlight.current) return;
       const [head, ...rest] = queue;
       if (head) sendWithSettings(head);
       setQueue(rest);
     }, 300);
     return () => clearTimeout(timer);
-  }, [running, queue]);
+  }, [running, queue, sendingGuide]);
 
   // 发送统一入口：携带 /model 面板的生效值（会话级覆盖，服务端优先级最高）
   const sendWithSettings = (text: string) => {
@@ -347,19 +350,24 @@ export function App({ boot }: { boot: BootResult }) {
   };
 
   // 引导：输入框有字=直接引导注入当前轮；无字=提升队首为引导
-  // TODO(gateway)：接 POST /api/tasks/<id>/runtime_guidance（当前仅本地上屏，服务端注入后续接）
-  const handleGuide = () => {
-    if (!runningRef.current) return;
-    const text = (textareaRef.current?.plainText ?? '').trim();
-    if (text) {
-      textareaRef.current?.setText('');
-      apiRef.current?.addGuide(text);
-      return;
-    }
-    const [head, ...rest] = queueRef.current;
-    if (head) {
-      setQueue(rest);
-      apiRef.current?.addGuide(head);
+  const handleGuide = async () => {
+    if (!runningRef.current || guideInFlight.current) return;
+    const draft = textareaRef.current?.plainText ?? '';
+    const fromQueue = !draft.trim();
+    const text = fromQueue ? queueRef.current[0] : draft.trim();
+    if (!text) return;
+    guideInFlight.current = true;
+    setSendingGuide(true);
+    try {
+      if (!await runtimeRef.current?.sendGuidance(text)) return;
+      if (fromQueue) {
+        setQueue(current => current[0] === text ? current.slice(1) : current);
+      } else if (textareaRef.current?.plainText === draft) {
+        textareaRef.current.setText('');
+      }
+    } finally {
+      guideInFlight.current = false;
+      setSendingGuide(false);
     }
   };
 
@@ -377,12 +385,13 @@ export function App({ boot }: { boot: BootResult }) {
     }
     if (key.ctrl && key.name === 'g') {
       key.preventDefault();
-      handleGuide();
+      void handleGuide();
     }
   });
 
   // Enter（菜单关闭时）：运行中=提前输入排队；空闲=直接发送
   const handleSubmit = () => {
+    if (guideInFlight.current) return;
     const text = (textareaRef.current?.plainText ?? '').trim();
     if (!text || SLASH_TOKEN_RE.test(text)) return;
     textareaRef.current?.setText('');

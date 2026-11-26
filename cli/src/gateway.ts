@@ -4,15 +4,106 @@
 // - 工作区：X-Astrion-Workspace-Id 头绑定（CLI 语义 = 启动目录即工作区，server/gateway_auth.py 解析）
 // 不依赖 Web 会话（Cookie/CSRF/host-login 全部不走）。
 import { homedir } from 'node:os';
-import { readFile, mkdir } from 'node:fs/promises';
-import { existsSync, openSync, mkdirSync } from 'node:fs';
-import { basename, resolve } from 'node:path';
+import { readFile } from 'node:fs/promises';
+import { closeSync, existsSync, lstatSync, openSync, mkdirSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
+import { basename, isAbsolute, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn, execFileSync } from 'node:child_process';
+import { createConnection } from 'node:net';
+import { setTimeout as delay } from 'node:timers/promises';
 import type { ToolApprovalItem } from './approval';
 
 const DEFAULT_PORT = 8091;
-const TOKEN_PATH = `${homedir()}/.astrion/astrion/host/data/host_api_token`;
+const RUST_PORT = 8092;
+const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
+const DEFAULT_DATA_ROOT = resolve(homedir(), '.astrion/astrion');
+
+export function cliExperiment(): boolean {
+  return cliBackend() === 'rust' && process.env.ASTRION_RUST_EXPERIMENT === '1';
+}
+
+function cliBackend(): string {
+  if (process.env.ASTRION_CLI_BACKEND) return process.env.ASTRION_CLI_BACKEND;
+  return process.env.ASTRION_API_BASE || process.env.ASTRION_HOST_TOKEN_FILE ? 'python' : 'rust';
+}
+
+export function cliConfigRoot(): string | null {
+  if (cliExperiment()) {
+    const root = process.env.ASTRION_RUST_DATA_ROOT;
+    return root && isAbsolute(root) ? root : null;
+  }
+  if (process.env.ASTRION_HOST_TOKEN_FILE) return null;
+  return configuredPath('ASTRION_DATA_ROOT') || DEFAULT_DATA_ROOT;
+}
+
+function configuredPath(name: string): string | undefined {
+  const value = process.env[name]?.trim();
+  if (!value) return;
+  if (value === '~') return homedir();
+  if (/^~[\\/]/.test(value)) return resolve(homedir(), value.slice(2));
+  return resolve(REPO_ROOT, value);
+}
+
+export function cliDataDir(): string | null {
+  const root = cliConfigRoot();
+  if (!root) return null;
+  return (!cliExperiment() && configuredPath('DATA_DIR')) || resolve(root, 'host/data');
+}
+
+export function cliDeployDir(): string | null {
+  const root = cliConfigRoot();
+  if (!root) return null;
+  return (!cliExperiment() && configuredPath('DEPLOY_CONFIG_DIR')) || resolve(root, 'config');
+}
+
+function rustExperimentRoot(): string {
+  const configured = cliConfigRoot();
+  if (!configured) throw new GatewayError('ASTRION_RUST_DATA_ROOT must be an absolute path to a dedicated directory');
+  const root = realpathSync(configured);
+  if ([DEFAULT_DATA_ROOT, resolve(homedir(), '.astrion/astrion-desktop')].some(production => containsPath(production, root))) {
+    throw new GatewayError('ASTRION_RUST_DATA_ROOT must be outside the production data directories');
+  }
+  const marker = resolve(root, '.astrion-rust-data');
+  if (!existsSync(marker)) {
+    if (readdirSync(root).some(name => name !== basename(marker))) throw new GatewayError('ASTRION_RUST_DATA_ROOT must be initially empty');
+    try { writeFileSync(marker, '', { flag: 'wx', mode: 0o600 }); }
+    catch (error) { if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error; }
+  }
+  if (!lstatSync(marker).isFile()) throw new GatewayError('Invalid Rust experiment marker');
+  for (const name of ['host', 'host/data', 'host/logs', 'config']) {
+    const directory = resolve(root, name);
+    if (existsSync(directory) && !lstatSync(directory).isDirectory()) {
+      throw new GatewayError(`Invalid Rust experiment directory: ${directory}`);
+    }
+  }
+  return root;
+}
+
+function containsPath(root: string, candidate: string): boolean {
+  const part = relative(root, candidate);
+  return part === '' || (!isAbsolute(part) && part !== '..' && !part.startsWith(`..${sep}`));
+}
+
+function rustResourceRoot(dataRoot: string): string {
+  const configured = process.env.ASTRION_RUST_RESOURCE_ROOT || resolve(REPO_ROOT, 'desktop-electron/.cache/rust-experiment/resources');
+  if (!isAbsolute(configured) || !existsSync(resolve(configured, 'config/providers_catalog.json'))) {
+    throw new GatewayError('Prepare the Rust resources with node desktop/scripts/prepare_rust_backend.mjs, or set ASTRION_RUST_RESOURCE_ROOT');
+  }
+  const root = realpathSync(configured);
+  if (containsPath(dataRoot, root) || existsSync(resolve(root, 'config/custom_models.json'))) {
+    throw new GatewayError('Use staged Rust product resources, separate from experiment data');
+  }
+  return root;
+}
+
+function portIsUnbound(port: number): Promise<boolean> {
+  return new Promise(resolvePort => {
+    const socket = createConnection({ host: '127.0.0.1', port, timeout: 800 });
+    socket.once('connect', () => { socket.destroy(); resolvePort(false); });
+    socket.once('timeout', () => { socket.destroy(); resolvePort(false); });
+    socket.once('error', (error: NodeJS.ErrnoException) => resolvePort(error.code === 'ECONNREFUSED'));
+  });
+}
 
 /** 探测能跑后端的 python 解释器：依次试候选，能 import 服务端关键依赖（yaml/flask）才用；
  *  全部失败时退回第一个存在的候选（让启动日志留下真实报错，而不是 CLI 侧静默）。 */
@@ -62,18 +153,25 @@ export class GatewayError extends Error {}
 export class GatewayClient {
   readonly baseUrl: string;
   private token = '';
+  private tokenPath: string | null;
+  private readonly backend = cliBackend();
+  private readonly port: number;
+  private readonly explicitToken = process.env.ASTRION_HOST_TOKEN_FILE;
   /** cwd 绑定的工作区 id（boot 确定后写入，后续请求自动携带） */
   workspaceId = '';
 
   constructor() {
-    const port = Number(process.env.ASTRION_API_PORT || process.env.WEB_SERVER_PORT || DEFAULT_PORT);
-    this.baseUrl = process.env.ASTRION_API_BASE || `http://127.0.0.1:${port}`;
+    const rust = this.backend === 'rust';
+    const defaultPort = cliExperiment() ? RUST_PORT : process.env.WEB_SERVER_PORT || DEFAULT_PORT;
+    this.port = Number(process.env.ASTRION_API_PORT || defaultPort);
+    this.baseUrl = (!rust && process.env.ASTRION_API_BASE) || `http://127.0.0.1:${this.port}`;
+    this.tokenPath = rust ? null : (this.explicitToken || resolve(cliDataDir() || resolve(DEFAULT_DATA_ROOT, 'host/data'), 'host_api_token'));
   }
 
   /** 读取 host Bearer token；文件不存在 = 服务未启动或非 host 模式 */
   async readToken(): Promise<string> {
     try {
-      this.token = (await readFile(TOKEN_PATH, 'utf8')).trim();
+      this.token = this.tokenPath ? (await readFile(this.tokenPath, 'utf8')).trim() : '';
     } catch {
       this.token = '';
     }
@@ -92,6 +190,8 @@ export class GatewayClient {
    */
   async ensureRunning(cwd: string, onPhase?: (phase: 'connecting' | 'starting') => void): Promise<void> {
     onPhase?.('connecting');
+    if (this.backend === 'rust') return this.ensureRustRunning(cwd, onPhase);
+    if (this.backend !== 'python') throw new GatewayError('ASTRION_CLI_BACKEND must be python or rust');
     if (await this.readToken()) {
       try {
         await this.listWorkspaces();
@@ -102,6 +202,9 @@ export class GatewayClient {
     }
     const alive = await this.probeAlive();
     if (!alive) {
+      // An explicitly paired instance owns its credential and lifecycle.
+      if (this.explicitToken || process.env.ASTRION_API_BASE)
+        throw new GatewayError(`connect_failed: ${this.baseUrl}`);
       onPhase?.('starting');
       this.spawnServer(cwd);
     }
@@ -120,10 +223,107 @@ export class GatewayClient {
     throw new GatewayError(alive ? 'stale_server' : 'start_timeout');
   }
 
+  private async probeRust(starting = false): Promise<number | null> {
+    let response: Response;
+    try {
+      response = await fetch(`${this.baseUrl}/api/host-mode-enabled`, {
+        redirect: 'manual', signal: AbortSignal.timeout(800),
+      });
+    } catch {
+      if (starting || await portIsUnbound(this.port)) return null;
+      throw new GatewayError(`Cannot verify Gateway at ${this.baseUrl}`);
+    }
+    const info = await response.json().catch(() => null);
+    if (response.ok && info?.backend === 'rust' && Number.isSafeInteger(info.pid) && info.pid > 0) return info.pid;
+    throw new GatewayError(`Another service is listening at ${this.baseUrl}`);
+  }
+
+  private async connectRust(): Promise<void> {
+    if (!await this.readToken()) throw new GatewayError('Rust Gateway token is missing from the selected data directory');
+    const catalog = await this.listWorkspaces();
+    if (!Array.isArray(catalog?.workspaces)) throw new GatewayError('Invalid Rust Gateway workspace list');
+  }
+
+  private async ensureRustRunning(cwd: string, onPhase?: (phase: 'starting') => void): Promise<void> {
+    if (process.env.ASTRION_API_BASE || this.explicitToken) {
+      throw new GatewayError('Use ASTRION_API_PORT for self-started Rust, or unset ASTRION_CLI_BACKEND and pair an existing server with ASTRION_API_BASE and ASTRION_HOST_TOKEN_FILE');
+    }
+    if (!Number.isInteger(this.port) || this.port < 1024 || this.port > 65535) throw new GatewayError('Invalid ASTRION_API_PORT');
+    const experimental = cliExperiment();
+    const root = experimental ? rustExperimentRoot() : cliConfigRoot()!;
+    const dataDir = experimental ? resolve(root, 'host/data') : cliDataDir()!;
+    this.tokenPath = resolve(dataDir, 'host_api_token');
+    if (await this.probeRust() !== null) return this.connectRust();
+
+    const endpoint = process.env.ASTRION_RUST_MODEL_ENDPOINT;
+    const model = process.env.ASTRION_RUST_MODEL;
+    if (Boolean(endpoint) !== Boolean(model)) throw new GatewayError('Set ASTRION_RUST_MODEL_ENDPOINT and ASTRION_RUST_MODEL together');
+    const executable = process.platform === 'win32' ? 'astrion-headless.exe' : 'astrion-headless';
+    const binary = process.env.ASTRION_RUST_BACKEND_BIN ||
+      ['release', 'debug'].map(profile => resolve(REPO_ROOT, 'backend-rust/target', profile, executable))
+        .find(existsSync);
+    if (!binary || !isAbsolute(binary) || !existsSync(binary))
+      throw new GatewayError('Build the Rust backend with cargo build --release, or set ASTRION_RUST_BACKEND_BIN to its absolute path');
+    const resourceRoot = rustResourceRoot(root);
+    const logDir = (experimental ? undefined : configuredPath('LOGS_DIR')) || resolve(root, 'host/logs');
+    const deployDir = experimental ? resolve(root, 'config') : cliDeployDir()!;
+    const registry = (experimental ? undefined : configuredPath('HOST_WORKSPACES_FILE')) || resolve(deployDir, 'host_workspaces.json');
+    const logPath = resolve(logDir, 'cli_spawned_server.log');
+    const args = ['--workspace', cwd, '--data-dir', dataDir, '--port', String(this.port)];
+    if (endpoint && model) args.push('--endpoint', endpoint, '--model', model);
+    const env = { ...process.env };
+    if (experimental) {
+      for (const key of Object.keys(env)) if (/^(ASTRION_|AGENT_|WEB_)/i.test(key)) delete env[key];
+      Object.assign(env, {
+        HOME: root, USERPROFILE: root, APPDATA: root, LOCALAPPDATA: root,
+        XDG_CONFIG_HOME: root, XDG_DATA_HOME: root, XDG_CACHE_HOME: root,
+      });
+    }
+    delete env.ASTRION_DESKTOP_VERSION;
+    delete env.ASTRION_DESKTOP_STOP_STDIN;
+    Object.assign(env, {
+      ASTRION_DATA_ROOT: root, ASTRION_RESOURCE_ROOT: resourceRoot, ASTRION_IGNORE_DOTENV: '1',
+      DEPLOY_CONFIG_DIR: deployDir, LOGS_DIR: logDir, HOST_WORKSPACES_FILE: registry,
+      ...(process.env.ASTRION_MODEL_API_KEY && { ASTRION_MODEL_API_KEY: process.env.ASTRION_MODEL_API_KEY }),
+    });
+    onPhase?.('starting');
+    mkdirSync(logDir, { recursive: true, mode: 0o700 });
+    const log = openSync(logPath, 'a', 0o600);
+    const child = (() => {
+      try {
+        return spawn(binary, args, { cwd, env, detached: true, stdio: ['ignore', log, log], windowsHide: true });
+      } finally {
+        closeSync(log);
+      }
+    })();
+    let spawnError: Error | undefined;
+    child.once('error', error => { spawnError = error; });
+    try {
+      const deadline = Date.now() + 30_000;
+      while (Date.now() < deadline) {
+        if (spawnError || child.exitCode !== null || child.signalCode !== null) {
+          throw new GatewayError(`Rust Gateway exited before readiness. See ${logPath}`, { cause: spawnError });
+        }
+        const pid = await this.probeRust(true);
+        if (pid !== null) {
+          if (pid !== child.pid) throw new GatewayError(`Another Rust process acquired ${this.baseUrl}`);
+          await this.connectRust();
+          child.unref();
+          return;
+        }
+        await delay(100);
+      }
+      throw new GatewayError(`Rust Gateway startup timed out. See ${logPath}`);
+    } catch (error) {
+      child.kill('SIGKILL');
+      throw error;
+    }
+  }
+
   /** 探测服务是否在运行：任何 HTTP 响应（含 401）都算在跑；连接拒绝才算不在跑 */
   private async probeAlive(): Promise<boolean> {
     try {
-      await fetch(`${this.baseUrl}/api/host/workspaces`, { method: 'GET' });
+      await fetch(`${this.baseUrl}/api/host/workspaces`, { method: 'GET', signal: AbortSignal.timeout(800) });
       return true;
     } catch {
       return false;
@@ -137,10 +337,10 @@ export class GatewayClient {
   private spawnServer(cwd: string): void {
     // cli/src → 项目根；fileURLToPath 正确解码中文路径（new URL().pathname 会留下
     // 百分号编码，导致 existsSync 永远 false、spawn cwd 无效——中文路径必用此函数）
-    const repoRoot = resolve(fileURLToPath(new URL('../..', import.meta.url)));
-    const port = Number(process.env.ASTRION_API_PORT || process.env.WEB_SERVER_PORT || DEFAULT_PORT);
+    const repoRoot = REPO_ROOT;
+    const port = this.port;
     const pythonBin = pickPython(repoRoot);
-    const logDir = `${homedir()}/.astrion/astrion/host/logs`;
+    const logDir = configuredPath('LOGS_DIR') || resolve(cliConfigRoot() || DEFAULT_DATA_ROOT, 'host/logs');
     try {
       mkdirSync(logDir, { recursive: true });
       const logFd = openSync(resolve(logDir, 'cli_spawned_server.log'), 'a');
@@ -314,6 +514,7 @@ export class GatewayClient {
       response = await fetch(`${this.baseUrl}${path}`, {
         method: options.method,
         headers,
+        ...(this.backend === 'rust' && { redirect: 'error' }),
         body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
       });
     } catch (err) {

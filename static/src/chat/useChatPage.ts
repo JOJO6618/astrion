@@ -142,8 +142,18 @@ export function useChatPage() {
   async function load(id: string, owner: () => boolean = () => true) {
     editing.value = null;
     const accepted = await chat.load(id, owner);
-    if (alive && accepted && owner())
+    if (alive && accepted && owner() && !chat.incompatibleId)
       await draft.open(chat.settings?.username || '', chat.cid || 'new');
+  }
+  function refreshAfterConversationMigration() {
+    if (!hasDesktopSidebar()) {
+      void run(async () => {
+        const query = conversations.searchQuery;
+        await chat.list();
+        if (query && conversations.searchQuery === query) await chat.list(query);
+      });
+    }
+    if (chat.incompatibleId && !chat.loading) void run(() => load(chat.incompatibleId));
   }
   async function navigate(id: string) {
     if (tabs.enabled)
@@ -166,7 +176,7 @@ export function useChatPage() {
     mobileOpen.value = false;
   }
   async function send() {
-    if (uploading.value || !draft.ready) return;
+    if (chat.incompatibleId || uploading.value || !draft.ready) return;
     const oldCid = chat.cid;
     const tabKey =
       tabs.viewTab?.kind === 'new' && tabs.viewTab.conversationKind === 'chat'
@@ -187,7 +197,7 @@ export function useChatPage() {
     });
   }
   async function upload(files: FileList | File[] | null) {
-    if (!files?.length || uploading.value) return;
+    if (chat.incompatibleId || !files?.length || uploading.value) return;
     const owner = draft.identity;
     const selected = Array.from(files);
     if (selected.some((f) => !/^(image|video)\//.test(f.type))) {
@@ -273,7 +283,7 @@ export function useChatPage() {
     }
   );
   watch(
-    () => chat.cid,
+    () => chat.incompatibleId || chat.cid,
     (id) => {
       conversations.currentConversationId = id || null;
       editing.value = null;
@@ -371,6 +381,7 @@ export function useChatPage() {
     versions,
     versionIndex,
     navigate,
+    refreshAfterConversationMigration,
     send,
     upload,
     saveEdit,

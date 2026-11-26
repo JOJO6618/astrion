@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sign in to Astrion</title>
+  <script src="/auth/login.js" defer></script>
+</head>
+<body>
+  <main>
+    <h1>Sign in to Astrion</h1>
+    <form id="sign-in" method="post" action="/host-login">
+      <p id="password-field" hidden>
+        <label for="password">Host password</label>
+        <input id="password" type="password" autocomplete="current-password" disabled>
+      </p>
+      <button id="submit" type="submit" disabled>Sign in</button>
+      <p id="message" role="alert"></p>
+    </form>
+    <noscript>Enable JavaScript to sign in.</noscript>
+  </main>
+</body>
+</html>

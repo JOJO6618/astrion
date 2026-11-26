@@ -34,3 +34,7 @@
 4. 跑 `test/历史测试_日期不明/test_tool_loading.py`（注册表完整性断言会校验数量与结构）。
 
 ---
+
+### Rust Host
+
+Rust 在主对话创建时固定个人空间的延迟集。模型工具循环从会话状态生成常驻 stub，`load_tools` 的完整定义和 `loaded` 在同一 SQLite 写入中提交。压缩沿用清空已加载定义的规则。真实模型循环回归在 `test/2026-11-27_Rust内置网页工具/web_tools_http.py`。

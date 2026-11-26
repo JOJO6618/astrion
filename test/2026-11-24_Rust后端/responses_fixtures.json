@@ -1,0 +1,1758 @@
+{
+  "requests": [
+    {
+      "name": "ordinary",
+      "input": {
+        "model_id": "gpt-6.2",
+        "messages": [
+          null,
+          {
+            "role": "system",
+            "content": "custom rules"
+          },
+          {
+            "role": "system",
+            "content": {
+              "z": "约定",
+              "a": [
+                {
+                  "plan": true
+                }
+              ]
+            }
+          },
+          {
+            "role": "system",
+            "content": ""
+          },
+          {
+            "role": "tool",
+            "tool_call_id": "call1",
+            "content": {
+              "z": 2,
+              "a": "提前到达"
+            }
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "混合内容"
+              },
+              {
+                "type": "image_url",
+                "image_url": {
+                  "url": "data:image/png;base64,c3ludGhldGlj",
+                  "detail": "low"
+                }
+              },
+              {
+                "type": "image_url",
+                "image_url": "https://image.example.invalid/x"
+              },
+              {
+                "type": "image_url",
+                "image_url": {}
+              },
+              {
+                "type": "video_url",
+                "video_url": "data:video/mp4;base64,eA=="
+              },
+              {
+                "type": "unknown",
+                "text": "drop"
+              },
+              "  字符串 ",
+              false,
+              [
+                null,
+                "a'b",
+                "空 格"
+              ],
+              " "
+            ]
+          },
+          {
+            "role": "user",
+            "content": null
+          },
+          {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "text",
+                "text": "答复"
+              },
+              {
+                "type": "video_url"
+              }
+            ],
+            "reasoning_content": "display only",
+            "responses_reasoning_items": [
+              {
+                "type": "reasoning",
+                "id": "rs1",
+                "encrypted_content": "opaque-fixture",
+                "summary": []
+              },
+              {
+                "type": "message",
+                "content": "drop"
+              }
+            ],
+            "tool_calls": [
+              {
+                "id": "call1",
+                "function": {
+                  "name": "inspect",
+                  "arguments": "{\"keep\":7}"
+                }
+              },
+              {
+                "id": "call2",
+                "function": {
+                  "name": "empty"
+                }
+              },
+              {
+                "id": "invalid",
+                "function": {}
+              },
+              {
+                "function": {
+                  "name": "inspect"
+                }
+              }
+            ]
+          },
+          {
+            "role": "tool",
+            "tool_call_id": "call1",
+            "content": [
+              {
+                "type": "image_url"
+              },
+              {
+                "type": "text",
+                "text": "结果"
+              }
+            ]
+          },
+          {
+            "role": "tool",
+            "tool_call_id": "call2",
+            "content": null
+          },
+          {
+            "role": "tool",
+            "name": "lost",
+            "content": [
+              17,
+              null,
+              {
+                "type": "video_url"
+              }
+            ]
+          },
+          {
+            "role": "developer",
+            "content": "only system handling adds a developer message"
+          }
+        ],
+        "instructions": "base",
+        "tools": [
+          {
+            "type": "function",
+            "function": {
+              "name": "inspect",
+              "description": "synthetic fixture",
+              "parameters": {
+                "$schema": "ignored",
+                "type": "object",
+                "properties": {
+                  "z": {
+                    "type": "string",
+                    "description": "已有 null 提示"
+                  },
+                  "if": {
+                    "type": "boolean",
+                    "if": {
+                      "const": true
+                    }
+                  },
+                  "keep": {
+                    "type": "number",
+                    "description": "required"
+                  },
+                  "union": {
+                    "type": [
+                      "array"
+                    ],
+                    "items": [
+                      {
+                        "type": "object",
+                        "propertyNames": {}
+                      }
+                    ]
+                  },
+                  "already": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "always_null": {
+                    "type": "null"
+                  },
+                  "raw": false,
+                  "ref": {
+                    "$ref": "#/$defs/then"
+                  }
+                },
+                "$defs": {
+                  "then": {
+                    "type": "object",
+                    "properties": {
+                      "else": {
+                        "type": "string",
+                        "$id": "drop"
+                      }
+                    }
+                  }
+                },
+                "definitions": {
+                  "contains": {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "minContains": 1
+                      },
+                      true
+                    ]
+                  }
+                },
+                "required": [
+                  "keep"
+                ]
+              },
+              "strict": false
+            }
+          },
+          {
+            "name": "empty",
+            "strict": 1
+          },
+          {
+            "name": "default",
+            "parameters": false
+          },
+          {
+            "type": "function",
+            "name": "ignored-outer-name"
+          },
+          null
+        ],
+        "effort": "high",
+        "verbosity": "low",
+        "max_output_tokens": 123,
+        "session_id": "fixture-session",
+        "use_developer_prompt": true
+      },
+      "expected": {
+        "model": "gpt-6.2",
+        "input": [
+          {
+            "type": "message",
+            "role": "developer",
+            "content": [
+              {
+                "type": "input_text",
+                "text": "base\n\ncustom rules\n\n{\"z\": \"约定\", \"a\": [{\"plan\": true}]}"
+              }
+            ]
+          },
+          {
+            "type": "message",
+            "role": "user",
+            "content": [
+              {
+                "type": "input_text",
+                "text": "[工具结果（tool）]\n{\"z\": 2, \"a\": \"提前到达\"}"
+              }
+            ]
+          },
+          {
+            "type": "message",
+            "role": "user",
+            "content": [
+              {
+                "type": "input_text",
+                "text": "混合内容"
+              },
+              {
+                "type": "input_image",
+                "image_url": "data:image/png;base64,c3ludGhldGlj"
+              },
+              {
+                "type": "input_image",
+                "image_url": "https://image.example.invalid/x"
+              },
+              {
+                "type": "input_text",
+                "text": "[用户提供了视频，当前模型不支持视频输入]"
+              },
+              {
+                "type": "input_text",
+                "text": "字符串"
+              },
+              {
+                "type": "input_text",
+                "text": "False"
+              },
+              {
+                "type": "input_text",
+                "text": "[None, \"a'b\", '空 格']"
+              }
+            ]
+          },
+          {
+            "type": "message",
+            "role": "user",
+            "content": [
+              {
+                "type": "input_text",
+                "text": ""
+              }
+            ]
+          },
+          {
+            "type": "reasoning",
+            "encrypted_content": "opaque-fixture",
+            "summary": []
+          },
+          {
+            "type": "message",
+            "role": "assistant",
+            "content": [
+              {
+                "type": "output_text",
+                "text": "答复\n[视频]"
+              }
+            ]
+          },
+          {
+            "type": "function_call",
+            "call_id": "call1",
+            "name": "inspect",
+            "arguments": "{\"keep\":7}"
+          },
+          {
+            "type": "function_call",
+            "call_id": "call2",
+            "name": "empty",
+            "arguments": ""
+          },
+          {
+            "type": "function_call_output",
+            "call_id": "call1",
+            "output": "[图片]\n结果"
+          },
+          {
+            "type": "function_call_output",
+            "call_id": "call2",
+            "output": ""
+          },
+          {
+            "type": "message",
+            "role": "user",
+            "content": [
+              {
+                "type": "input_text",
+                "text": "[工具结果（lost）]\n17\nNone\n[视频]"
+              }
+            ]
+          }
+        ],
+        "store": false,
+        "stream": true,
+        "include": [
+          "reasoning.encrypted_content"
+        ],
+        "tools": [
+          {
+            "type": "function",
+            "name": "inspect",
+            "description": "synthetic fixture",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "z": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "已有 null 提示"
+                },
+                "if": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ],
+                  "description": "（不需要时填 null，系统会视为未提供）"
+                },
+                "keep": {
+                  "type": "number",
+                  "description": "required"
+                },
+                "union": {
+                  "type": [
+                    "array",
+                    "null"
+                  ],
+                  "items": [
+                    {
+                      "type": "object"
+                    }
+                  ],
+                  "description": "（不需要时填 null，系统会视为未提供）"
+                },
+                "already": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "description": "（不需要时填 null，系统会视为未提供）"
+                },
+                "always_null": {
+                  "type": "null",
+                  "description": "（不需要时填 null，系统会视为未提供）"
+                },
+                "raw": false,
+                "ref": {
+                  "$ref": "#/$defs/then",
+                  "description": "（不需要时填 null，系统会视为未提供）"
+                }
+              },
+              "$defs": {
+                "then": {
+                  "type": "object",
+                  "properties": {
+                    "else": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "definitions": {
+                "contains": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    true
+                  ]
+                }
+              },
+              "required": [
+                "keep"
+              ]
+            },
+            "strict": false
+          },
+          {
+            "type": "function",
+            "name": "empty",
+            "description": "",
+            "parameters": {
+              "type": "object",
+              "properties": {}
+            },
+            "strict": true
+          },
+          {
+            "type": "function",
+            "name": "default",
+            "description": "",
+            "parameters": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        ],
+        "tool_choice": "auto",
+        "reasoning": {
+          "effort": "high",
+          "summary": "detailed"
+        },
+        "text": {
+          "verbosity": "low"
+        },
+        "max_output_tokens": 123,
+        "prompt_cache_key": "fixture-session"
+      }
+    },
+    {
+      "name": "frozen",
+      "input": {
+        "model_id": "o4-mini",
+        "messages": [
+          {
+            "role": "system",
+            "content": "frozen",
+            "_frozen_system_prompt": true
+          },
+          {
+            "role": "system",
+            "content": "suffix"
+          },
+          {
+            "role": "user",
+            "content": "hello"
+          }
+        ],
+        "instructions": "provider should not repeat"
+      },
+      "expected": {
+        "model": "o4-mini",
+        "input": [
+          {
+            "type": "message",
+            "role": "user",
+            "content": [
+              {
+                "type": "input_text",
+                "text": "hello"
+              }
+            ]
+          }
+        ],
+        "store": false,
+        "stream": true,
+        "include": [
+          "reasoning.encrypted_content"
+        ],
+        "instructions": "frozen\n\nsuffix",
+        "reasoning": {
+          "summary": "detailed"
+        }
+      }
+    },
+    {
+      "name": "marker_not_first",
+      "input": {
+        "model_id": "o4-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "hello"
+          },
+          {
+            "role": "system",
+            "content": "normal",
+            "_frozen_system_prompt": true
+          }
+        ],
+        "instructions": ""
+      },
+      "expected": {
+        "model": "o4-mini",
+        "input": [
+          {
+            "type": "message",
+            "role": "user",
+            "content": [
+              {
+                "type": "input_text",
+                "text": "hello"
+              }
+            ]
+          }
+        ],
+        "store": false,
+        "stream": true,
+        "include": [
+          "reasoning.encrypted_content"
+        ],
+        "instructions": "\n\nnormal",
+        "reasoning": {
+          "summary": "detailed"
+        }
+      }
+    },
+    {
+      "name": "absent_optional_parameters",
+      "input": {
+        "model_id": "external",
+        "messages": [
+          {
+            "role": "system"
+          }
+        ],
+        "instructions": "",
+        "effort": "",
+        "summary": "",
+        "max_output_tokens": -5,
+        "verbosity": "",
+        "session_id": ""
+      },
+      "expected": {
+        "model": "external",
+        "input": [],
+        "store": false,
+        "stream": true,
+        "include": [
+          "reasoning.encrypted_content"
+        ],
+        "instructions": "\n\nnull"
+      }
+    },
+    {
+      "name": "empty_instructions_developer_mode",
+      "input": {
+        "model_id": "gpt-6.2",
+        "messages": [],
+        "instructions": "",
+        "use_developer_prompt": true,
+        "max_output_tokens": 0
+      },
+      "expected": {
+        "model": "gpt-6.2",
+        "input": [],
+        "store": false,
+        "stream": true,
+        "include": [
+          "reasoning.encrypted_content"
+        ],
+        "instructions": "",
+        "reasoning": {
+          "summary": "detailed"
+        }
+      }
+    },
+    {
+      "name": "empty_frozen_system",
+      "input": {
+        "model_id": "gpt-6.2",
+        "messages": [
+          {
+            "role": "system",
+            "content": "",
+            "_frozen_system_prompt": true
+          }
+        ],
+        "instructions": "base",
+        "use_developer_prompt": true
+      },
+      "expected": {
+        "model": "gpt-6.2",
+        "input": [
+          {
+            "type": "message",
+            "role": "developer",
+            "content": [
+              {
+                "type": "input_text",
+                "text": "base"
+              }
+            ]
+          }
+        ],
+        "store": false,
+        "stream": true,
+        "include": [
+          "reasoning.encrypted_content"
+        ],
+        "reasoning": {
+          "summary": "detailed"
+        }
+      }
+    }
+  ],
+  "policies": [
+    {
+      "input": {},
+      "developer": false,
+      "cache": false
+    },
+    {
+      "input": {
+        "responses_auth": "codex_oauth",
+        "model_id": "private"
+      },
+      "developer": true,
+      "cache": true
+    },
+    {
+      "input": {
+        "provider_id": "openai-api"
+      },
+      "developer": true,
+      "cache": true
+    },
+    {
+      "input": {
+        "provider_id": "openai-codex"
+      },
+      "developer": true,
+      "cache": true
+    },
+    {
+      "input": {
+        "model_id": " GPT-6.2 ",
+        "base_url": "https://proxy.example.invalid/v1"
+      },
+      "developer": true,
+      "cache": false
+    },
+    {
+      "input": {
+        "model_id": "chatgpt-latest"
+      },
+      "developer": true,
+      "cache": false
+    },
+    {
+      "input": {
+        "model_id": "gpt-oss-120b",
+        "base_url": "https://proxy.example.invalid/v1"
+      },
+      "developer": false,
+      "cache": false
+    },
+    {
+      "input": {
+        "model_id": "o1"
+      },
+      "developer": true,
+      "cache": false
+    },
+    {
+      "input": {
+        "model_id": "o4-mini"
+      },
+      "developer": true,
+      "cache": false
+    },
+    {
+      "input": {
+        "model_id": "o9-x"
+      },
+      "developer": true,
+      "cache": false
+    },
+    {
+      "input": {
+        "model_id": "o10-mini"
+      },
+      "developer": false,
+      "cache": false
+    },
+    {
+      "input": {
+        "base_url": "https://API.OPENAI.COM:443/v1"
+      },
+      "developer": true,
+      "cache": true
+    },
+    {
+      "input": {
+        "base_url": "https://resource.openai.azure.com/openai"
+      },
+      "developer": true,
+      "cache": true
+    },
+    {
+      "input": {
+        "base_url": "//gateway.ai.cloudflare.com/v1"
+      },
+      "developer": true,
+      "cache": true
+    },
+    {
+      "input": {
+        "base_url": "https://evilopenai.com"
+      },
+      "developer": false,
+      "cache": false
+    },
+    {
+      "input": {
+        "base_url": "https://api.openai.com.example.invalid"
+      },
+      "developer": false,
+      "cache": false
+    },
+    {
+      "input": {
+        "base_url": "api.openai.com/v1"
+      },
+      "developer": false,
+      "cache": false
+    },
+    {
+      "input": {
+        "base_url": "https://[broken.openai.com"
+      },
+      "developer": false,
+      "cache": false
+    },
+    {
+      "input": {
+        "base_url": "https://api.openai.com@thirdparty.example.invalid"
+      },
+      "developer": false,
+      "cache": false
+    }
+  ],
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "inspect",
+        "description": "synthetic fixture",
+        "parameters": {
+          "$schema": "ignored",
+          "type": "object",
+          "properties": {
+            "z": {
+              "type": "string",
+              "description": "已有 null 提示"
+            },
+            "if": {
+              "type": "boolean",
+              "if": {
+                "const": true
+              }
+            },
+            "keep": {
+              "type": "number",
+              "description": "required"
+            },
+            "union": {
+              "type": [
+                "array"
+              ],
+              "items": [
+                {
+                  "type": "object",
+                  "propertyNames": {}
+                }
+              ]
+            },
+            "already": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "always_null": {
+              "type": "null"
+            },
+            "raw": false,
+            "ref": {
+              "$ref": "#/$defs/then"
+            }
+          },
+          "$defs": {
+            "then": {
+              "type": "object",
+              "properties": {
+                "else": {
+                  "type": "string",
+                  "$id": "drop"
+                }
+              }
+            }
+          },
+          "definitions": {
+            "contains": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minContains": 1
+                },
+                true
+              ]
+            }
+          },
+          "required": [
+            "keep"
+          ]
+        },
+        "strict": false
+      }
+    },
+    {
+      "name": "empty",
+      "strict": 1
+    },
+    {
+      "name": "default",
+      "parameters": false
+    },
+    {
+      "type": "function",
+      "name": "ignored-outer-name"
+    },
+    null
+  ],
+  "required": {
+    "inspect": [
+      "keep"
+    ],
+    "empty": [],
+    "default": []
+  },
+  "argument_cases": [
+    {
+      "name": "inspect",
+      "input": " {\"z\":null,\"keep\":null,\"msg\":\"文本\",\"nested\":{\"b\":null,\"a\":false},\"e\":1e-6,\"large\":1e16,\"zero\":-0.0} ",
+      "expected": "{\"keep\": null, \"msg\": \"文本\", \"nested\": {\"b\": null, \"a\": false}, \"e\": 1e-06, \"large\": 1e+16, \"zero\": -0.0}"
+    },
+    {
+      "name": "empty",
+      "input": {
+        "c": null,
+        "z": [
+          null,
+          false
+        ],
+        "a": {}
+      },
+      "expected": "{\"z\": [null, false], \"a\": {}}"
+    },
+    {
+      "name": "inspect",
+      "input": " {invalid JSON} ",
+      "expected": " {invalid JSON} "
+    },
+    {
+      "name": "inspect",
+      "input": " [null, 1] ",
+      "expected": " [null, 1] "
+    },
+    {
+      "name": "unknown",
+      "input": " {\"z\":null} ",
+      "expected": " {\"z\":null} "
+    },
+    {
+      "name": null,
+      "input": null,
+      "expected": "{}"
+    },
+    {
+      "name": "inspect",
+      "input": false,
+      "expected": "{}"
+    },
+    {
+      "name": "empty",
+      "input": "null",
+      "expected": "null"
+    },
+    {
+      "name": "inspect",
+      "input": "{\"x\":null,\"x\":2,\"a\":4,\"a\":null,\"n\":0,\"b\":false,\"s\":\"\"}",
+      "expected": "{\"x\": 2, \"n\": 0, \"b\": false, \"s\": \"\"}"
+    }
+  ],
+  "streams": [
+    {
+      "name": "tool_summary_usage",
+      "lines": [
+        [
+          0,
+          ""
+        ],
+        [
+          1,
+          ": heartbeat"
+        ],
+        [
+          2,
+          "event: response.created"
+        ],
+        [
+          3,
+          "data: broken"
+        ],
+        [
+          4,
+          "data: [1,2]"
+        ],
+        [
+          5,
+          "data: null"
+        ],
+        [
+          6,
+          " data: {}"
+        ],
+        [
+          7,
+          "data:    "
+        ],
+        [
+          10,
+          "data: {\"type\": \"response.created\"}"
+        ],
+        [
+          20,
+          "data: {\"type\": \"response.reasoning_text.delta\", \"delta\": \"raw reasoning\"}"
+        ],
+        [
+          30,
+          "data: {\"type\": \"response.reasoning_summary_text.delta\", \"item_id\": \"rs-first\", \"summary_index\": 0, \"delta\": \"wrong fallback\"}"
+        ],
+        [
+          40,
+          "data: {\"type\": \"response.reasoning_summary_text.done\", \"item_id\": \"rs-first\", \"summary_index\": 0, \"text\": \" **原生摘要** \"}"
+        ],
+        [
+          45,
+          "data: {\"type\": \"response.reasoning_summary_text.delta\", \"item_id\": \"a\", \"summary_index\": \"2\", \"delta\": \" **第二段** \"}"
+        ],
+        [
+          46,
+          "data: {\"type\": \"response.reasoning_summary_text.done\", \"item_id\": \"a\", \"summary_index\": 2}"
+        ],
+        [
+          48,
+          "data: {\"type\": \"response.reasoning_summary_text.done\", \"text\": \"****\"}"
+        ],
+        [
+          50,
+          "data: {\"type\": \"response.output_item.done\", \"item\": {\"type\": \"reasoning\", \"id\": \"rs-first\", \"summary\": [{\"type\": \"summary_text\", \"text\": \"原生摘要\"}], \"encrypted_content\": \"ciphertext-fixture\"}}"
+        ],
+        [
+          60,
+          "data: {\"type\": \"response.output_item.added\", \"output_index\": 1, \"item\": {\"type\": \"function_call\", \"id\": \"one\", \"call_id\": \"call-one\", \"name\": \"inspect\"}}"
+        ],
+        [
+          70,
+          "data: {\"type\": \"response.function_call_arguments.delta\", \"item_id\": \"one\", \"delta\": \"{\\\"z\\\": null, \"}"
+        ],
+        [
+          80,
+          "data: {\"type\": \"response.output_item.added\", \"output_index\": 2, \"item\": {\"type\": \"function_call\", \"id\": \"two\", \"call_id\": \"call-two\", \"name\": \"empty\"}}"
+        ],
+        [
+          90,
+          "data: {\"type\": \"response.function_call_arguments.delta\", \"item_id\": \"two\", \"delta\": \"{\\\"abandoned\\\":0}\"}"
+        ],
+        [
+          100,
+          "data: {\"type\": \"response.function_call_arguments.delta\", \"item_id\": \"one\", \"delta\": \"\\\"keep\\\": null, \\\"a\\\": \\\"值\\\"}\"}"
+        ],
+        [
+          110,
+          "data: {\"type\": \"response.function_call_arguments.done\", \"item_id\": \"one\"}"
+        ],
+        [
+          120,
+          "data: {\"type\": \"response.output_item.done\", \"item\": {\"type\": \"function_call\", \"id\": \"two\", \"call_id\": \"call-two\", \"name\": \"empty\", \"arguments\": \"{\\\"remove\\\":null,\\\"final\\\":false}\"}}"
+        ],
+        [
+          130,
+          "data: {\"type\": \"response.output_item.done\", \"item\": {\"type\": \"function_call\", \"id\": \"one\", \"call_id\": \"call-one\", \"name\": \"inspect\", \"arguments\": \"\"}}"
+        ],
+        [
+          150,
+          "data: {\"type\": \"response.output_text.delta\", \"item_id\": \"text\", \"content_index\": 0, \"delta\": \"正文\"}"
+        ],
+        [
+          180,
+          "data: {\"type\": \"response.output_text.done\", \"item_id\": \"text\", \"content_index\": 0}"
+        ],
+        [
+          200,
+          "data: {\"type\": \"response.completed\", \"response\": {\"output\": [{\"encrypted_content\": \"ciphertext-fixture\", \"id\": \"rs-repeated\", \"summary\": [{\"text\": \"原生摘要\", \"type\": \"summary_text\"}], \"type\": \"reasoning\"}, {\"type\": \"message\", \"id\": \"text\"}, {\"type\": \"reasoning\", \"encrypted_content\": \"思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思\"}, {\"type\": \"reasoning\", \"encrypted_content\": \"思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思tail\"}], \"usage\": {\"input_tokens\": 8, \"output_tokens\": 5, \"total_tokens\": 0, \"input_tokens_details\": {\"cached_tokens\": 0}, \"output_tokens_details\": {\"reasoning_tokens\": 2}}}}"
+        ],
+        [
+          201,
+          "data: [DONE]\r"
+        ]
+      ],
+      "steps": [
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [
+          {
+            "choices": [
+              {
+                "index": 0,
+                "delta": {
+                  "role": "assistant"
+                }
+              }
+            ]
+          }
+        ],
+        [
+          {
+            "choices": [
+              {
+                "index": 0,
+                "delta": {
+                  "reasoning_content": "raw reasoning"
+                }
+              }
+            ]
+          }
+        ],
+        [],
+        [
+          {
+            "choices": [
+              {
+                "index": 0,
+                "delta": {
+                  "reasoning_content": "原生摘要"
+                }
+              }
+            ],
+            "_reasoning_summary": "原生摘要"
+          }
+        ],
+        [],
+        [
+          {
+            "choices": [
+              {
+                "index": 0,
+                "delta": {
+                  "reasoning_content": "\n\n第二段"
+                }
+              }
+            ],
+            "_reasoning_summary": "第二段"
+          }
+        ],
+        [],
+        [],
+        [
+          {
+            "choices": [
+              {
+                "index": 0,
+                "delta": {
+                  "tool_calls": [
+                    {
+                      "index": 0,
+                      "id": "call-one",
+                      "type": "function",
+                      "function": {
+                        "name": "inspect",
+                        "arguments": ""
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ],
+        [],
+        [
+          {
+            "choices": [
+              {
+                "index": 0,
+                "delta": {
+                  "tool_calls": [
+                    {
+                      "index": 1,
+                      "id": "call-two",
+                      "type": "function",
+                      "function": {
+                        "name": "empty",
+                        "arguments": ""
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ],
+        [],
+        [],
+        [],
+        [
+          {
+            "choices": [
+              {
+                "index": 0,
+                "delta": {
+                  "tool_calls": [
+                    {
+                      "index": 1,
+                      "function": {
+                        "arguments": "{\"final\": false}"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ],
+        [
+          {
+            "choices": [
+              {
+                "index": 0,
+                "delta": {
+                  "tool_calls": [
+                    {
+                      "index": 0,
+                      "function": {
+                        "arguments": "{\"keep\": null, \"a\": \"值\"}"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ],
+        [
+          {
+            "choices": [
+              {
+                "index": 0,
+                "delta": {
+                  "content": "正文"
+                }
+              }
+            ]
+          }
+        ],
+        [],
+        [
+          {
+            "choices": [
+              {
+                "index": 0,
+                "delta": {},
+                "finish_reason": "tool_calls"
+              }
+            ],
+            "usage": {
+              "prompt_tokens": 8,
+              "completion_tokens": 5,
+              "total_tokens": 13,
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 2
+              }
+            },
+            "_response_output_timing": {
+              "duration_ms": 90
+            }
+          }
+        ],
+        []
+      ],
+      "reasoning": [
+        {
+          "type": "reasoning",
+          "summary": [
+            {
+              "type": "summary_text",
+              "text": "原生摘要"
+            }
+          ],
+          "encrypted_content": "ciphertext-fixture"
+        },
+        {
+          "type": "reasoning",
+          "encrypted_content": "思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思思"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "completion_flushes_in_order",
+      "lines": [
+        [
+          0,
+          "data: {\"type\": \"response.function_call_arguments.delta\", \"delta\": \"unmatched\"}"
+        ],
+        [
+          10,
+          "data: {\"type\": \"response.output_item.done\", \"item\": {\"type\": \"function_call\", \"id\": \"none\", \"call_id\": \"call-none\", \"name\": \"empty\", \"arguments\": \"{}\"}}"
+        ],
+        [
+          20,
+          "data: {\"type\": \"response.output_item.added\", \"item\": {\"type\": \"function_call\", \"id\": \"one\", \"call_id\": \"call-one\", \"name\": \"inspect\"}}"
+        ],
+        [
+          30,
+          "data: {\"type\": \"response.output_item.added\", \"item\": {\"type\": \"function_call\", \"id\": \"two\", \"call_id\": \"call-two\", \"name\": \"empty\"}}"
+        ],
+        [
+          40,
+          "data: {\"type\": \"response.function_call_arguments.delta\", \"delta\": \"{\\\"second\\\":false,\\\"z\\\":null}\"}"
+        ],
+        [
+          50,
+          "data: {\"type\": \"response.function_call_arguments.delta\", \"item_id\": \"one\", \"delta\": \"{\\\"first\\\":true,\\\"z\\\":null}\"}"
+        ],
+        [
+          60,
+          "data: {\"type\": \"response.reasoning_summary_text.delta\", \"item_id\": \"z\", \"summary_index\": 1, \"delta\": \"last\"}"
+        ],
+        [
+          70,
+          "data: {\"type\": \"response.reasoning_summary_text.delta\", \"item_id\": \"a\", \"summary_index\": 2, \"delta\": \"middle\"}"
+        ],
+        [
+          80,
+          "data: {\"type\": \"response.reasoning_summary_text.delta\", \"item_id\": \"a\", \"summary_index\": 0, \"delta\": \" **first** \"}"
+        ],
+        [
+          90,
+          "data: {\"type\": \"response.completed\", \"response\": {\"usage\": {\"input_tokens\": 0, \"output_tokens\": 0, \"total_tokens\": 0}}}"
+        ]
+      ],
+      "steps": [
+        [],
+        [],
+        [
+          {
+            "choices": [
+              {
+                "index": 0,
+                "delta": {
+                  "tool_calls": [
+                    {
+                      "index": 0,
+                      "id": "call-one",
+                      "type": "function",
+                      "function": {
+                        "name": "inspect",
+                        "arguments": ""
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ],
+        [
+          {
+            "choices": [
+              {
+                "index": 0,
+                "delta": {
+                  "tool_calls": [
+                    {
+                      "index": 1,
+                      "id": "call-two",
+                      "type": "function",
+                      "function": {
+                        "name": "empty",
+                        "arguments": ""
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [
+          {
+            "choices": [
+              {
+                "index": 0,
+                "delta": {
+                  "reasoning_content": "first"
+                }
+              }
+            ],
+            "_reasoning_summary": "first"
+          },
+          {
+            "choices": [
+              {
+                "index": 0,
+                "delta": {
+                  "reasoning_content": "\n\nmiddle"
+                }
+              }
+            ],
+            "_reasoning_summary": "middle"
+          },
+          {
+            "choices": [
+              {
+                "index": 0,
+                "delta": {
+                  "reasoning_content": "\n\nlast"
+                }
+              }
+            ],
+            "_reasoning_summary": "last"
+          },
+          {
+            "choices": [
+              {
+                "index": 0,
+                "delta": {
+                  "tool_calls": [
+                    {
+                      "index": 0,
+                      "function": {
+                        "arguments": "{\"first\": true}"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "choices": [
+              {
+                "index": 0,
+                "delta": {
+                  "tool_calls": [
+                    {
+                      "index": 1,
+                      "function": {
+                        "arguments": "{\"second\": false}"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "choices": [
+              {
+                "index": 0,
+                "delta": {},
+                "finish_reason": "tool_calls"
+              }
+            ],
+            "usage": {
+              "prompt_tokens": 0,
+              "completion_tokens": 0,
+              "total_tokens": 0
+            },
+            "_response_output_timing": {
+              "duration_ms": 60
+            }
+          }
+        ]
+      ],
+      "reasoning": [],
+      "error": null
+    },
+    {
+      "name": "overlapping_content_and_timing",
+      "lines": [
+        [
+          0,
+          "data: {\"type\": \"response.output_item.added\", \"output_index\": 0, \"item\": {\"type\": \"message\", \"id\": \"one\"}}"
+        ],
+        [
+          10,
+          "data: {\"type\": \"response.refusal.delta\", \"item_id\": \"one\", \"delta\": \"refusal timer only\"}"
+        ],
+        [
+          20,
+          "data: {\"type\": \"response.output_text.delta\", \"item_id\": \"one\", \"content_index\": 1, \"delta\": \"piece\"}"
+        ],
+        [
+          30,
+          "data: {\"type\": \"response.refusal.done\", \"output_index\": 0}"
+        ],
+        [
+          40,
+          "data: {\"type\": \"response.output_text.done\", \"item_id\": \"one\", \"content_index\": 1}"
+        ],
+        [
+          70,
+          "data: {\"type\": \"response.output_text.delta\", \"item_id\": \"two\", \"delta\": \"unfinished\"}"
+        ],
+        [
+          100,
+          "data: {\"type\": \"response.completed\", \"response\": {\"usage\": {\"input_tokens\": 10, \"output_tokens\": 2, \"total_tokens\": 20, \"input_tokens_details\": {\"cached_tokens\": null}, \"output_tokens_details\": []}}}"
+        ]
+      ],
+      "steps": [
+        [],
+        [],
+        [
+          {
+            "choices": [
+              {
+                "index": 0,
+                "delta": {
+                  "content": "piece"
+                }
+              }
+            ]
+          }
+        ],
+        [],
+        [],
+        [
+          {
+            "choices": [
+              {
+                "index": 0,
+                "delta": {
+                  "content": "unfinished"
+                }
+              }
+            ]
+          }
+        ],
+        [
+          {
+            "choices": [
+              {
+                "index": 0,
+                "delta": {},
+                "finish_reason": "stop"
+              }
+            ],
+            "usage": {
+              "prompt_tokens": 10,
+              "completion_tokens": 2,
+              "total_tokens": 20
+            },
+            "_response_output_timing": {
+              "duration_ms": 60
+            }
+          }
+        ]
+      ],
+      "reasoning": [],
+      "error": null
+    },
+    {
+      "name": "timing_below_reporting_threshold",
+      "lines": [
+        [
+          0,
+          "data: {\"type\": \"response.output_text.delta\", \"delta\": \"tiny\"}"
+        ],
+        [
+          0.3,
+          "data: {\"type\": \"response.output_text.done\"}"
+        ],
+        [
+          20,
+          "data: {\"type\": \"response.completed\"}"
+        ]
+      ],
+      "steps": [
+        [
+          {
+            "choices": [
+              {
+                "index": 0,
+                "delta": {
+                  "content": "tiny"
+                }
+              }
+            ]
+          }
+        ],
+        [],
+        [
+          {
+            "choices": [
+              {
+                "index": 0,
+                "delta": {},
+                "finish_reason": "stop"
+              }
+            ],
+            "_response_output_timing": {}
+          }
+        ]
+      ],
+      "reasoning": [],
+      "error": null
+    },
+    {
+      "name": "no_text_or_usage",
+      "lines": [
+        [
+          0,
+          "data: {\"type\": \"response.completed\", \"response\": null}"
+        ]
+      ],
+      "steps": [
+        [
+          {
+            "choices": [
+              {
+                "index": 0,
+                "delta": {},
+                "finish_reason": "stop"
+              }
+            ],
+            "_response_output_timing": {}
+          }
+        ]
+      ],
+      "reasoning": [],
+      "error": null
+    },
+    {
+      "name": "business_failure",
+      "lines": [
+        [
+          1,
+          "data: {\"type\": \"response.created\"}"
+        ],
+        [
+          2,
+          "data: {\"type\": \"response.failed\", \"response\": {\"error\": {\"code\": \"example_code\", \"message\": \"fixture failure\"}}}"
+        ],
+        [
+          3,
+          "data: {\"type\": \"response.completed\"}"
+        ]
+      ],
+      "steps": [
+        [
+          {
+            "choices": [
+              {
+                "index": 0,
+                "delta": {
+                  "role": "assistant"
+                }
+              }
+            ]
+          }
+        ],
+        []
+      ],
+      "reasoning": [],
+      "error": {
+        "line": 1,
+        "code": "example_code",
+        "message": "fixture failure"
+      }
+    },
+    {
+      "name": "failed_event_default",
+      "lines": [
+        [
+          0,
+          "data: {\"type\": \"response.failed\", \"response\": null}"
+        ]
+      ],
+      "steps": [
+        []
+      ],
+      "reasoning": [],
+      "error": {
+        "line": 0,
+        "code": null,
+        "message": "Responses 响应失败"
+      }
+    },
+    {
+      "name": "top_level_error",
+      "lines": [
+        [
+          0,
+          "data: {\"type\": \"error\", \"code\": \"stream_error\", \"error\": {\"message\": \"synthetic\"}}"
+        ]
+      ],
+      "steps": [
+        []
+      ],
+      "reasoning": [],
+      "error": {
+        "line": 0,
+        "code": "stream_error",
+        "message": "{'message': 'synthetic'}"
+      }
+    },
+    {
+      "name": "error_event_default",
+      "lines": [
+        [
+          0,
+          "data: {\"type\": \"error\"}"
+        ]
+      ],
+      "steps": [
+        []
+      ],
+      "reasoning": [],
+      "error": {
+        "line": 0,
+        "code": null,
+        "message": "Responses 流式错误"
+      }
+    },
+    {
+      "name": "eof_after_done_without_completed",
+      "lines": [
+        [
+          1,
+          "data: {\"type\": \"response.output_text.delta\", \"delta\": \"partial\"}"
+        ],
+        [
+          2,
+          "data: {\"type\": \"response.incomplete\", \"response\": {\"status\": \"incomplete\"}}"
+        ],
+        [
+          3,
+          "data: [DONE]"
+        ]
+      ],
+      "steps": [
+        [
+          {
+            "choices": [
+              {
+                "index": 0,
+                "delta": {
+                  "content": "partial"
+                }
+              }
+            ]
+          }
+        ],
+        [],
+        []
+      ],
+      "reasoning": [],
+      "error": {
+        "line": null,
+        "code": "stream_incomplete",
+        "message": "Responses 响应流中断（未收到 completed 事件）"
+      }
+    }
+  ]
+}

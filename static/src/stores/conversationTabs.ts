@@ -329,7 +329,11 @@ export const useConversationTabsStore = defineStore('conversationTabs', {
     },
     async attach() {
       if (!this.viewKey) return;
-      await this.command('attach', { key: this.viewKey, renderer_id: this.localRendererId });
+      await this.command('attach', {
+        key: this.viewKey,
+        renderer_id: this.localRendererId,
+        workspace_id: this.viewTab?.workspaceId
+      });
       this.attached = true;
       if (this.pendingFail) {
         const error = this.pendingFail;
@@ -404,8 +408,8 @@ export const useConversationTabsStore = defineStore('conversationTabs', {
     },
     failView(error: string) {
       if (!this.ownsView) {
-        // 路由启动早于 attach：登记后由 attach 补发。
-        this.pendingFail = error;
+        // 只补发首次登记前的失败。旧工作区已经撤销的错误不能重放到迁移目标。
+        if (!this.attached) this.pendingFail = error;
         return Promise.resolve(null);
       }
       return this.command('fail', {

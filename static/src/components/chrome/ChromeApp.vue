@@ -1,11 +1,13 @@
 <template>
   <ConversationTabStrip />
   <DesktopSidebar v-if="sidebarAvailable" />
+  <ConversationStorageMigrationDialog v-if="sidebarAvailable" />
 </template>
 
 <script setup lang="ts">
 import { defineAsyncComponent, onBeforeUnmount, onMounted } from 'vue';
 import ConversationTabStrip from '@/components/chrome/ConversationTabStrip.vue';
+import ConversationStorageMigrationDialog from '@/components/overlay/ConversationStorageMigrationDialog.vue';
 import { useConversationTabsStore } from '@/stores/conversationTabs';
 import { desktopSidebarBridge } from './desktopSidebarBridge';
 

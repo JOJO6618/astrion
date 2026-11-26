@@ -1,0 +1,220 @@
+[
+  {
+    "options": {
+      "model": "fixture",
+      "session_id": "frozen-session",
+      "account": "chatgpt-fixture-a",
+      "instructions": "Current provider prefix and bridge.",
+      "requested_effort": "xhigh",
+      "max_output_tokens": 875,
+      "fast": true,
+      "model_info": {
+        "supported_reasoning_levels": [
+          {
+            "effort": "low"
+          },
+          {
+            "effort": "high"
+          }
+        ],
+        "default_reasoning_level": "high",
+        "service_tiers": [
+          {
+            "id": "priority"
+          }
+        ]
+      },
+      "messages": [
+        {
+          "role": "system",
+          "content": "Original frozen instructions.\n\nAstrion bridge.",
+          "_frozen_system_prompt": true
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "请原样返回你好。"
+            }
+          ]
+        }
+      ],
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "echo",
+            "description": "Return the supplied text",
+            "parameters": {
+              "type": "object",
+              "required": [
+                "text"
+              ],
+              "properties": {
+                "text": {
+                  "type": "string"
+                },
+                "prefix": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "request": {
+      "method": "POST",
+      "url": "https://chatgpt.com/backend-api/codex/responses",
+      "body": {
+        "model": "fixture",
+        "input": [
+          {
+            "type": "message",
+            "role": "developer",
+            "content": [
+              {
+                "type": "input_text",
+                "text": "Original frozen instructions.\n\nAstrion bridge."
+              }
+            ]
+          },
+          {
+            "type": "message",
+            "role": "user",
+            "content": [
+              {
+                "type": "input_text",
+                "text": "请原样返回你好。"
+              }
+            ]
+          }
+        ],
+        "store": false,
+        "stream": true,
+        "include": [
+          "reasoning.encrypted_content"
+        ],
+        "tools": [
+          {
+            "type": "function",
+            "name": "echo",
+            "description": "Return the supplied text",
+            "parameters": {
+              "type": "object",
+              "required": [
+                "text"
+              ],
+              "properties": {
+                "text": {
+                  "type": "string"
+                },
+                "prefix": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "（不需要时填 null，系统会视为未提供）"
+                }
+              }
+            }
+          }
+        ],
+        "tool_choice": "auto",
+        "reasoning": {
+          "effort": "high",
+          "summary": "detailed"
+        },
+        "max_output_tokens": 875,
+        "prompt_cache_key": "frozen-session",
+        "service_tier": "priority"
+      },
+      "headers": {
+        "Authorization": "Bearer synthetic-oauth-token",
+        "Content-Type": "application/json",
+        "Accept": "text/event-stream",
+        "OpenAI-Beta": "responses=experimental",
+        "originator": "codex_cli_rs",
+        "session_id": "frozen-session",
+        "chatgpt-account-id": "chatgpt-fixture-a"
+      }
+    }
+  },
+  {
+    "options": {
+      "model": "fixture",
+      "session_id": "fresh-session",
+      "account": "chatgpt-fixture-b",
+      "instructions": "Provider prefix and bridge.",
+      "requested_effort": " low ",
+      "max_output_tokens": null,
+      "fast": true,
+      "model_info": {
+        "additional_speed_tiers": [
+          "fast"
+        ]
+      },
+      "messages": [
+        {
+          "role": "system",
+          "content": "Chat instructions."
+        },
+        {
+          "role": "user",
+          "content": "Follow up"
+        }
+      ],
+      "tools": []
+    },
+    "request": {
+      "method": "POST",
+      "url": "https://chatgpt.com/backend-api/codex/responses",
+      "body": {
+        "model": "fixture",
+        "input": [
+          {
+            "type": "message",
+            "role": "developer",
+            "content": [
+              {
+                "type": "input_text",
+                "text": "Provider prefix and bridge.\n\nChat instructions."
+              }
+            ]
+          },
+          {
+            "type": "message",
+            "role": "user",
+            "content": [
+              {
+                "type": "input_text",
+                "text": "Follow up"
+              }
+            ]
+          }
+        ],
+        "store": false,
+        "stream": true,
+        "include": [
+          "reasoning.encrypted_content"
+        ],
+        "reasoning": {
+          "effort": "low",
+          "summary": "detailed"
+        },
+        "prompt_cache_key": "fresh-session",
+        "service_tier": "priority"
+      },
+      "headers": {
+        "Authorization": "Bearer synthetic-oauth-token",
+        "Content-Type": "application/json",
+        "Accept": "text/event-stream",
+        "OpenAI-Beta": "responses=experimental",
+        "originator": "codex_cli_rs",
+        "session_id": "fresh-session",
+        "chatgpt-account-id": "chatgpt-fixture-b"
+      }
+    }
+  }
+]

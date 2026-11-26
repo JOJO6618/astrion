@@ -1,0 +1,673 @@
+{
+  "files": {
+    "sample.txt": "你好🦀\r\nLead\rHIT alpha\ntext\rhit β\r\n..\nCAP\nHIT z",
+    "empty.txt": "",
+    "separate.txt": "needle\n--\n--\nneedle\n--\n--\nneedle\n--\n--\nneedle\n--\n--\nneedle\n--\n--\nneedle\n"
+  },
+  "cases": [
+    {
+      "name": "default_mode_and_newlines",
+      "args": {
+        "path": "sample.txt"
+      },
+      "result": {
+        "success": true,
+        "type": "read",
+        "path": "sample.txt",
+        "encoding": "utf-8",
+        "max_chars": 50000,
+        "truncated": false,
+        "content": "你好🦀\nLead\nHIT alpha\ntext\nhit β\n..\nCAP\nHIT z",
+        "line_start": 1,
+        "line_end": 8,
+        "total_lines": 8,
+        "file_size": 52,
+        "char_count": 42,
+        "message": "已读取 sample.txt 的内容（行 1~8）"
+      }
+    },
+    {
+      "name": "read_truncates_unicode",
+      "args": {
+        "path": "sample.txt",
+        "type": "READ",
+        "max_chars": 3
+      },
+      "result": {
+        "success": true,
+        "type": "read",
+        "path": "sample.txt",
+        "encoding": "utf-8",
+        "max_chars": 3,
+        "truncated": true,
+        "content": "你好🦀",
+        "line_start": 1,
+        "line_end": 8,
+        "total_lines": 8,
+        "file_size": 52,
+        "char_count": 3,
+        "message": "已读取 sample.txt 的内容（行 1~8）"
+      }
+    },
+    {
+      "name": "read_coerces_and_clips",
+      "args": {
+        "path": "sample.txt",
+        "type": "read",
+        "start_line": "4",
+        "end_line": 10
+      },
+      "result": {
+        "success": true,
+        "type": "read",
+        "path": "sample.txt",
+        "encoding": "utf-8",
+        "max_chars": 50000,
+        "truncated": false,
+        "content": "text\nhit β\n..\nCAP\nHIT z",
+        "line_start": 4,
+        "line_end": 8,
+        "total_lines": 8,
+        "file_size": 52,
+        "char_count": 23,
+        "message": "已读取 sample.txt 的内容（行 4~8）"
+      }
+    },
+    {
+      "name": "read_exact_end",
+      "args": {
+        "path": "sample.txt",
+        "type": "read",
+        "start_line": 1,
+        "end_line": 1,
+        "max_chars": 4
+      },
+      "result": {
+        "success": true,
+        "type": "read",
+        "path": "sample.txt",
+        "encoding": "utf-8",
+        "max_chars": 4,
+        "truncated": false,
+        "content": "你好🦀\n",
+        "line_start": 1,
+        "line_end": 1,
+        "total_lines": 8,
+        "file_size": 52,
+        "char_count": 4,
+        "message": "已读取 sample.txt 的内容（行 1~1）"
+      }
+    },
+    {
+      "name": "read_empty_even_with_positive_bounds",
+      "args": {
+        "path": "empty.txt",
+        "type": "read",
+        "start_line": 5,
+        "end_line": 9
+      },
+      "result": {
+        "success": true,
+        "type": "read",
+        "path": "empty.txt",
+        "encoding": "utf-8",
+        "max_chars": 50000,
+        "truncated": false,
+        "content": "",
+        "line_start": 0,
+        "line_end": 0,
+        "total_lines": 0,
+        "file_size": 0,
+        "char_count": 0,
+        "message": "已读取 empty.txt 的内容（行 0~0）"
+      }
+    },
+    {
+      "name": "read_bad_start",
+      "args": {
+        "path": "sample.txt",
+        "type": "read",
+        "start_line": 0
+      },
+      "result": {
+        "success": false,
+        "error": "start_line 必须大于等于1"
+      }
+    },
+    {
+      "name": "read_non_numeric_start",
+      "args": {
+        "path": "sample.txt",
+        "type": "read",
+        "start_line": "one"
+      },
+      "result": {
+        "success": false,
+        "error": "start_line 必须是整数"
+      }
+    },
+    {
+      "name": "read_reversed",
+      "args": {
+        "path": "sample.txt",
+        "type": "read",
+        "start_line": 3,
+        "end_line": 2
+      },
+      "result": {
+        "success": false,
+        "error": "end_line 必须大于等于 start_line"
+      }
+    },
+    {
+      "name": "read_out_of_file",
+      "args": {
+        "path": "sample.txt",
+        "type": "read",
+        "start_line": 9
+      },
+      "result": {
+        "success": false,
+        "error": "起始行超出文件长度"
+      }
+    },
+    {
+      "name": "empty_path",
+      "args": {
+        "path": ""
+      },
+      "result": {
+        "success": false,
+        "error": "缺少文件路径参数"
+      }
+    },
+    {
+      "name": "unknown_mode",
+      "args": {
+        "path": "sample.txt",
+        "type": "UNKNOWN"
+      },
+      "result": {
+        "success": false,
+        "error": "未知的读取类型: unknown"
+      }
+    },
+    {
+      "name": "missing_file",
+      "args": {
+        "path": "missing.txt",
+        "type": "read"
+      },
+      "result": {
+        "success": false,
+        "error": "文件不存在"
+      }
+    },
+    {
+      "name": "search_merges_overlapping_windows",
+      "args": {
+        "path": "sample.txt",
+        "type": "search",
+        "query": "hit"
+      },
+      "result": {
+        "success": true,
+        "type": "search",
+        "path": "sample.txt",
+        "encoding": "utf-8",
+        "max_chars": 50000,
+        "truncated": false,
+        "file_size": 52,
+        "query": "hit",
+        "max_matches": 5,
+        "actual_matches": 2,
+        "returned_matches": 2,
+        "context_before": 1,
+        "context_after": 1,
+        "case_sensitive": false,
+        "matches": [
+          {
+            "line_start": 2,
+            "line_end": 6,
+            "hits": [
+              3,
+              5
+            ],
+            "snippet": "Lead\nHIT alpha\ntext\nhit β\n..\n"
+          },
+          {
+            "line_start": 7,
+            "line_end": 8,
+            "hits": [
+              8
+            ],
+            "snippet": "CAP\nHIT z"
+          }
+        ],
+        "char_count": 38,
+        "message": "在 sample.txt 中搜索 \"hit\"，返回 2 条结果"
+      }
+    },
+    {
+      "name": "search_caps_context_and_window_count",
+      "args": {
+        "path": "sample.txt",
+        "type": "search",
+        "query": "HIT",
+        "case_sensitive": true,
+        "context_before": 12,
+        "context_after": -1,
+        "max_matches": 1
+      },
+      "result": {
+        "success": true,
+        "type": "search",
+        "path": "sample.txt",
+        "encoding": "utf-8",
+        "max_chars": 50000,
+        "truncated": false,
+        "file_size": 52,
+        "query": "HIT",
+        "max_matches": 1,
+        "actual_matches": 1,
+        "returned_matches": 1,
+        "context_before": 3,
+        "context_after": 0,
+        "case_sensitive": true,
+        "matches": [
+          {
+            "line_start": 1,
+            "line_end": 3,
+            "hits": [
+              3
+            ],
+            "snippet": "你好🦀\nLead\nHIT alpha\n"
+          }
+        ],
+        "char_count": 19,
+        "message": "在 sample.txt 中搜索 \"HIT\"，返回 1 条结果"
+      }
+    },
+    {
+      "name": "search_default_window_limit",
+      "args": {
+        "path": "separate.txt",
+        "type": "search",
+        "query": "needle"
+      },
+      "result": {
+        "success": true,
+        "type": "search",
+        "path": "separate.txt",
+        "encoding": "utf-8",
+        "max_chars": 50000,
+        "truncated": false,
+        "file_size": 72,
+        "query": "needle",
+        "max_matches": 5,
+        "actual_matches": 5,
+        "returned_matches": 5,
+        "context_before": 1,
+        "context_after": 1,
+        "case_sensitive": false,
+        "matches": [
+          {
+            "line_start": 1,
+            "line_end": 2,
+            "hits": [
+              1
+            ],
+            "snippet": "needle\n--\n"
+          },
+          {
+            "line_start": 3,
+            "line_end": 5,
+            "hits": [
+              4
+            ],
+            "snippet": "--\nneedle\n--\n"
+          },
+          {
+            "line_start": 6,
+            "line_end": 8,
+            "hits": [
+              7
+            ],
+            "snippet": "--\nneedle\n--\n"
+          },
+          {
+            "line_start": 9,
+            "line_end": 11,
+            "hits": [
+              10
+            ],
+            "snippet": "--\nneedle\n--\n"
+          },
+          {
+            "line_start": 12,
+            "line_end": 14,
+            "hits": [
+              13
+            ],
+            "snippet": "--\nneedle\n--\n"
+          }
+        ],
+        "char_count": 62,
+        "message": "在 separate.txt 中搜索 \"needle\"，返回 5 条结果"
+      }
+    },
+    {
+      "name": "search_budget_across_windows",
+      "args": {
+        "path": "sample.txt",
+        "type": "search",
+        "query": "HIT",
+        "context_before": 0,
+        "context_after": 0,
+        "max_chars": 12
+      },
+      "result": {
+        "success": true,
+        "type": "search",
+        "path": "sample.txt",
+        "encoding": "utf-8",
+        "max_chars": 12,
+        "truncated": true,
+        "file_size": 52,
+        "query": "HIT",
+        "max_matches": 5,
+        "actual_matches": 3,
+        "returned_matches": 2,
+        "context_before": 0,
+        "context_after": 0,
+        "case_sensitive": false,
+        "matches": [
+          {
+            "line_start": 3,
+            "line_end": 3,
+            "hits": [
+              3
+            ],
+            "snippet": "HIT alpha\n"
+          },
+          {
+            "line_start": 5,
+            "line_end": 5,
+            "hits": [
+              5
+            ],
+            "snippet": "hi",
+            "truncated": true
+          }
+        ],
+        "char_count": 12,
+        "message": "在 sample.txt 中搜索 \"HIT\"，返回 2 条结果"
+      }
+    },
+    {
+      "name": "search_no_regex",
+      "args": {
+        "path": "sample.txt",
+        "type": "search",
+        "query": ".*"
+      },
+      "result": {
+        "success": true,
+        "type": "search",
+        "path": "sample.txt",
+        "encoding": "utf-8",
+        "max_chars": 50000,
+        "truncated": false,
+        "file_size": 52,
+        "query": ".*",
+        "max_matches": 5,
+        "actual_matches": 0,
+        "returned_matches": 0,
+        "context_before": 1,
+        "context_after": 1,
+        "case_sensitive": false,
+        "matches": [],
+        "char_count": 0,
+        "message": "在 sample.txt 中搜索 \".*\"，返回 0 条结果"
+      }
+    },
+    {
+      "name": "search_requires_query",
+      "args": {
+        "path": "sample.txt",
+        "type": "search",
+        "query": ""
+      },
+      "result": {
+        "success": false,
+        "error": "搜索模式需要提供 query 参数"
+      }
+    },
+    {
+      "name": "extract_order_labels_and_clip",
+      "args": {
+        "path": "sample.txt",
+        "type": "extract",
+        "segments": [
+          {
+            "label": "last",
+            "start_line": 7,
+            "end_line": 20
+          },
+          {
+            "start_line": 1,
+            "end_line": 1
+          },
+          {
+            "label": "middle",
+            "start_line": 3,
+            "end_line": 4
+          }
+        ]
+      },
+      "result": {
+        "success": true,
+        "type": "extract",
+        "path": "sample.txt",
+        "encoding": "utf-8",
+        "max_chars": 50000,
+        "truncated": false,
+        "segments": [
+          {
+            "label": "last",
+            "line_start": 7,
+            "line_end": 8,
+            "content": "CAP\nHIT z"
+          },
+          {
+            "label": null,
+            "line_start": 1,
+            "line_end": 1,
+            "content": "你好🦀\n"
+          },
+          {
+            "label": "middle",
+            "line_start": 3,
+            "line_end": 4,
+            "content": "HIT alpha\ntext\n"
+          }
+        ],
+        "file_size": 52,
+        "total_lines": 8,
+        "segment_count": 3,
+        "char_count": 28,
+        "message": "已从 sample.txt 抽取 3 个片段"
+      }
+    },
+    {
+      "name": "extract_budget_partial_segment",
+      "args": {
+        "path": "sample.txt",
+        "type": "extract",
+        "max_chars": 5,
+        "segments": [
+          {
+            "start_line": 1,
+            "end_line": 1
+          },
+          {
+            "start_line": 2,
+            "end_line": 2
+          },
+          {
+            "start_line": 3,
+            "end_line": 3
+          }
+        ]
+      },
+      "result": {
+        "success": true,
+        "type": "extract",
+        "path": "sample.txt",
+        "encoding": "utf-8",
+        "max_chars": 5,
+        "truncated": true,
+        "segments": [
+          {
+            "label": null,
+            "line_start": 1,
+            "line_end": 1,
+            "content": "你好🦀\n"
+          },
+          {
+            "label": null,
+            "line_start": 2,
+            "line_end": 2,
+            "content": "L",
+            "truncated": true
+          }
+        ],
+        "file_size": 52,
+        "total_lines": 8,
+        "segment_count": 2,
+        "char_count": 5,
+        "message": "已从 sample.txt 抽取 2 个片段"
+      }
+    },
+    {
+      "name": "extract_budget_excludes_remaining_segments",
+      "args": {
+        "path": "sample.txt",
+        "type": "extract",
+        "max_chars": 4,
+        "segments": [
+          {
+            "start_line": 1,
+            "end_line": 1
+          },
+          {
+            "start_line": 2,
+            "end_line": 2
+          }
+        ]
+      },
+      "result": {
+        "success": true,
+        "type": "extract",
+        "path": "sample.txt",
+        "encoding": "utf-8",
+        "max_chars": 4,
+        "truncated": true,
+        "segments": [
+          {
+            "label": null,
+            "line_start": 1,
+            "line_end": 1,
+            "content": "你好🦀\n"
+          }
+        ],
+        "file_size": 52,
+        "total_lines": 8,
+        "segment_count": 1,
+        "char_count": 4,
+        "message": "已从 sample.txt 抽取 1 个片段"
+      }
+    },
+    {
+      "name": "extract_validates_all_despite_budget",
+      "args": {
+        "path": "sample.txt",
+        "type": "extract",
+        "max_chars": 1,
+        "segments": [
+          {
+            "start_line": 1,
+            "end_line": 1
+          },
+          {
+            "start_line": 9,
+            "end_line": 10
+          }
+        ]
+      },
+      "result": {
+        "success": false,
+        "error": "区间起点 9 超出文件行数"
+      }
+    },
+    {
+      "name": "extract_empty",
+      "args": {
+        "path": "sample.txt",
+        "type": "extract",
+        "segments": []
+      },
+      "result": {
+        "success": false,
+        "error": "extract 模式需要提供 segments 数组"
+      }
+    },
+    {
+      "name": "extract_missing_end",
+      "args": {
+        "path": "sample.txt",
+        "type": "extract",
+        "segments": [
+          {
+            "start_line": 1
+          }
+        ]
+      },
+      "result": {
+        "success": false,
+        "error": "所有区间都必须包含 start_line 和 end_line"
+      }
+    },
+    {
+      "name": "extract_invalid_bounds",
+      "args": {
+        "path": "sample.txt",
+        "type": "extract",
+        "segments": [
+          {
+            "start_line": 2,
+            "end_line": 1
+          }
+        ]
+      },
+      "result": {
+        "success": false,
+        "error": "行区间不合法"
+      }
+    },
+    {
+      "name": "extract_bad_item",
+      "args": {
+        "path": "sample.txt",
+        "type": "extract",
+        "segments": [
+          0
+        ]
+      },
+      "result": {
+        "success": false,
+        "error": "segments 数组中的每一项都必须是对象"
+      }
+    }
+  ]
+}

@@ -13,12 +13,14 @@ try {
     if ([IO.Path]::GetFileName($ExecutableName) -ne $ExecutableName) { exit 1 }
     $shell = [IO.Path]::Combine($root, $ExecutableName)
     $helper = [IO.Path]::Combine($root, 'resources\astrion-windows-helper.exe')
+    $rust = [IO.Path]::Combine($root, 'resources\runtime\rust\astrion-headless.exe')
     $processes = Get-CimInstance Win32_Process
     foreach ($process in $processes) {
         if (-not $process.ExecutablePath) { continue }
         $candidate = [IO.Path]::GetFullPath($process.ExecutablePath)
         $matched = $candidate.Equals($shell, [StringComparison]::OrdinalIgnoreCase) -or
-            $candidate.Equals($helper, [StringComparison]::OrdinalIgnoreCase)
+            $candidate.Equals($helper, [StringComparison]::OrdinalIgnoreCase) -or
+            $candidate.Equals($rust, [StringComparison]::OrdinalIgnoreCase)
         foreach ($prefix in $allowed) {
             if ($candidate.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) { $matched = $true }
         }

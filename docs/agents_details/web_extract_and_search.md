@@ -41,3 +41,7 @@
 6. **Tavily key 同时是提取层凭证**：选定提取商为 tavily 时经 `resolve_search_credential("tavily")` 取 key（与搜索同源）；`resolve_tavily_api_key`（`modules/search_engine.py`）为其环境变量兜底实现，不要删。
 
 ---
+
+### Rust Host
+
+Agent 与 Chat 共用 Rust 的五个搜索服务商和四个提取商适配器。直提用 Rust HTML tokenizer 提取正文，并保留 GitHub blob 的 CDN、API 降级顺序。模型工具循环生成与 Python 兼容的网页引用 ID，在助手消息中持久化引用。真实模型回环测试调用隔离的本地 SearXNG 和网页，覆盖 Agent 与 Chat。

@@ -8,18 +8,19 @@
 
 ## 2) 当前可用启动/构建命令（已按代码核对）
 
-### Python / 服务端
-- 安装依赖：`pip install -r requirements.txt`
-- 推荐启动 Web：`python -m server.app`
-- 可选参数：`python -m server.app --path ./project --port 8091 --debug --thinking-mode`
-- 兼容启动方式：`python web_server.py`
-- 统一入口：`python main.py`（当前实现会默认进入 Web 启动流程）
-- **Headless 启动（CLI 自启动专用）**：`python -m server.headless_app --path <cwd> --port 8091 --thinking-mode`
+### Host Web
+
+- 构建 Rust 后端：`cargo build --locked --release --manifest-path backend-rust/Cargo.toml`。
+- 常用启动命令：`./start.sh`、`python3 -m server.app`、`python3 main.py`、`python3 web_server.py`。这些命令默认使用 Rust，并沿用 `.env`、`settings.json` 和环境变量的 Host 配置。
+- 可选参数：`--path ./project --port 8091 --thinking-mode`。未指定监听地址时使用 `127.0.0.1`。`--bind`、`WEB_SERVER_HOST` 或 `server.host` 可显式指定 IP。`--debug` 为 Rust 进程启用诊断。
+- 自备的二进制和资源通过 `ASTRION_RUST_BACKEND_BIN` 和 `ASTRION_RUST_RESOURCE_ROOT` 配置。资源目录包含已构建的 `static/dist`。
+- 旧 Flask 对照命令是 `python3 -m server.app --backend python` 或 `python3 -m server.app_legacy`，依赖通过 `pip install -r requirements.txt` 安装。部署若共用数据根，只能启动一个服务。
+- **旧版 Python headless 启动**：`python -m server.headless_app --path <cwd> --port 8091 --thinking-mode`
   - 只挂运行时蓝图（gateway / tasks / status / approval / usage 五件套），不含 web 站点路由面（无 /login、无静态页、无会话管理）；根路径 `/` 返回简单 HTML 告知页；非 /api/ 的 GET 路径 404 时回落告知页（对齐 SPA fallback 语义）
   - **headless 额外挂 host 设置面**（`add_url_rule` 直接共享 chat_bp/conversation_bp/workflow_page_bp 的视图函数，URL 与 full 一致）：`/api/personalization` GET/POST、`/api/path-authorization` GET/POST、`/api/sub_agents` GET、`/api/background_commands` GET、`/api/workflows` GET、`/api/conversations/<cid>/versioning/checkpoints` GET——这些端点装饰器已双通道化（`api_login_or_host_token_required`），list 类端点支持 query 显式传 conversation_id（Bearer 装配的 terminal 无当前对话概念）
   - 与 full 共用 `server/host_startup.py`。headless 独立装配路由及 Flask 配置。两种形态都保留 `/api/v1/models`。
   - 与 full 形态同进程模型（RuntimeService 单例/同一数据目录/同一端口 8091），只是启动时挂的路由面不同；**绝不能与 full 形态双进程并存**（MultiAgentState/门闸/审批 Map 是进程内单例）
-  - CLI（`cli/src/gateway.ts`）探测无服务时 spawn 的就是这个入口；python 解释器经依赖探测（import yaml/flask）从 .venv → homebrew 3.12/3.11 → python3 中选第一个可用的
+  - CLI 显式设置 `ASTRION_CLI_BACKEND=python` 时使用这个入口。解释器经依赖探测（import yaml/flask）从 .venv → homebrew 3.12/3.11 → python3 中选第一个可用的
 
 ### Frontend（根目录）
 - 安装依赖：`npm install`
@@ -32,17 +33,19 @@
 - 开发启动：`bun cli/src/main.tsx`（或 `npm --prefix cli run dev`）
 - 类型检查：`cd cli && ./node_modules/.bin/tsc --noEmit`
 - 可执行命令名：`astrion`（已装到 `/opt/homebrew/bin/astrion` → `cli/bin/astrion` symlink，bun wrapper 支持 symlink 解析；`--version`/`--help` 快速退出不启 TUI；后续 `bun build --compile` 单文件分发）
+- CLI 自启动默认使用 Rust。源码安装先运行 `cargo build --locked --release --manifest-path backend-rust/Cargo.toml` 和 `node desktop/scripts/prepare_rust_backend.mjs`。部署可通过绝对路径 `ASTRION_RUST_BACKEND_BIN` 与 `ASTRION_RUST_RESOURCE_ROOT` 提供二进制和资源。
 - 依赖安装：沙箱网络受限时不跑 npm/bun install，从 `cli-redesign-demo/node_modules` 铺平（版本以 `cli/package.json` 为准）
 
 ### Desktop（`desktop-electron/`，macOS 与 Windows 共用 Electron/Chromium）
 - **引擎迁移**：macOS 自 2026-09-28 起使用 Electron（commit b53e8c3a）；Windows 迁移于 2026-11-14 以 `7cb8f769` 合入 main，同日正式发布 **0.10.0**。此前 0.10.0–0.10.3 是迁移测试包编号，历史产物与验证报告保留原编号。原 Tauri/WebView2 代码保留作旧版和原生模块来源。**web 版只支持 Chromium 系浏览器**（Safari 不再兼容）。正式身份真实界面更新验收入口见 `test/2026-11-14_Windows更新实机/README.md`：独立标准用户中原版 0.9.3 经正式源升至 0.10.0，以及 Electron 0.10.0 经本地测试源升至未发布 0.10.1 均通过；不等于原账户历史故障已根治。
 - **Windows 构建**：Windows 原生环境执行 `node desktop-electron/scripts/build_windows.mjs`，`--dir` 仅生成目录包，已有本次前端/helper 可加 `--skip-frontend --skip-native`；固定 `--publish never`。版本/说明独立于 macOS，权威为 `desktop-electron/windows-release.json`。NSIS、Job 回收、一次性 stdin 凭据与隔离实验契约见 `docs/windows_electron.md`。
-- 形态：Electron 主进程 + 内嵌 Python 后端 sidecar；BaseWindow + **双 WebContentsView**（chrome 46px 独立标签条常驻不闪动 + main 加载 `http://127.0.0.1:<动态端口>/`，前后端同源）；原生控制桥只负责版本、更新、窗口及数据目录等能力，标签导航走后端命令与版本快照，见 `docs/desktop_navigation.md`；壳经 preload + contextBridge 注入 `window.__ASTRION_DESKTOP__`/`__ASTRION_CHROME__`
+- 形态：Electron 主进程 + 内嵌后端 sidecar，macOS 1.0.0 使用 Rust，Windows 独立发布仍沿用原打包链；BaseWindow + **双 WebContentsView**（chrome 46px 独立标签条常驻不闪动 + main 加载 `http://127.0.0.1:<动态端口>/`，前后端同源）；原生控制桥只负责版本、更新、窗口及数据目录等能力，标签导航走后端命令与版本快照，见 `docs/desktop_navigation.md`；壳经 preload + contextBridge 注入 `window.__ASTRION_DESKTOP__`/`__ASTRION_CHROME__`
 - 开发：`cd desktop-electron && npm install && npm run dev`（装依赖需 `ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/`）；前端需先 `npm run build`
+- macOS 的 `npm run build` 与 `npm run build:dir` 从相同 staging 目录打包 Rust 后端。无签名的本地目录包用 `npm run build:rust:app`，输出 `dist-rust/mac-arm64/Astrion.app`，同时包含原生 Quick Chat 组件与更新策略界面资源。
 - **构建编号与更新策略**：Windows 构建入口与 macOS `npm run build` / `npm run build:dir` 为每次构建生成独立 UUID，写入打包元数据 `astrionBuildId`；Windows 构建回执同时记录 `build_id`。可用 `ASTRION_BUILD_ID` 显式指定 1–128 位安全 ASCII 标识，不同构建应保持唯一。macOS 必须经 `scripts/run_builder.mjs`（npm 脚本已接线）传入编号。修改壳、策略客户端或内嵌后端后必须完整构建，禁止仅用旧 `win-unpacked --prepackaged` 重包安装器来交付这些修改。启动门槛、官网独立策略服务与先服务后客户端的部署顺序见 `docs/desktop_update_policy.md`；旧客户端不具备新策略能力。
 - 关键差异：窗口拖拽走 `app-region` CSS（_tab-strip.scss）；红绿灯 `trafficLightPosition` 一行配置；菜单不占 Cmd+W/Cmd+T（留给前端标签条，关窗=Cmd+Shift+W）；子进程 `ASTRION_IGNORE_DOTENV=1`（防仓库 .env 强制覆盖数据根）；Ctrl+Enter/拖放原生正常（WebKit 特有问题全消）
-- 打包发布：`electron-builder`（dmg+zip+latest-mac.yml，签名=Apple Development 证书，`signIgnore` 排除内嵌 Python 运行时）；`bash desktop-electron/scripts/release_mac.sh [版本]`；安装后 ~458MB（Chromium 244MB 为换引擎固有代价）。详细坑与决策见 `desktop-electron/README.md` 与项目记忆 `desktop_electron_shell`
-- **macOS 快捷对话（0.5.0）**：独立设置分区 `/settings/quick-chat`，仅 macOS Electron 展示。快捷默认工作区/模型留空分别继承 host 工作区目录的 `default_workspace_id` 与个性化 `default_model`，每次唤起刷新；模型须支持图片，不可用时提示，不擅自换模型。启用后保留现有单一 `server.app` 后端与菜单栏；**显式启动应用自动打开主窗口，启动期间的程序坞激活意图保留到后端就绪**，关闭主窗口隐藏而不退出。macOS 快捷窗及截图覆盖层不设置 `skipTaskbar=true`，避免将整个应用转为 UIElement；主应用保持 regular 身份。当前必须先启动应用，登录自启动延后实现。原生 Swift 监听与截图辅助程序由 `build:quick-native` 编译并随包签名，快捷对话来源为 `metadata.quick_entry=true`，快捷菜单按工作区仅查询该来源且先过滤后分页。详细说明见 `desktop-electron/QUICK_ENTRY.md`。
+- 打包发布：`electron-builder`（dmg+zip+latest-mac.yml，签名=Apple Development 证书）；`bash desktop-electron/scripts/release_mac.sh [版本]`；安装后 ~458MB（Chromium 244MB 为换引擎固有代价）。详细坑与决策见 `desktop-electron/README.md` 与项目记忆 `desktop_electron_shell`
+- **macOS 快捷对话（0.5.0）**：独立设置分区 `/settings/quick-chat`，仅 macOS Electron 展示。快捷默认工作区/模型留空分别继承 host 工作区目录的 `default_workspace_id` 与个性化 `default_model`，每次唤起刷新；模型须支持图片，不可用时提示，不擅自换模型。启用后保留现有单一 Host 后端与菜单栏；**显式启动应用自动打开主窗口，启动期间的程序坞激活意图保留到后端就绪**，关闭主窗口隐藏而不退出。macOS 快捷窗及截图覆盖层不设置 `skipTaskbar=true`，避免将整个应用转为 UIElement；主应用保持 regular 身份。当前必须先启动应用，登录自启动延后实现。原生 Swift 监听与截图辅助程序由 `build:quick-native` 编译并随包签名，快捷对话来源为 `metadata.quick_entry=true`，快捷菜单按工作区仅查询该来源且先过滤后分页。详细说明见 `desktop-electron/QUICK_ENTRY.md`。
 - **macOS 浮窗跨桌面身份（2026-10-05）**：快捷窗与截图覆盖层统一调用 `desktop-electron/src/quick/workspace-visibility.js`，`setVisibleOnAllWorkspaces` 必须同时设置 `visibleOnFullScreen: true` 和 `skipTransformProcessType: true`。只禁用 `skipTaskbar` 不足以阻止 Electron 将应用切换为 UIElement；默认全屏兼容变换也会隐藏程序坞并影响运行点。真实 Electron 的 Foreground 身份检查见 `test/2026-10-05_程序坞全屏浮窗/`。
 
 ### Desktop（`desktop/`，旧 Tauri 2 桌面壳及保留的原生模块）

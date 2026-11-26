@@ -330,6 +330,8 @@ export default {
   silentToolDisableDesc: "Don't tell the model when tools are disabled",
   toolIntentTitle: 'Tool intent hints',
   toolIntentDesc: 'Briefly state the intent before calling a tool',
+  readBeforeEditTitle: 'Require reading before editing',
+  readBeforeEditDesc: 'Require agents to read an existing file before editing or overwriting it.',
   skillHintsTitle: 'Skill hint system',
   skillHintsDesc: 'Remind the model to read relevant skills when appropriate',
   strictSkillTitle: 'Strict constraints',

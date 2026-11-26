@@ -125,6 +125,7 @@ interface PersonalForm {
   /** Jina Reader API 密钥（可选；为空=匿名限速调用） */
   jina_api_key: string;
   skill_hints_enabled: boolean;
+  require_read_before_edit: boolean;
   skill_strict_terminal_enabled: boolean;
   skill_strict_sub_agent_enabled: boolean;
   skill_strict_run_command_foreground_enabled: boolean;
@@ -370,6 +371,7 @@ const defaultForm = (): PersonalForm => ({
   webpage_extract_provider: 'jina',
   jina_api_key: '',
   skill_hints_enabled: false,
+  require_read_before_edit: false,
   skill_strict_terminal_enabled: false,
   skill_strict_sub_agent_enabled: false,
   skill_strict_run_command_foreground_enabled: false,
@@ -701,6 +703,7 @@ export const usePersonalizationStore = defineStore('personalization', {
           : 'jina',
         jina_api_key: typeof data.jina_api_key === 'string' ? data.jina_api_key.trim() : '',
         skill_hints_enabled: !!data.skill_hints_enabled,
+        require_read_before_edit: data.require_read_before_edit === true,
         skill_strict_terminal_enabled: !!data.skill_strict_terminal_enabled,
         skill_strict_sub_agent_enabled: !!data.skill_strict_sub_agent_enabled,
         skill_strict_run_command_foreground_enabled:

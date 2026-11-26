@@ -4,6 +4,21 @@
 //          static/src/app/methods/conversation/{action,load,state}.ts
 //          static/src/app/methods/history.ts、static/src/app/methods/versioning.ts
 export default {
+  storageMigration: {
+    title: 'Migrate older conversations',
+    pending:
+      'Found one older conversation. Migrate it to open it in Astrion 1.0. | Found {count} older conversations. Migrate them to open them in Astrion 1.0.',
+    running: 'Migrating older conversations…',
+    result: 'Migrated {migrated} · Failed {failed}',
+    later: 'Later',
+    start: 'Start migration',
+    open: 'Migrate conversations',
+    requestFailed: 'Could not get the migration status. Try again.',
+    upToDate: 'There are no conversations to migrate.',
+    incompatible: 'Incompatible conversation',
+    incompatibleDescription: 'Migrate your older conversations to open this conversation.',
+    pendingLabel: 'Migration needed'
+  },
   // ── Messages: clear/compress conversation (message/chat.ts) ──
   clearChatTitle: 'Clear chat',
   clearChatConfirmMessage:

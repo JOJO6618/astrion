@@ -1,18 +1,21 @@
 import { computed, onBeforeUnmount, ref } from 'vue';
-import { chatApi, command, loadView, operationId, releasePresentation } from './api';
+import { ChatApiError, chatApi, command, loadView, operationId, releasePresentation } from './api';
 import { activeStatuses, pathOf, textOf } from './types';
 import type { ChatDocument, ChatMessage, ChatSettings, ChatView, MediaRef } from './types';
 import { prepareGeneratingLabels } from '@/utils/generatingLabel';
 import { t } from '@/locales';
 import { useModelStore } from '@/stores/model';
+import type { ConversationSummary } from '@/stores/conversation';
+import { requiresConversationMigration } from '@/stores/conversationStorageMigration';
 
 export function useChat(onTaskError: (data: Record<string, any>) => void = () => {}) {
   const settings = ref<ChatSettings | null>(null);
   const document = ref<ChatDocument | null>(null);
   const display = ref<ChatView['display'] | null>(null);
-  const history = ref<Array<{ id: string; title: string }>>([]);
+  const history = ref<ConversationSummary[]>([]);
   const historyQuery = ref('');
   const viewingLeaf = ref<string | null>(null);
+  const incompatibleId = ref('');
   const error = ref('');
   const loading = ref(false);
   const sending = ref(false);
@@ -66,7 +69,7 @@ export function useChat(onTaskError: (data: Record<string, any>) => void = () =>
 
   async function list(query = '') {
     const sequence = ++listSequence;
-    const items = await chatApi<Array<{ id: string; title: string }>>(
+    const items = await chatApi<ConversationSummary[]>(
       `/conversations?q=${encodeURIComponent(query)}`
     );
     if (!disposed && sequence === listSequence) {
@@ -153,12 +156,24 @@ export function useChat(onTaskError: (data: Record<string, any>) => void = () =>
     error.value = '';
     viewingLeaf.value = null;
     try {
-      if (id) apply(await loadView(id, presentationId.value), token);
-      else if (owns(token)) {
+      const view = id ? await loadView(id, presentationId.value) : null;
+      if (!owns(token)) return false;
+      incompatibleId.value = '';
+      if (view) apply(view, token);
+      else {
         document.value = null;
         display.value = null;
         resetSettings();
       }
+    } catch (cause) {
+      if (!owns(token)) return false;
+      if (
+        !(cause instanceof ChatApiError && requiresConversationMigration(cause.status, cause.code))
+      )
+        throw cause;
+      incompatibleId.value = id;
+      document.value = null;
+      display.value = null;
     } finally {
       if (owns(token)) loading.value = false;
     }
@@ -180,7 +195,7 @@ export function useChat(onTaskError: (data: Record<string, any>) => void = () =>
     schedule(token, true);
   }
   async function send(text: string, media: MediaRef[], extra: Record<string, unknown> = {}) {
-    if (busy.value) return null;
+    if (busy.value || incompatibleId.value) return null;
     if (!useModelStore().allModels.some((option) => option.key === model.value)) {
       report(t('appCore.modelNotSelected'));
       return null;
@@ -339,6 +354,7 @@ export function useChat(onTaskError: (data: Record<string, any>) => void = () =>
     network,
     presentationId,
     cid,
+    incompatibleId,
     path,
     messages,
     task,

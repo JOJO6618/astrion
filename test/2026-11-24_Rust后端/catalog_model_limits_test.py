@@ -20,6 +20,12 @@ FIELDS = ("context_window", "default_context_window", "max_context_window", "max
 
 
 class CatalogModelLimitsTest(unittest.TestCase):
+    def test_codex_embedded_prompt_matches_python_fallback(self):
+        from utils.api_client.codex.prompt import _FALLBACK_INSTRUCTIONS
+
+        embedded = TEST_DIR.parents[1] / "prompts" / "codex_fallback.txt"
+        self.assertEqual(embedded.read_bytes(), _FALLBACK_INSTRUCTIONS.encode("utf-8"))
+
     def setUp(self):
         directory = TemporaryDirectory(prefix="catalog_limits_", dir=TEST_DIR)
         self.addCleanup(directory.cleanup)
@@ -133,6 +139,44 @@ class CatalogModelLimitsTest(unittest.TestCase):
             self.assertEqual(body["max_tokens"], 64000)
             self.assertNotIn("context_window", body)
             self.assertNotIn("anthropic-beta", headers)
+
+    def test_python_qwen_and_responses_reasoning_wire_values(self):
+        from utils.api_client import APIClient
+
+        requests = []
+
+        def respond(request):
+            requests.append(json.loads(request.content))
+            return httpx.Response(200, headers={"content-type": "text/event-stream"}, text="data: [DONE]\n\n")
+
+        async def trigger(protocol, thinking, effort, extras=None):
+            profile = self.model_profiles._build_custom_profile({
+                "model_name": "alias", "model_id": "vendor/QWEN-test", "apikey": "fixture-key",
+                "reasoning_capability": "fast,thinking", "url": "https://provider.invalid/v1",
+                "extra_parameter": extras or {},
+            })
+            profile["api_protocol"] = protocol
+            client = APIClient(thinking_mode=thinking, web_mode=True)
+            with patch.object(client, "_debug_log"), patch.object(client, "_dump_request_payload", return_value=None):
+                client.apply_profile(profile)
+                client.reasoning_effort = effort
+                async for _ in client.chat([{"role": "user", "content": "fixture"}]):
+                    pass
+
+        new_client = httpx.AsyncClient
+        with patch.object(httpx, "AsyncClient", side_effect=lambda **kwargs: new_client(transport=httpx.MockTransport(respond), **kwargs)):
+            asyncio.run(trigger("chat_completions", False, "high"))
+            asyncio.run(trigger("chat_completions", True, "high"))
+            asyncio.run(trigger("chat_completions", False, "high", {"enable_thinking": True, "reasoning_effort": "low"}))
+            asyncio.run(trigger("chat_completions", True, "high", {"enable_thinking": True, "reasoning_effort": "low"}))
+            asyncio.run(trigger("responses", False, "xhigh"))
+        self.assertEqual(len(requests), 5)
+        self.assertEqual([(body.get("enable_thinking"), body.get("reasoning_effort")) for body in requests[:4]], [
+            (False, None), (None, "high"), (True, "low"), (True, "high"),
+        ])
+        self.assertEqual(requests[-1]["reasoning"], {"effort": "xhigh", "summary": "detailed"})
+        self.assertNotIn("enable_thinking", requests[-1])
+        self.assertNotIn("reasoning_effort", requests[-1])
 
 
 if __name__ == "__main__":

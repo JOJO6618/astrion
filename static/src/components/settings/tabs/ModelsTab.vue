@@ -9,6 +9,7 @@ import { useProvidersStore } from '@/stores/providers';
 import type { CustomModelEntry } from '@/stores/providers';
 import { useSettingsStore } from '@/stores/settings';
 import { useUiStore } from '@/stores/ui';
+import { modelContextCapacity } from '@/utils/modelLimits';
 import UiSwitch from '@/components/ui/UiSwitch.vue';
 import CustomModelDialog from './providers/CustomModelDialog.vue';
 
@@ -74,7 +75,7 @@ const registryCaps = (model: ModelOption): string[] => {
   if (model.supportsImage) caps.push(t('settings.capImage'));
   if (model.supportsVideo) caps.push(t('settings.capVideo'));
   if (model.supportsThinking) caps.push(t('settings.capThinking'));
-  const ctx = formatContext(model.contextWindow);
+  const ctx = formatContext(modelContextCapacity(model));
   if (ctx) caps.push(ctx);
   return caps;
 };

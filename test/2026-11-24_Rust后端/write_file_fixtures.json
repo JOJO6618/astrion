@@ -1,0 +1,992 @@
+[
+  {
+    "name": "create_unicode",
+    "before": null,
+    "tool": "write_file",
+    "args": {
+      "file_path": "file.txt",
+      "content": "你好🦀\ntext"
+    },
+    "result": {
+      "success": true,
+      "path": "file.txt",
+      "size": 8,
+      "mode": "w",
+      "original_file": null,
+      "new_file": "你好🦀\ntext"
+    },
+    "after": "你好🦀\ntext"
+  },
+  {
+    "name": "create_nested_empty",
+    "before": null,
+    "tool": "write_file",
+    "args": {
+      "file_path": "nested/more/a.txt",
+      "content": ""
+    },
+    "result": {
+      "success": true,
+      "path": "nested/more/a.txt",
+      "size": 0,
+      "mode": "w",
+      "original_file": null,
+      "new_file": ""
+    },
+    "after": ""
+  },
+  {
+    "name": "overwrite_universal_newlines",
+    "before": "旧\r\n内容\rtext",
+    "tool": "write_file",
+    "args": {
+      "file_path": "file.txt",
+      "content": "新\r文本"
+    },
+    "result": {
+      "success": true,
+      "path": "file.txt",
+      "size": 4,
+      "mode": "w",
+      "original_file": "旧\n内容\ntext",
+      "new_file": "新\n文本"
+    },
+    "after": "新\n文本"
+  },
+  {
+    "name": "append_existing",
+    "before": "before\r\n",
+    "tool": "write_file",
+    "args": {
+      "file_path": "file.txt",
+      "content": "added🦀\n",
+      "append": true
+    },
+    "result": {
+      "success": true,
+      "path": "file.txt",
+      "size": 7,
+      "mode": "a",
+      "original_file": "before\n",
+      "new_file": "before\nadded🦀\n"
+    },
+    "after": "before\nadded🦀\n"
+  },
+  {
+    "name": "append_creates_a_new_file",
+    "before": null,
+    "tool": "write_file",
+    "args": {
+      "file_path": "file.txt",
+      "content": "hello",
+      "append": true
+    },
+    "result": {
+      "success": true,
+      "path": "file.txt",
+      "size": 5,
+      "mode": "a",
+      "original_file": null,
+      "new_file": "hello"
+    },
+    "after": "hello"
+  },
+  {
+    "name": "append_empty",
+    "before": "before\n",
+    "tool": "write_file",
+    "args": {
+      "file_path": "file.txt",
+      "content": "",
+      "append": true
+    },
+    "result": {
+      "success": true,
+      "path": "file.txt",
+      "size": 0,
+      "mode": "a",
+      "original_file": "before\n",
+      "new_file": "before\n"
+    },
+    "after": "before\n"
+  },
+  {
+    "name": "first_of_multiple",
+    "before": "top\nother\nline α\ntarget\nline β\nnear\nmedium\nline α\ntarget\nline β\nend\n",
+    "tool": "edit_file",
+    "args": {
+      "file_path": "file.txt",
+      "replacements": [
+        {
+          "old_string": "line α\ntarget\nline β",
+          "new_string": "line α\nchanged\nline β"
+        }
+      ]
+    },
+    "result": {
+      "success": true,
+      "path": "file.txt",
+      "size": 69,
+      "mode": "w",
+      "original_file": "top\nother\nline α\ntarget\nline β\nnear\nmedium\nline α\ntarget\nline β\nend\n",
+      "new_file": "top\nother\nline α\nchanged\nline β\nnear\nmedium\nline α\ntarget\nline β\nend\n",
+      "replacements": 1,
+      "found_matches": 2,
+      "replacement_groups": 1,
+      "details": [
+        {
+          "index": 1,
+          "status": "success",
+          "replace_all": false,
+          "found_matches": 2,
+          "replacements": 1,
+          "matched_lines": [
+            3,
+            8
+          ],
+          "contexts": [
+            {
+              "old_start_line": 3,
+              "old_end_line": 5,
+              "before_lines": [
+                {
+                  "line": 1,
+                  "text": "top"
+                },
+                {
+                  "line": 2,
+                  "text": "other"
+                }
+              ],
+              "after_lines": [
+                {
+                  "line": 6,
+                  "text": "near"
+                },
+                {
+                  "line": 7,
+                  "text": "medium"
+                }
+              ]
+            }
+          ],
+          "old_string": "line α\ntarget\nline β",
+          "new_string": "line α\nchanged\nline β",
+          "old_lines": [
+            "line α",
+            "target",
+            "line β"
+          ],
+          "new_lines": [
+            "line α",
+            "changed",
+            "line β"
+          ],
+          "old_line_count": 3,
+          "new_line_count": 3
+        }
+      ],
+      "write_performed": true,
+      "message": "共 1 组替换，替换 1 处"
+    },
+    "after": "top\nother\nline α\nchanged\nline β\nnear\nmedium\nline α\ntarget\nline β\nend\n"
+  },
+  {
+    "name": "replace_all",
+    "before": "top\nother\nline α\ntarget\nline β\nnear\nmedium\nline α\ntarget\nline β\nend\n",
+    "tool": "edit_file",
+    "args": {
+      "file_path": "file.txt",
+      "replacements": [
+        {
+          "old_string": "line α\ntarget\nline β",
+          "new_string": "line α\nchanged\nline β",
+          "replace_all": true
+        }
+      ]
+    },
+    "result": {
+      "success": true,
+      "path": "file.txt",
+      "size": 70,
+      "mode": "w",
+      "original_file": "top\nother\nline α\ntarget\nline β\nnear\nmedium\nline α\ntarget\nline β\nend\n",
+      "new_file": "top\nother\nline α\nchanged\nline β\nnear\nmedium\nline α\nchanged\nline β\nend\n",
+      "replacements": 2,
+      "found_matches": 2,
+      "replacement_groups": 1,
+      "details": [
+        {
+          "index": 1,
+          "status": "success",
+          "replace_all": true,
+          "found_matches": 2,
+          "replacements": 2,
+          "matched_lines": [
+            3,
+            8
+          ],
+          "contexts": [
+            {
+              "old_start_line": 3,
+              "old_end_line": 5,
+              "before_lines": [
+                {
+                  "line": 1,
+                  "text": "top"
+                },
+                {
+                  "line": 2,
+                  "text": "other"
+                }
+              ],
+              "after_lines": [
+                {
+                  "line": 6,
+                  "text": "near"
+                },
+                {
+                  "line": 7,
+                  "text": "medium"
+                }
+              ]
+            },
+            {
+              "old_start_line": 8,
+              "old_end_line": 10,
+              "before_lines": [
+                {
+                  "line": 6,
+                  "text": "near"
+                },
+                {
+                  "line": 7,
+                  "text": "medium"
+                }
+              ],
+              "after_lines": [
+                {
+                  "line": 11,
+                  "text": "end"
+                }
+              ]
+            }
+          ],
+          "old_string": "line α\ntarget\nline β",
+          "new_string": "line α\nchanged\nline β",
+          "old_lines": [
+            "line α",
+            "target",
+            "line β"
+          ],
+          "new_lines": [
+            "line α",
+            "changed",
+            "line β"
+          ],
+          "old_line_count": 3,
+          "new_line_count": 3
+        }
+      ],
+      "write_performed": true,
+      "message": "共 1 组替换，替换 2 处"
+    },
+    "after": "top\nother\nline α\nchanged\nline β\nnear\nmedium\nline α\nchanged\nline β\nend\n"
+  },
+  {
+    "name": "subsequent_group_observes_earlier_edit",
+    "before": "top\nother\nline α\ntarget\nline β\nnear\nmedium\nline α\ntarget\nline β\nend\n",
+    "tool": "edit_file",
+    "args": {
+      "file_path": "file.txt",
+      "replacements": [
+        {
+          "old_string": "line α\ntarget\nline β",
+          "new_string": "uno\ndos\ntres"
+        },
+        {
+          "old_string": "uno\ndos\ntres",
+          "new_string": "final"
+        }
+      ]
+    },
+    "result": {
+      "success": true,
+      "path": "file.txt",
+      "size": 53,
+      "mode": "w",
+      "original_file": "top\nother\nline α\ntarget\nline β\nnear\nmedium\nline α\ntarget\nline β\nend\n",
+      "new_file": "top\nother\nfinal\nnear\nmedium\nline α\ntarget\nline β\nend\n",
+      "replacements": 2,
+      "found_matches": 3,
+      "replacement_groups": 2,
+      "details": [
+        {
+          "index": 1,
+          "status": "success",
+          "replace_all": false,
+          "found_matches": 2,
+          "replacements": 1,
+          "matched_lines": [
+            3,
+            8
+          ],
+          "contexts": [
+            {
+              "old_start_line": 3,
+              "old_end_line": 5,
+              "before_lines": [
+                {
+                  "line": 1,
+                  "text": "top"
+                },
+                {
+                  "line": 2,
+                  "text": "other"
+                }
+              ],
+              "after_lines": [
+                {
+                  "line": 6,
+                  "text": "near"
+                },
+                {
+                  "line": 7,
+                  "text": "medium"
+                }
+              ]
+            }
+          ],
+          "old_string": "line α\ntarget\nline β",
+          "new_string": "uno\ndos\ntres",
+          "old_lines": [
+            "line α",
+            "target",
+            "line β"
+          ],
+          "new_lines": [
+            "uno",
+            "dos",
+            "tres"
+          ],
+          "old_line_count": 3,
+          "new_line_count": 3
+        },
+        {
+          "index": 2,
+          "status": "success",
+          "replace_all": false,
+          "found_matches": 1,
+          "replacements": 1,
+          "matched_lines": [
+            3
+          ],
+          "contexts": [
+            {
+              "old_start_line": 3,
+              "old_end_line": 5,
+              "before_lines": [
+                {
+                  "line": 1,
+                  "text": "top"
+                },
+                {
+                  "line": 2,
+                  "text": "other"
+                }
+              ],
+              "after_lines": [
+                {
+                  "line": 6,
+                  "text": "near"
+                },
+                {
+                  "line": 7,
+                  "text": "medium"
+                }
+              ]
+            }
+          ],
+          "old_string": "uno\ndos\ntres",
+          "new_string": "final",
+          "old_lines": [
+            "uno",
+            "dos",
+            "tres"
+          ],
+          "new_lines": [
+            "final"
+          ],
+          "old_line_count": 3,
+          "new_line_count": 1
+        }
+      ],
+      "write_performed": true,
+      "message": "共 2 组替换，替换 2 处"
+    },
+    "after": "top\nother\nfinal\nnear\nmedium\nline α\ntarget\nline β\nend\n"
+  },
+  {
+    "name": "rollback_on_late_missing_match",
+    "before": "top\nother\nline α\ntarget\nline β\nnear\nmedium\nline α\ntarget\nline β\nend\n",
+    "tool": "edit_file",
+    "args": {
+      "file_path": "file.txt",
+      "replacements": [
+        {
+          "old_string": "line α\ntarget\nline β",
+          "new_string": "one\ntwo\nthree"
+        },
+        {
+          "old_string": "missing\nthree\nlines",
+          "new_string": "replacement"
+        }
+      ]
+    },
+    "result": {
+      "success": false,
+      "path": "file.txt",
+      "error": "第 2 组替换失败：未找到要替换的内容",
+      "failed_replacement_index": 2,
+      "failed_details": [
+        {
+          "index": 2,
+          "status": "not_found",
+          "replace_all": false,
+          "found_matches": 0,
+          "replacements": 0,
+          "matched_lines": [],
+          "reason": "未找到要替换的内容"
+        }
+      ],
+      "details": [
+        {
+          "index": 1,
+          "status": "success",
+          "replace_all": false,
+          "found_matches": 2,
+          "replacements": 1,
+          "matched_lines": [
+            3,
+            8
+          ],
+          "contexts": [
+            {
+              "old_start_line": 3,
+              "old_end_line": 5,
+              "before_lines": [
+                {
+                  "line": 1,
+                  "text": "top"
+                },
+                {
+                  "line": 2,
+                  "text": "other"
+                }
+              ],
+              "after_lines": [
+                {
+                  "line": 6,
+                  "text": "near"
+                },
+                {
+                  "line": 7,
+                  "text": "medium"
+                }
+              ]
+            }
+          ],
+          "old_string": "line α\ntarget\nline β",
+          "new_string": "one\ntwo\nthree",
+          "old_lines": [
+            "line α",
+            "target",
+            "line β"
+          ],
+          "new_lines": [
+            "one",
+            "two",
+            "three"
+          ],
+          "old_line_count": 3,
+          "new_line_count": 3
+        },
+        {
+          "index": 2,
+          "status": "not_found",
+          "replace_all": false,
+          "found_matches": 0,
+          "replacements": 0,
+          "matched_lines": [],
+          "reason": "未找到要替换的内容"
+        }
+      ],
+      "write_performed": false,
+      "completed_replacements": 1
+    },
+    "after": "top\nother\nline α\ntarget\nline β\nnear\nmedium\nline α\ntarget\nline β\nend\n"
+  },
+  {
+    "name": "rollback_on_short_old_string",
+    "before": "top\nother\nline α\ntarget\nline β\nnear\nmedium\nline α\ntarget\nline β\nend\n",
+    "tool": "edit_file",
+    "args": {
+      "file_path": "file.txt",
+      "replacements": [
+        {
+          "old_string": "line α\ntarget\nline β",
+          "new_string": "one\ntwo\nthree"
+        },
+        {
+          "old_string": "one\ntwo\n",
+          "new_string": "replacement"
+        }
+      ]
+    },
+    "result": {
+      "success": false,
+      "path": "file.txt",
+      "error": "第 2 组替换失败：old_string 少于3行，请包含目标行及其前后上下文（至少3行）后重试",
+      "failed_replacement_index": 2,
+      "failed_details": [
+        {
+          "index": 2,
+          "status": "error",
+          "replace_all": false,
+          "found_matches": 0,
+          "replacements": 0,
+          "matched_lines": [],
+          "reason": "old_string 少于3行，请包含目标行及其前后上下文（至少3行）后重试"
+        }
+      ],
+      "details": [
+        {
+          "index": 1,
+          "status": "success",
+          "replace_all": false,
+          "found_matches": 2,
+          "replacements": 1,
+          "matched_lines": [
+            3,
+            8
+          ],
+          "contexts": [
+            {
+              "old_start_line": 3,
+              "old_end_line": 5,
+              "before_lines": [
+                {
+                  "line": 1,
+                  "text": "top"
+                },
+                {
+                  "line": 2,
+                  "text": "other"
+                }
+              ],
+              "after_lines": [
+                {
+                  "line": 6,
+                  "text": "near"
+                },
+                {
+                  "line": 7,
+                  "text": "medium"
+                }
+              ]
+            }
+          ],
+          "old_string": "line α\ntarget\nline β",
+          "new_string": "one\ntwo\nthree",
+          "old_lines": [
+            "line α",
+            "target",
+            "line β"
+          ],
+          "new_lines": [
+            "one",
+            "two",
+            "three"
+          ],
+          "old_line_count": 3,
+          "new_line_count": 3
+        },
+        {
+          "index": 2,
+          "status": "error",
+          "replace_all": false,
+          "found_matches": 0,
+          "replacements": 0,
+          "matched_lines": [],
+          "reason": "old_string 少于3行，请包含目标行及其前后上下文（至少3行）后重试"
+        }
+      ],
+      "write_performed": false,
+      "completed_replacements": 1
+    },
+    "after": "top\nother\nline α\ntarget\nline β\nnear\nmedium\nline α\ntarget\nline β\nend\n"
+  },
+  {
+    "name": "replace_all_must_be_boolean",
+    "before": "top\nother\nline α\ntarget\nline β\nnear\nmedium\nline α\ntarget\nline β\nend\n",
+    "tool": "edit_file",
+    "args": {
+      "file_path": "file.txt",
+      "replacements": [
+        {
+          "old_string": "line α\ntarget\nline β",
+          "new_string": "replacement",
+          "replace_all": "true"
+        }
+      ]
+    },
+    "result": {
+      "success": false,
+      "path": "file.txt",
+      "error": "第 1 组替换失败：replace_all 必须是 true 或 false；不提供时默认为 false",
+      "failed_replacement_index": 1,
+      "failed_details": [
+        {
+          "index": 1,
+          "status": "error",
+          "replace_all": "true",
+          "found_matches": 0,
+          "replacements": 0,
+          "matched_lines": [],
+          "reason": "replace_all 必须是 true 或 false；不提供时默认为 false"
+        }
+      ],
+      "details": [
+        {
+          "index": 1,
+          "status": "error",
+          "replace_all": "true",
+          "found_matches": 0,
+          "replacements": 0,
+          "matched_lines": [],
+          "reason": "replace_all 必须是 true 或 false；不提供时默认为 false"
+        }
+      ],
+      "write_performed": false,
+      "completed_replacements": 0
+    },
+    "after": "top\nother\nline α\ntarget\nline β\nnear\nmedium\nline α\ntarget\nline β\nend\n"
+  },
+  {
+    "name": "empty_old_string",
+    "before": "top\nother\nline α\ntarget\nline β\nnear\nmedium\nline α\ntarget\nline β\nend\n",
+    "tool": "edit_file",
+    "args": {
+      "file_path": "file.txt",
+      "replacements": [
+        {
+          "old_string": "",
+          "new_string": "replacement"
+        }
+      ]
+    },
+    "result": {
+      "success": false,
+      "path": "file.txt",
+      "error": "第 1 组替换失败：old_string 不能为空，请从 read_file 内容中精确复制",
+      "failed_replacement_index": 1,
+      "failed_details": [
+        {
+          "index": 1,
+          "status": "error",
+          "replace_all": false,
+          "found_matches": 0,
+          "replacements": 0,
+          "matched_lines": [],
+          "reason": "old_string 不能为空，请从 read_file 内容中精确复制"
+        }
+      ],
+      "details": [
+        {
+          "index": 1,
+          "status": "error",
+          "replace_all": false,
+          "found_matches": 0,
+          "replacements": 0,
+          "matched_lines": [],
+          "reason": "old_string 不能为空，请从 read_file 内容中精确复制"
+        }
+      ],
+      "write_performed": false,
+      "completed_replacements": 0
+    },
+    "after": "top\nother\nline α\ntarget\nline β\nnear\nmedium\nline α\ntarget\nline β\nend\n"
+  },
+  {
+    "name": "identical_replacement",
+    "before": "top\nother\nline α\ntarget\nline β\nnear\nmedium\nline α\ntarget\nline β\nend\n",
+    "tool": "edit_file",
+    "args": {
+      "file_path": "file.txt",
+      "replacements": [
+        {
+          "old_string": "line α\ntarget\nline β",
+          "new_string": "line α\ntarget\nline β"
+        }
+      ]
+    },
+    "result": {
+      "success": false,
+      "path": "file.txt",
+      "error": "第 1 组替换失败：old_string 与 new_string 相同，无法执行替换",
+      "failed_replacement_index": 1,
+      "failed_details": [
+        {
+          "index": 1,
+          "status": "error",
+          "replace_all": false,
+          "found_matches": 0,
+          "replacements": 0,
+          "matched_lines": [],
+          "reason": "old_string 与 new_string 相同，无法执行替换"
+        }
+      ],
+      "details": [
+        {
+          "index": 1,
+          "status": "error",
+          "replace_all": false,
+          "found_matches": 0,
+          "replacements": 0,
+          "matched_lines": [],
+          "reason": "old_string 与 new_string 相同，无法执行替换"
+        }
+      ],
+      "write_performed": false,
+      "completed_replacements": 0
+    },
+    "after": "top\nother\nline α\ntarget\nline β\nnear\nmedium\nline α\ntarget\nline β\nend\n"
+  },
+  {
+    "name": "missing_new_string",
+    "before": "top\nother\nline α\ntarget\nline β\nnear\nmedium\nline α\ntarget\nline β\nend\n",
+    "tool": "edit_file",
+    "args": {
+      "file_path": "file.txt",
+      "replacements": [
+        {
+          "old_string": "line α\ntarget\nline β"
+        }
+      ]
+    },
+    "result": {
+      "success": false,
+      "path": "file.txt",
+      "error": "第 1 组替换失败：缺少 old_string/new_string",
+      "failed_replacement_index": 1,
+      "failed_details": [
+        {
+          "index": 1,
+          "status": "error",
+          "replace_all": false,
+          "found_matches": 0,
+          "replacements": 0,
+          "matched_lines": [],
+          "reason": "缺少 old_string/new_string"
+        }
+      ],
+      "details": [
+        {
+          "index": 1,
+          "status": "error",
+          "replace_all": false,
+          "found_matches": 0,
+          "replacements": 0,
+          "matched_lines": [],
+          "reason": "缺少 old_string/new_string"
+        }
+      ],
+      "write_performed": false,
+      "completed_replacements": 0
+    },
+    "after": "top\nother\nline α\ntarget\nline β\nnear\nmedium\nline α\ntarget\nline β\nend\n"
+  },
+  {
+    "name": "non_object_group",
+    "before": "top\nother\nline α\ntarget\nline β\nnear\nmedium\nline α\ntarget\nline β\nend\n",
+    "tool": "edit_file",
+    "args": {
+      "file_path": "file.txt",
+      "replacements": [
+        "replacement"
+      ]
+    },
+    "result": {
+      "success": false,
+      "path": "file.txt",
+      "error": "第 1 组替换失败：替换项必须是对象，包含 old_string 和 new_string",
+      "failed_replacement_index": 1,
+      "failed_details": [
+        {
+          "index": 1,
+          "status": "error",
+          "replace_all": false,
+          "found_matches": 0,
+          "replacements": 0,
+          "matched_lines": [],
+          "reason": "替换项必须是对象，包含 old_string 和 new_string"
+        }
+      ],
+      "details": [
+        {
+          "index": 1,
+          "status": "error",
+          "replace_all": false,
+          "found_matches": 0,
+          "replacements": 0,
+          "matched_lines": [],
+          "reason": "替换项必须是对象，包含 old_string 和 new_string"
+        }
+      ],
+      "write_performed": false,
+      "completed_replacements": 0
+    },
+    "after": "top\nother\nline α\ntarget\nline β\nnear\nmedium\nline α\ntarget\nline β\nend\n"
+  },
+  {
+    "name": "old_string_starts_at_newline",
+    "before": "intro\r\nalpha\rbravo\r\ncharlie\r\nend",
+    "tool": "edit_file",
+    "args": {
+      "file_path": "file.txt",
+      "replacements": [
+        {
+          "old_string": "\nalpha\nbravo",
+          "new_string": "\njoined"
+        }
+      ]
+    },
+    "result": {
+      "success": true,
+      "path": "file.txt",
+      "size": 24,
+      "mode": "w",
+      "original_file": "intro\nalpha\nbravo\ncharlie\nend",
+      "new_file": "intro\njoined\ncharlie\nend",
+      "replacements": 1,
+      "found_matches": 1,
+      "replacement_groups": 1,
+      "details": [
+        {
+          "index": 1,
+          "status": "success",
+          "replace_all": false,
+          "found_matches": 1,
+          "replacements": 1,
+          "matched_lines": [
+            2
+          ],
+          "contexts": [
+            {
+              "old_start_line": 2,
+              "old_end_line": 4,
+              "before_lines": [
+                {
+                  "line": 1,
+                  "text": "intro"
+                }
+              ],
+              "after_lines": [
+                {
+                  "line": 5,
+                  "text": "end"
+                }
+              ]
+            }
+          ],
+          "old_string": "\nalpha\nbravo",
+          "new_string": "\njoined",
+          "old_lines": [
+            "",
+            "alpha",
+            "bravo"
+          ],
+          "new_lines": [
+            "",
+            "joined"
+          ],
+          "old_line_count": 3,
+          "new_line_count": 2
+        }
+      ],
+      "write_performed": true,
+      "message": "共 1 组替换，替换 1 处"
+    },
+    "after": "intro\njoined\ncharlie\nend"
+  },
+  {
+    "name": "python_unicode_splitlines",
+    "before": "start\nα βγ\nend",
+    "tool": "edit_file",
+    "args": {
+      "file_path": "file.txt",
+      "replacements": [
+        {
+          "old_string": "α βγ",
+          "new_string": "new"
+        }
+      ]
+    },
+    "result": {
+      "success": true,
+      "path": "file.txt",
+      "size": 13,
+      "mode": "w",
+      "original_file": "start\nα βγ\nend",
+      "new_file": "start\nnew\nend",
+      "replacements": 1,
+      "found_matches": 1,
+      "replacement_groups": 1,
+      "details": [
+        {
+          "index": 1,
+          "status": "success",
+          "replace_all": false,
+          "found_matches": 1,
+          "replacements": 1,
+          "matched_lines": [
+            2
+          ],
+          "contexts": [
+            {
+              "old_start_line": 2,
+              "old_end_line": 4,
+              "before_lines": [
+                {
+                  "line": 1,
+                  "text": "start"
+                }
+              ],
+              "after_lines": [
+                {
+                  "line": 5,
+                  "text": "end"
+                }
+              ]
+            }
+          ],
+          "old_string": "α βγ",
+          "new_string": "new",
+          "old_lines": [
+            "α",
+            "β",
+            "γ"
+          ],
+          "new_lines": [
+            "new"
+          ],
+          "old_line_count": 3,
+          "new_line_count": 1
+        }
+      ],
+      "write_performed": true,
+      "message": "共 1 组替换，替换 1 处"
+    },
+    "after": "start\nnew\nend"
+  }
+]

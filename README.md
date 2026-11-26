@@ -36,7 +36,7 @@
 | **终端执行** | 宿主机 OS 级沙箱（macOS `sandbox-exec` / Windows WSL2 / Linux 受限助手；Linux 首批 Ubuntu 24.04 隔离实测） |
 | **可登录账号** | 默认本机免登录；开启 Host 网页密码后只使用密码登录 |
 | **数据目录** | `<数据根>/host/` |
-| **默认监听** | `setup` 向导默认 `127.0.0.1`；未显式配置时程序默认 `0.0.0.0`，Host 请显式设 `WEB_SERVER_HOST=127.0.0.1` |
+| **默认监听** | Host Web 默认监听 `127.0.0.1`。`WEB_SERVER_HOST`、`server.host` 或 `--bind` 可显式指定监听地址 |
 | **用户注册** | 单人使用，无需注册 |
 | **前置要求** | Windows 安装 WSL2 沙箱；Linux 管理员安装受限助手（见安装说明） |
 
@@ -57,15 +57,19 @@ cd astrion
 #    向导会依次询问：监听地址/端口 → 数据目录 → 模型 API（并自动生成会话密钥）
 ./setup.sh
 
-# 3. 构建前端
+# 3. 构建前端和 Rust 后端
 npm install && npm run build
+cargo build --locked --release --manifest-path backend-rust/Cargo.toml
 
-# 4. 启动
+# 4. 启动 Host Web
 ./start.sh
-# 或：python -m server.app --port 8091 --thinking-mode
+# 或：python3 -m server.app --port 8091
+# 或：python3 main.py
 ```
 
-访问 `http://localhost:8091`。Host 模式默认本机免登录；启用 Host 网页密码后只显示密码登录（见下文）。桌面端免密码。
+访问 `http://localhost:8091`。Host 模式默认本机免登录。启用 Host 网页密码后使用密码登录，详见下文。桌面端免密码。
+
+上面的启动命令均使用 Rust 后端。需要对照旧 Flask 实现时，运行 `python3 -m server.app --backend python`。Rust 和 Python 实例共用数据根时只能启动一个。
 
 > Linux 首次使用还需由管理员安装 Host 沙箱助手：`sudo bash scripts/setup-linux-sandbox.sh`。Windows 首次使用按设置页向导安装 WSL2 沙箱。
 >
@@ -80,7 +84,7 @@ npm install && npm run build
 bun cli/src/main.tsx   # 或 npm --prefix cli run dev；当前目录即工作区
 ```
 
-CLI 通过本机 Gateway Bearer 连接服务，探测到无服务时自动启动 `server.headless_app`。命令入口为 `cli/bin/astrion`，加入 PATH 后可直接使用 `astrion` 命令。
+CLI 通过本机 Gateway Bearer 连接服务，探测到无服务时默认启动 Rust headless 后端。源码安装先执行 `cargo build --locked --release --manifest-path backend-rust/Cargo.toml` 和 `node desktop/scripts/prepare_rust_backend.mjs`。命令入口为 `cli/bin/astrion`，加入 PATH 后可直接使用 `astrion` 命令。显式配对已有实例时设置 `ASTRION_API_BASE` 与 `ASTRION_HOST_TOKEN_FILE`。
 
 ### Host 网页密码（可选）
 

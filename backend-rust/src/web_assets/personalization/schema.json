@@ -1,0 +1,341 @@
+{
+  "defaults": {
+    "chat_default_model": "",
+    "chat_default_thinking_mode": true,
+    "chat_default_reasoning_effort": null,
+    "chat_network_enabled": true,
+    "chat_instructions": "",
+    "chat_deep_compress_trigger_tokens": 250000,
+    "enabled": false,
+    "communication_style": "default",
+    "conversation_continuity": "medium",
+    "morality_level": "medium",
+    "adult_content_restriction": "medium",
+    "self_identify": "",
+    "user_name": "",
+    "use_custom_names": false,
+    "profession": "",
+    "tone": "",
+    "considerations": [],
+    "disabled_tool_categories": [],
+    "enabled_skills": null,
+    "skills_catalog_snapshot": null,
+    "hidden_models": [],
+    "default_run_mode": "thinking",
+    "default_reasoning_effort": null,
+    "default_permission_mode": "approval",
+    "default_work_mode": "plan",
+    "auto_generate_title": true,
+    "title_model": "",
+    "thinking_summary_enabled": false,
+    "thinking_summary_model": "",
+    "thinking_summary_interval_seconds": 20,
+    "sub_agent_model_high": "",
+    "sub_agent_model_medium": "",
+    "sub_agent_model_low": "",
+    "external_session_header": true,
+    "recent_conversations_prompt_enabled": false,
+    "recent_conversations_prompt_limit": 10,
+    "project_memory_inject_limit": 20,
+    "tool_intent_enabled": true,
+    "skill_hints_enabled": false,
+    "skill_strict_terminal_enabled": false,
+    "skill_strict_sub_agent_enabled": false,
+    "skill_strict_run_command_foreground_enabled": false,
+    "skill_strict_run_command_background_enabled": false,
+    "tool_loading_enabled": false,
+    "tool_loading_deferred": null,
+    "require_read_before_edit": false,
+    "git_worktree_enabled": false,
+    "webpage_direct_extract_enabled": true,
+    "webpage_direct_extract_domains": [],
+    "tavily_api_key": "",
+    "search_provider": "tavily",
+    "bocha_api_key": "",
+    "exa_api_key": "",
+    "parallel_api_key": "",
+    "searxng_base_url": "",
+    "webpage_extract_provider": "jina",
+    "jina_api_key": "",
+    "default_model": null,
+    "image_compression": "original",
+    "auto_shallow_compress_enabled": false,
+    "auto_deep_compress_enabled": true,
+    "adaptive_compress_enabled": false,
+    "shallow_compress_trigger_tokens": null,
+    "shallow_compress_keep_recent_tools": null,
+    "shallow_compress_max_replace_per_round": null,
+    "shallow_compress_trigger_tool_calls_interval": null,
+    "shallow_compress_keep_user_turn_tools": null,
+    "deep_compress_trigger_tokens": null,
+    "silent_tool_disable": true,
+    "enhanced_tool_display": true,
+    "compact_message_display": "full",
+    "block_display_mode": "minimal",
+    "show_status_avatar": true,
+    "stacked_hide_borders": false,
+    "minimal_expand_height_limited": true,
+    "show_git_status_bar": true,
+    "send_shortcut": "mod_enter",
+    "versioning_enabled_by_default": true,
+    "versioning_backup_mode": "shallow",
+    "versioning_restore_mode": "overwrite",
+    "agents_md_auto_inject": false,
+    "claude_md_auto_inject": false,
+    "agents_skills_scan_enabled": true,
+    "default_hide_workspace": false,
+    "hide_quick_dock": false,
+    "quick_dock_auto_expand": true,
+    "preview_auto_open": false,
+    "browser_tools_default": false,
+    "browser_auto_open": true,
+    "browser_download_dir": "",
+    "file_preview_auto_wrap": false,
+    "edit_summary_live_display": false,
+    "modify_history_enabled": true,
+    "group_sidebar_by_workspace": false,
+    "sidebar_pinned_workspaces": [],
+    "sidebar_workspace_order": [],
+    "theme": "classic",
+    "ui_locale": "zh-CN",
+    "display_currency": "USD",
+    "subscription_quota_enabled": true,
+    "subscription_quota_source": "auto",
+    "goal_review_mode": "readonly",
+    "goal_end_conditions": [
+      "max_turns"
+    ],
+    "goal_max_turns": 5,
+    "goal_max_tokens": null,
+    "sub_agent_max_instances": 20,
+    "sub_agent_compress_threshold_tokens": 250000,
+    "sub_agent_max_turns": null,
+    "full_access_warning_dismissed": false,
+    "allow_auto_approve_full_access": false,
+    "review_agents": {
+      "auto_approval": {
+        "model": "",
+        "max_rounds": 10
+      },
+      "goal_review": {
+        "model": "",
+        "max_rounds": 10
+      },
+      "workflow_review": {
+        "model": "",
+        "max_rounds": 10
+      }
+    }
+  },
+  "tool_categories": {
+    "network": {
+      "label": "网络检索",
+      "tools": [
+        "web_search",
+        "extract_webpage",
+        "save_webpage"
+      ],
+      "default_enabled": true
+    },
+    "mcp": {
+      "label": "MCP 工具",
+      "tools": [
+        "list_mcp_servers"
+      ],
+      "default_enabled": true
+    },
+    "file_edit": {
+      "label": "文件编辑",
+      "tools": [
+        "create_file",
+        "write_file",
+        "edit_file",
+        "delete_file",
+        "rename_file",
+        "create_folder"
+      ],
+      "default_enabled": true
+    },
+    "read_focus": {
+      "label": "阅读聚焦",
+      "tools": [
+        "read_file",
+        "vlm_analyze",
+        "ocr_image",
+        "view_image"
+      ],
+      "default_enabled": true
+    },
+    "skills": {
+      "label": "Skills",
+      "tools": [
+        "read_skill",
+        "search_skills",
+        "create_skill"
+      ],
+      "default_enabled": true
+    },
+    "terminal_realtime": {
+      "label": "实时终端",
+      "tools": [
+        "terminal_session",
+        "terminal_input",
+        "terminal_snapshot",
+        "sleep"
+      ],
+      "default_enabled": true
+    },
+    "terminal_command": {
+      "label": "终端指令",
+      "tools": [
+        "run_command"
+      ],
+      "default_enabled": true
+    },
+    "git_worktree": {
+      "label": "Git worktree",
+      "tools": [
+        "enter_worktree",
+        "exit_worktree"
+      ],
+      "default_enabled": true
+    },
+    "schedules": {
+      "label": "定时任务",
+      "tools": [
+        "submit_schedule",
+        "query_schedules",
+        "manage_schedule"
+      ],
+      "default_enabled": true
+    },
+    "memory": {
+      "label": "记忆",
+      "tools": [
+        "update_memory",
+        "conversation_search",
+        "conversation_review"
+      ],
+      "default_enabled": true
+    },
+    "todo": {
+      "label": "待办事项",
+      "tools": [
+        "todo_create",
+        "todo_update_task"
+      ],
+      "default_enabled": true
+    },
+    "sub_agent": {
+      "label": "子智能体",
+      "tools": [
+        "create_sub_agent",
+        "send_message_to_sub_agent",
+        "get_sub_agent_status",
+        "stop_sub_agent",
+        "terminate_sub_agent",
+        "answer_sub_agent_question"
+      ],
+      "default_enabled": true
+    },
+    "easter_egg": {
+      "label": "彩蛋实验",
+      "tools": [
+        "trigger_easter_egg"
+      ],
+      "default_enabled": false
+    },
+    "personalization": {
+      "label": "个性化设置",
+      "tools": [
+        "manage_personalization"
+      ],
+      "default_enabled": true
+    },
+    "communication": {
+      "label": "用户沟通",
+      "tools": [
+        "ask_user"
+      ],
+      "default_enabled": true
+    }
+  },
+  "tool_loading_registry": [
+    {
+      "key": "schedules",
+      "tools": [
+        "submit_schedule",
+        "query_schedules",
+        "manage_schedule"
+      ]
+    },
+    {
+      "key": "git_worktree",
+      "tools": [
+        "enter_worktree",
+        "exit_worktree"
+      ]
+    },
+    {
+      "key": "workflow",
+      "tools": [
+        "activate_workflow",
+        "report_workflow_stage",
+        "choose_workflow_branch",
+        "get_workflow_status",
+        "deactivate_workflow",
+        "list_workflows",
+        "save_workflow"
+      ]
+    },
+    {
+      "key": "sub_agent",
+      "tools": [
+        "create_sub_agent",
+        "get_sub_agent_status",
+        "terminate_sub_agent",
+        "send_message_to_sub_agent",
+        "stop_sub_agent",
+        "answer_sub_agent_question"
+      ]
+    },
+    {
+      "key": "conversation",
+      "tools": [
+        "conversation_search",
+        "conversation_review"
+      ]
+    },
+    {
+      "key": "memory_write",
+      "tools": [
+        "update_memory",
+        "update_project_memory"
+      ]
+    },
+    {
+      "key": "personalization",
+      "tools": [
+        "manage_personalization"
+      ]
+    },
+    {
+      "key": "skill_create",
+      "tools": [
+        "create_skill"
+      ]
+    },
+    {
+      "key": "mcp",
+      "tools": [
+        "list_mcp_servers"
+      ]
+    },
+    {
+      "key": "misc",
+      "tools": [
+        "trigger_easter_egg"
+      ]
+    }
+  ]
+}

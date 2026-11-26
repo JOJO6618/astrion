@@ -1,0 +1,203 @@
+{
+  "label": "large",
+  "root": "/Users/jojo/Desktop/agents/正在修复中/agents/.astrion/worktrees/migration-rust-backend-d5f6ae5a/test/2026-11-26_Rust启动性能/.tmp/large",
+  "probe": "/api/health",
+  "python": "/opt/homebrew/bin/python3.11",
+  "rust": "/Users/jojo/Desktop/agents/正在修复中/agents/.astrion/worktrees/migration-rust-backend-d5f6ae5a/backend-rust/target/debug/astrion-headless",
+  "rounds": 7,
+  "warmup": 1,
+  "summary": {
+    "python": {
+      "runs": 7,
+      "p50_ms": 776.9,
+      "min_ms": 735.6,
+      "max_ms": 803.2,
+      "all_ms": [
+        803.2,
+        735.6,
+        797.1,
+        776.2,
+        778.1,
+        776.9,
+        756.3
+      ],
+      "p50_rss_kb": 110640,
+      "all_rss_kb": [
+        113600,
+        113360,
+        110640,
+        106736,
+        104688,
+        107824,
+        110704
+      ]
+    },
+    "rust": {
+      "runs": 7,
+      "p50_ms": 15.1,
+      "min_ms": 12.8,
+      "max_ms": 17.7,
+      "all_ms": [
+        17.7,
+        17.4,
+        13.8,
+        12.8,
+        17.3,
+        13.6,
+        15.1
+      ],
+      "p50_rss_kb": 16960,
+      "all_rss_kb": [
+        17104,
+        16960,
+        16784,
+        17264,
+        16784,
+        16816,
+        17040
+      ]
+    }
+  },
+  "runs": [
+    {
+      "kind": "python",
+      "ready_ms": 803.2,
+      "ready_status": 401,
+      "rss_kb": 113600,
+      "error": null,
+      "log": "/Users/jojo/Desktop/agents/正在修复中/agents/.astrion/worktrees/migration-rust-backend-d5f6ae5a/test/2026-11-26_Rust启动性能/.tmp/logs/python-060117-65528.log",
+      "round": 1,
+      "order": "python->rust"
+    },
+    {
+      "kind": "rust",
+      "ready_ms": 17.7,
+      "ready_status": 404,
+      "rss_kb": 17104,
+      "error": null,
+      "log": "/Users/jojo/Desktop/agents/正在修复中/agents/.astrion/worktrees/migration-rust-backend-d5f6ae5a/test/2026-11-26_Rust启动性能/.tmp/logs/rust-060118-49201.log",
+      "round": 1,
+      "order": "python->rust"
+    },
+    {
+      "kind": "rust",
+      "ready_ms": 17.4,
+      "ready_status": 404,
+      "rss_kb": 16960,
+      "error": null,
+      "log": "/Users/jojo/Desktop/agents/正在修复中/agents/.astrion/worktrees/migration-rust-backend-d5f6ae5a/test/2026-11-26_Rust启动性能/.tmp/logs/rust-060118-49205.log",
+      "round": 2,
+      "order": "rust->python"
+    },
+    {
+      "kind": "python",
+      "ready_ms": 735.6,
+      "ready_status": 401,
+      "rss_kb": 113360,
+      "error": null,
+      "log": "/Users/jojo/Desktop/agents/正在修复中/agents/.astrion/worktrees/migration-rust-backend-d5f6ae5a/test/2026-11-26_Rust启动性能/.tmp/logs/python-060118-49209.log",
+      "round": 2,
+      "order": "rust->python"
+    },
+    {
+      "kind": "python",
+      "ready_ms": 797.1,
+      "ready_status": 401,
+      "rss_kb": 110640,
+      "error": null,
+      "log": "/Users/jojo/Desktop/agents/正在修复中/agents/.astrion/worktrees/migration-rust-backend-d5f6ae5a/test/2026-11-26_Rust启动性能/.tmp/logs/python-060119-49268.log",
+      "round": 3,
+      "order": "python->rust"
+    },
+    {
+      "kind": "rust",
+      "ready_ms": 13.8,
+      "ready_status": 404,
+      "rss_kb": 16784,
+      "error": null,
+      "log": "/Users/jojo/Desktop/agents/正在修复中/agents/.astrion/worktrees/migration-rust-backend-d5f6ae5a/test/2026-11-26_Rust启动性能/.tmp/logs/rust-060120-49334.log",
+      "round": 3,
+      "order": "python->rust"
+    },
+    {
+      "kind": "rust",
+      "ready_ms": 12.8,
+      "ready_status": 404,
+      "rss_kb": 17264,
+      "error": null,
+      "log": "/Users/jojo/Desktop/agents/正在修复中/agents/.astrion/worktrees/migration-rust-backend-d5f6ae5a/test/2026-11-26_Rust启动性能/.tmp/logs/rust-060120-49338.log",
+      "round": 4,
+      "order": "rust->python"
+    },
+    {
+      "kind": "python",
+      "ready_ms": 776.2,
+      "ready_status": 401,
+      "rss_kb": 106736,
+      "error": null,
+      "log": "/Users/jojo/Desktop/agents/正在修复中/agents/.astrion/worktrees/migration-rust-backend-d5f6ae5a/test/2026-11-26_Rust启动性能/.tmp/logs/python-060120-49342.log",
+      "round": 4,
+      "order": "rust->python"
+    },
+    {
+      "kind": "python",
+      "ready_ms": 778.1,
+      "ready_status": 401,
+      "rss_kb": 104688,
+      "error": null,
+      "log": "/Users/jojo/Desktop/agents/正在修复中/agents/.astrion/worktrees/migration-rust-backend-d5f6ae5a/test/2026-11-26_Rust启动性能/.tmp/logs/python-060120-49404.log",
+      "round": 5,
+      "order": "python->rust"
+    },
+    {
+      "kind": "rust",
+      "ready_ms": 17.3,
+      "ready_status": 404,
+      "rss_kb": 16784,
+      "error": null,
+      "log": "/Users/jojo/Desktop/agents/正在修复中/agents/.astrion/worktrees/migration-rust-backend-d5f6ae5a/test/2026-11-26_Rust启动性能/.tmp/logs/rust-060121-49463.log",
+      "round": 5,
+      "order": "python->rust"
+    },
+    {
+      "kind": "rust",
+      "ready_ms": 13.6,
+      "ready_status": 404,
+      "rss_kb": 16816,
+      "error": null,
+      "log": "/Users/jojo/Desktop/agents/正在修复中/agents/.astrion/worktrees/migration-rust-backend-d5f6ae5a/test/2026-11-26_Rust启动性能/.tmp/logs/rust-060121-49467.log",
+      "round": 6,
+      "order": "rust->python"
+    },
+    {
+      "kind": "python",
+      "ready_ms": 776.9,
+      "ready_status": 401,
+      "rss_kb": 107824,
+      "error": null,
+      "log": "/Users/jojo/Desktop/agents/正在修复中/agents/.astrion/worktrees/migration-rust-backend-d5f6ae5a/test/2026-11-26_Rust启动性能/.tmp/logs/python-060121-49471.log",
+      "round": 6,
+      "order": "rust->python"
+    },
+    {
+      "kind": "python",
+      "ready_ms": 756.3,
+      "ready_status": 401,
+      "rss_kb": 110704,
+      "error": null,
+      "log": "/Users/jojo/Desktop/agents/正在修复中/agents/.astrion/worktrees/migration-rust-backend-d5f6ae5a/test/2026-11-26_Rust启动性能/.tmp/logs/python-060122-49530.log",
+      "round": 7,
+      "order": "python->rust"
+    },
+    {
+      "kind": "rust",
+      "ready_ms": 15.1,
+      "ready_status": 404,
+      "rss_kb": 17040,
+      "error": null,
+      "log": "/Users/jojo/Desktop/agents/正在修复中/agents/.astrion/worktrees/migration-rust-backend-d5f6ae5a/test/2026-11-26_Rust启动性能/.tmp/logs/rust-060123-49592.log",
+      "round": 7,
+      "order": "python->rust"
+    }
+  ]
+}

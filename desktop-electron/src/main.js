@@ -21,16 +21,18 @@ import { startQuickEntry, quickEnabled, showQuickEntry } from './quick/controlle
 import { focusMainWindow } from './window.js';
 import { isUpdaterInstalling } from './updater-state.js';
 import { focusUpdatePolicyWindow, updatePolicyTransitioning } from './update-policy-window.js';
+import { resolveDesktopBackend } from './rust-backend.js';
 
-app.setName('Astrion');
-const isolatedUserData = process.env.ASTRION_ELECTRON_USER_DATA;
+const rust = resolveDesktopBackend({ resourcesPath: app.isPackaged ? process.resourcesPath : undefined });
+app.setName(rust?.experimental ? 'Astrion Rust Experiment' : 'Astrion');
+const isolatedUserData = rust?.profile || process.env.ASTRION_ELECTRON_USER_DATA;
 if (isolatedUserData) {
   const directory = path.resolve(isolatedUserData);
   fs.mkdirSync(directory, { recursive: true });
   app.setPath('userData', directory);
   app.setPath('sessionData', directory);
 }
-const quickDebug = !app.isPackaged && process.argv.includes('--quick-debug');
+const quickDebug = !rust && !app.isPackaged && process.argv.includes('--quick-debug');
 if (quickDebug) app.setPath('userData', app.getPath('userData') + '-quick-debug');
 protocol.registerSchemesAsPrivileged([{ scheme: 'astrion-quick', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }]);
 
@@ -59,15 +61,15 @@ if (!app.requestSingleInstanceLock()) {
       if (quickDebug) {
         await startQuickEntry({ debug: true, port: process.env.ASTRION_API_PORT ? Number(process.env.ASTRION_API_PORT) : undefined, dataRoot: process.env.ASTRION_DATA_ROOT, workspacePath: process.env.ASTRION_QUICK_WORKSPACE || process.cwd() });
       } else {
-        await startBackendAndCreateWindow();
+        await startBackendAndCreateWindow(rust);
       }
     } catch (err) {
+      await shutdownBackend();
       // 后端起不来属致命错误：写日志 + 落盘临时文件（GUI 进程无控制台可见性），退出
       console.error('[astrion-desktop] 启动失败:', err);
       const fs = await import('node:fs');
       const os = await import('node:os');
-      const path = await import('node:path');
-      const logPath = path.join(os.tmpdir(), 'astrion-desktop-startup.log');
+      const logPath = path.join(rust?.profile || os.tmpdir(), 'astrion-desktop-startup.log');
       try {
         fs.writeFileSync(logPath, `[astrion-desktop] 启动失败\n${err?.stack || err}\n`);
       } catch {
@@ -84,7 +86,17 @@ if (!app.requestSingleInstanceLock()) {
     // 更新策略窗口关闭流程由 updatePolicyTransitioning 管理。
   });
 
-  app.on('will-quit', () => {
-    shutdownBackend();
+  let backendShutdown;
+  app.on('will-quit', (event) => {
+    if (!rust) {
+      shutdownBackend();
+      return;
+    }
+    event.preventDefault();
+    backendShutdown ??= Promise.resolve(shutdownBackend()).then(result => {
+      if (result === false) console.error('[astrion-desktop] Rust 后端未在退出期限内关闭');
+    }).catch(error => {
+      console.error('[astrion-desktop] Rust 后端退出失败:', error);
+    }).finally(() => app.exit(0));
   });
 }

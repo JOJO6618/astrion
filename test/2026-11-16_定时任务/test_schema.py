@@ -175,6 +175,8 @@ class NormalizeTest(unittest.TestCase):
             {"mode": "custom", "execution_mode": "host"},
             {"mode": "custom", "reasoning_effort": "ultra"},
             {"mode": "custom", "reasoning_effort": "minimal"},
+            {"mode": "custom", "chatgpt_fast_mode": True},
+            {"mode": "inherit", "chatgpt_fast_mode": False},
             {"mode": "custom", "model_key": ""},
             {"mode": "custom", "thinking": "yes"},
             {"mode": "custom", "ask_user": "yes"},

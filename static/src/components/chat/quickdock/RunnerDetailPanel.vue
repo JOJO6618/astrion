@@ -20,10 +20,12 @@
           <CloseButton :label="$t('common.close')" :title="$t('common.close')" @click="close" />
         </span>
       </header>
+      <ActivityPager v-if="effectiveDetail?.kind === 'agent'" />
       <div ref="bodyRef" class="qd-detail__body" :class="{ 'body-fade': bodyFading }">
         <!-- 子智能体：工具调用 + 文本输出时间线 -->
         <template v-if="effectiveDetail?.kind === 'agent'">
-          <div v-if="!timelineItems.length" class="qd-detail__empty">
+          <div v-if="subAgentStore.activityError" class="qd-detail__empty" role="status">{{ subAgentStore.activityError }}</div>
+          <div v-else-if="!timelineItems.length" class="qd-detail__empty">
             {{ activityLoading ? $t('common.loading') : $t('quickdock.noProgress') }}
           </div>
           <div
@@ -109,6 +111,7 @@ import { useSubAgentStore } from '@/stores/subAgent';
 import { useBackgroundCommandStore } from '@/stores/backgroundCommand';
 import { useUiStore } from '@/stores/ui';
 import CloseButton from '@/components/common/CloseButton.vue';
+import ActivityPager from './ActivityPager.vue';
 import { buildSubAgentToolParts } from './subAgentToolText';
 
 /**
@@ -548,7 +551,8 @@ watch(
       return;
     }
     const newKeys = keys.filter((k) => !seenFeedKeys.has(k));
-    if (!newKeys.length) {
+    seenFeedKeys = new Set(keys);
+    if (subAgentStore.historyPage || !newKeys.length) {
       return;
     }
     newKeys.forEach((k) => seenFeedKeys.add(k));
@@ -658,7 +662,7 @@ function maybeAutoScroll() {
   }
   // 首次填充由 feed watch 瞬间定位到底，不走平滑滚动；
   // 平滑滚动只用于「已在底部时新步骤出现」的场景
-  if (!feedHydrated) {
+  if (!feedHydrated || subAgentStore.historyPage) {
     return;
   }
   const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;

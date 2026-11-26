@@ -53,7 +53,8 @@ npm run dev        # 开发模式：系统 python + 仓库源码树（同 Tauri 
 ## 打包与发布
 
 ```bash
-npm run build      # = prepare-backend（复用 desktop/scripts/prepare_backend.py）+ electron-builder
+npm run build      # 构建 Rust、前端和原生组件，生成 macOS 安装包
+npm run build:rust:app   # 在 dist-rust/ 生成未签名的本地 Astrion.app
 bash scripts/release_mac.sh [版本]   # 半一键发布（见脚本头注释）
 ```
 

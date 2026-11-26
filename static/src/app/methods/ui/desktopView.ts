@@ -2,6 +2,8 @@
 // 桌面多视图：每个内容视图固定绑定一个标签（key 由壳层按 sender 告知），
 // 启动后 attach 登记 renderer 身份，此后本文档不再切换到其他标签（切换 = 另一个视图）。
 import { useConversationTabsStore } from '../../../stores/conversationTabs';
+import { navigationId } from '../../../stores/desktopNavigationTransport';
+import { watch } from 'vue';
 import { currentConversationSession } from '../conversation/session';
 import { t } from '@/locales';
 import { onViewVisibilityChange } from './viewVisibility';
@@ -19,7 +21,7 @@ function errorToast(host, error) {
 export async function startDesktopView(host) {
   const tabs = useConversationTabsStore();
   if (!tabs.enabled || controllers.has(host)) return;
-  const control = { disposed: false, retryTimer: 0, shown: false, unsubscribe: null };
+  const control = { disposed: false, retryTimer: 0, shown: false, unsubscribe: null, stopRelocationWatch: null };
   controllers.set(host, control);
   // 重新可见：被暂停的辅助刷新各补一次（任务事件轮询从未停止，只是降频）。
   control.unsubscribe = onViewVisibilityChange((visible) => {
@@ -47,6 +49,22 @@ export async function startDesktopView(host) {
       control.retryTimer = window.setTimeout(attach, 2000);
     }
   };
+  control.stopRelocationWatch = watch(
+    () => tabs.viewTab,
+    (next, previous) => {
+      if (
+        tabs.attached && next?.kind === 'conv' && previous?.kind === 'conv' &&
+        next.key === previous.key && next.conversationId === previous.conversationId &&
+        next.workspaceId !== previous.workspaceId && !tabs.renderers[next.key]
+      ) {
+        window.clearTimeout(control.retryTimer);
+        tabs.localRendererId = navigationId();
+        tabs.pendingFail = '';
+        void attach();
+      }
+    },
+    { flush: 'post' }
+  );
   await attach();
 }
 
@@ -55,6 +73,7 @@ export function stopDesktopView(host) {
   if (control) {
     control.disposed = true;
     control.unsubscribe?.();
+    control.stopRelocationWatch?.();
     if (control.retryTimer) window.clearTimeout(control.retryTimer);
     controllers.delete(host);
   }

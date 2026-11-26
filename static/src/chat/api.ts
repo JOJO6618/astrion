@@ -3,7 +3,8 @@ import type { ChatView, MediaRef } from './types';
 export class ChatApiError extends Error {
   constructor(
     message: string,
-    public status: number
+    public status: number,
+    public code?: string
   ) {
     super(message);
   }
@@ -20,7 +21,7 @@ export async function chatApi<T = any>(path: string, options: RequestInit = {}):
   });
   const value = await response.json();
   if (!response.ok || value.success === false)
-    throw new ChatApiError(value.error || response.statusText, response.status);
+    throw new ChatApiError(value.error || response.statusText, response.status, value.code);
   return value.data as T;
 }
 export const command = <T = any>(path: string, data: Record<string, unknown>, method = 'POST') =>

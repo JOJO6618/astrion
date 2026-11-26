@@ -129,6 +129,7 @@ export const routeMethods = {
         urlMode: 'replace'
       });
       if (!owns() || result.superseded) return { success: false, superseded: true };
+      if (result.migrationRequired) return result;
       if (result.success) {
         this.currentConversationTitle = result.title || '';
         this.titleReady = true;
@@ -177,7 +178,7 @@ export const routeMethods = {
     }
     this.handleSelectWorkspaceConversation({
       conversationId: String(convId || ''),
-      workspaceId: String(this.currentHostWorkspaceId || '')
+      workspaceId: String(state.workspaceId || this.currentHostWorkspaceId || '')
     });
   },
   refreshCurrentPage() {

@@ -5,7 +5,7 @@ export default {
   'boot.connectFailed': 'Cannot connect to local Astrion service ({url}). Please start the service and retry.',
   'boot.starting': 'No running service found. Starting local Astrion service for you (first run takes a few seconds)…',
   'boot.staleServer': 'A service is running but is too old for CLI access (no host token generated). Please restart it and retry.',
-  'boot.startTimeout': 'Local service start timed out. Please start it manually (python -m server.app) and retry.',
+  'boot.startTimeout': 'Local service start timed out. Start a local Astrion Gateway and retry.',
   'boot.workspace.title': 'Workspace',
   'boot.workspace.notRegistered': 'Current directory is not an Astrion workspace yet:',
   'boot.workspace.askCreate': 'Create it as a workspace?',

@@ -3,6 +3,8 @@
 #[cfg(not(windows))]
 compile_error!("astrion-windows-helper must be built on Windows");
 
+mod backend_guardian;
+
 #[path = "../../../../desktop/src-tauri/src/quick/keyboard.rs"]
 mod keyboard;
 #[path = "../../../../desktop/src-tauri/src/quick/capture/wgc.rs"]
@@ -85,8 +87,16 @@ fn run(args: &[String]) -> Result<(), String> {
 }
 
 fn main() {
-    let args: Vec<_> = std::env::args().skip(1).collect();
-    if let Err(error) = run(&args) {
+    let args: Vec<_> = std::env::args_os().skip(1).collect();
+    let result = if args.first().is_some_and(|arg| arg == "guard-backend") {
+        backend_guardian::run(&args[1..]).map_err(|error| error.to_string())
+    } else {
+        args.into_iter()
+            .map(|arg| arg.into_string().map_err(|_| "Invalid native helper argument".to_owned()))
+            .collect::<Result<Vec<_>, _>>()
+            .and_then(|args| run(&args))
+    };
+    if let Err(error) = result {
         eprintln!("[astrion-native] {error}");
         std::process::exit(1);
     }

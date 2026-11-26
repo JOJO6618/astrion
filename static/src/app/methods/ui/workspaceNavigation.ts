@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { t } from '@/locales';
 import { useConversationStore } from '../../../stores/conversation';
+import { useConversationStorageMigrationStore } from '../../../stores/conversationStorageMigration';
 import { useConversationTabsStore } from '../../../stores/conversationTabs';
 import { useTaskStore } from '../../../stores/task';
 import { ownsConversationSession } from '../conversation/session';
@@ -131,7 +132,7 @@ export const workspaceNavigationMethods = {
         if (crossingWorkspace || options.force) {
           void this.loadConversationsList({ background: true, autoEnter: false });
         }
-      } else {
+      } else if (!result?.migrationRequired) {
         this.suppressTitleTyping = false;
         this.titleReady = true;
         this.uiPushToast({
@@ -218,6 +219,7 @@ export const workspaceNavigationMethods = {
       commitWorkspaceIdentity(this, id, { ...selection, ...view.workspace });
       this.clearLocalTaskUiState?.('switch-workspace');
       useTaskStore().clearTask();
+      useConversationStorageMigrationStore().blockedAgent = null;
       this.messages = [];
       this.currentConversationId = null;
       this.currentConversationTitle = t('common.newConversation');

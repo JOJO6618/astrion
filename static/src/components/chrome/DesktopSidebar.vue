@@ -168,6 +168,7 @@ onMounted(() => {
     attributes: true,
     attributeFilter: ['class', 'style', 'hidden']
   });
+  syncOverlay();
   stopBrowserState = bridge?.onBrowserPanelState?.(({ key, open }) => {
     browserPanels.value[key] = open;
   });

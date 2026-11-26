@@ -1,16 +1,45 @@
 """Startup shared by the full Host server and the CLI headless server."""
 from __future__ import annotations
 
+import os
 import threading
 from datetime import datetime
 
 from flask import Flask
+from werkzeug.serving import is_running_from_reloader
 
-from config import AUTO_FIX_TOOL_CALL, MAX_ITERATIONS_PER_TASK, MAX_TOTAL_TOOL_CALLS
+from config import AUTO_FIX_TOOL_CALL, DATA_DIR, MAX_ITERATIONS_PER_TASK, MAX_TOTAL_TOOL_CALLS
+from server.instance_lock import acquire_instance_lock
 from server.utils_common import DEBUG_LOG_FILE, debug_log
 
 _background_lock = threading.Lock()
 _background_started = False
+_instance_lock_guard = threading.Lock()
+_instance_lock = None
+
+
+def _close_inherited_instance_lock() -> None:
+    # A forked tool process must not keep its parent's writer lock alive.
+    global _instance_lock, _instance_lock_guard
+    if _instance_lock is not None:
+        _instance_lock.close()
+        _instance_lock = None
+    _instance_lock_guard = threading.Lock()
+
+
+if hasattr(os, 'register_at_fork'):
+    os.register_at_fork(after_in_child=_close_inherited_instance_lock)
+
+
+def hold_backend_instance_lock(*, use_reloader: bool = False) -> bool:
+    """Claim the writer lock for process lifetime, returning false in the debug supervisor."""
+    if use_reloader and not is_running_from_reloader():
+        return False
+    global _instance_lock
+    with _instance_lock_guard:
+        if _instance_lock is None:
+            _instance_lock = acquire_instance_lock(DATA_DIR)
+    return True
 
 
 def initialize_host(app: Flask, path: str, thinking_mode: bool = False) -> None:

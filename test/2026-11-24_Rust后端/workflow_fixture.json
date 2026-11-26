@@ -1,0 +1,434 @@
+{
+  "definitions": {
+    "bug-fix-triage": {
+      "name": "bug-fix-triage",
+      "description": "缺陷分诊修复流程：复现确认、按严重程度三向分流、热修/常规双轨、统一回归把关",
+      "reviewMode": "active",
+      "maxStageRounds": 30,
+      "endConditions": "修复通过回归审核且更新日志落盘；或分诊为不跟进直接归档",
+      "updatedAt": "",
+      "body": "## 工作方式\n先复现再分诊，按严重程度走对应修复轨道。\n\n## 验证方式\n热修必须有最小复现用例；常规修复必须补回归测试。\n\n## 结束方式\n回归审核通过后更新更新日志并归档。",
+      "source": "builtin",
+      "nodes": [
+        {
+          "id": "start-1",
+          "kind": "start",
+          "name": "开始",
+          "next": "reproduce"
+        },
+        {
+          "id": "reproduce",
+          "kind": "stage",
+          "name": "复现确认",
+          "goal": "稳定复现缺陷并确认影响面",
+          "instructions": "记录复现步骤与环境；无法复现的缺陷退回报告人补充信息。",
+          "next": "severity-branch"
+        },
+        {
+          "id": "severity-branch",
+          "kind": "branch",
+          "name": "严重程度分诊",
+          "next": [
+            {
+              "target": "hotfix",
+              "condition": "线上崩溃、数据丢失或安全漏洞，必须立即修复"
+            },
+            {
+              "target": "fix",
+              "condition": "功能异常但存在变通方法，随正常节奏修复"
+            },
+            {
+              "target": "end-1",
+              "condition": "影响极低、无法复现或重复反馈，记录后不再跟进"
+            }
+          ]
+        },
+        {
+          "id": "hotfix",
+          "kind": "stage",
+          "name": "紧急热修",
+          "goal": "以最小改动止血",
+          "instructions": "只修阻断点，不做顺手重构；附带最小复现用例验证。",
+          "next": "hotfix-gate"
+        },
+        {
+          "id": "hotfix-gate",
+          "kind": "review",
+          "name": "热修审核",
+          "prompt": "热修是否最小化且无副作用，复现用例是否真实跑过",
+          "next": "merge",
+          "rejectTo": "hotfix",
+          "maxRejects": 2
+        },
+        {
+          "id": "fix",
+          "kind": "stage",
+          "name": "常规修复",
+          "goal": "根治缺陷并补齐防护",
+          "instructions": "定位根因后修复；必须补回归测试覆盖该缺陷路径。",
+          "next": "fix-gate"
+        },
+        {
+          "id": "fix-gate",
+          "kind": "review",
+          "name": "修复审核",
+          "prompt": "是否根治而非掩盖症状，回归测试是否真实运行过",
+          "next": "merge",
+          "rejectTo": "fix",
+          "maxRejects": 3
+        },
+        {
+          "id": "merge",
+          "kind": "branch",
+          "name": "汇总",
+          "next": [
+            {
+              "target": "regress-gate",
+              "condition": ""
+            }
+          ]
+        },
+        {
+          "id": "regress-gate",
+          "kind": "review",
+          "name": "回归审核",
+          "prompt": "整体回归是否通过，修复是否引入新问题",
+          "next": "document",
+          "rejectTo": "severity-branch",
+          "maxRejects": 2
+        },
+        {
+          "id": "document",
+          "kind": "stage",
+          "name": "更新日志",
+          "goal": "记录缺陷根因与修复内容",
+          "instructions": "写入更新日志；标注受影响版本范围。",
+          "next": "end-1"
+        },
+        {
+          "id": "end-1",
+          "kind": "end",
+          "name": "结束"
+        }
+      ]
+    },
+    "code-review-pipeline": {
+      "name": "code-review-pipeline",
+      "description": "代码评审标准流程：探索改动、逐项评审、输出结构化报告",
+      "reviewMode": "active",
+      "maxStageRounds": 20,
+      "endConditions": "评审报告落盘且最终审核通过",
+      "updatedAt": "",
+      "body": "## 工作方式\n按阶段推进，每个阶段完成后调用阶段汇报工具。\n\n## 验证方式\n关键结论必须有代码行号或命令输出佐证。\n\n## 结束方式\n报告写入 output/ 目录并汇报完成。",
+      "source": "builtin",
+      "nodes": [
+        {
+          "id": "start-1",
+          "kind": "start",
+          "name": "开始",
+          "next": "explore"
+        },
+        {
+          "id": "explore",
+          "kind": "stage",
+          "name": "代码探索",
+          "goal": "理解改动范围与相关模块，产出影响面清单",
+          "instructions": "先读 git diff 总览，再按模块逐个深入；禁止通读整文件。",
+          "next": "review"
+        },
+        {
+          "id": "review",
+          "kind": "stage",
+          "name": "逐项评审",
+          "goal": "按 checklist 评审每个改动文件",
+          "instructions": "关注边界条件、错误处理、安全问题；每条意见标注文件与行号。",
+          "next": "review-gate"
+        },
+        {
+          "id": "review-gate",
+          "kind": "review",
+          "name": "评审审核",
+          "prompt": "检查是否遗漏边界条件和安全问题",
+          "next": "report",
+          "rejectTo": "explore",
+          "maxRejects": 3
+        },
+        {
+          "id": "report",
+          "kind": "stage",
+          "name": "输出报告",
+          "goal": "生成结构化评审报告并落盘",
+          "instructions": "按「严重/建议/可选」三档组织；给出明确结论。",
+          "next": "report-gate"
+        },
+        {
+          "id": "report-gate",
+          "kind": "review",
+          "name": "报告审核",
+          "prompt": "报告结论是否与评审意见一致",
+          "next": "end-1",
+          "rejectTo": "review",
+          "maxRejects": 3
+        },
+        {
+          "id": "end-1",
+          "kind": "end",
+          "name": "结束"
+        }
+      ]
+    },
+    "feature-development": {
+      "name": "feature-development",
+      "description": "功能开发流程：需求理解、按策略分支实现、汇总验证、文档收尾",
+      "reviewMode": "active",
+      "maxStageRounds": 30,
+      "endConditions": "验证通过且文档更新完成",
+      "updatedAt": "",
+      "body": "## 工作方式\n先理解再动手，禁止跳过验证。\n\n## 验证方式\n构建通过 + 相关测试通过。\n\n## 结束方式\n更新文档并汇报。",
+      "source": "builtin",
+      "nodes": [
+        {
+          "id": "start-1",
+          "kind": "start",
+          "name": "开始",
+          "next": "understand"
+        },
+        {
+          "id": "understand",
+          "kind": "stage",
+          "name": "需求理解",
+          "goal": "明确需求边界与涉及模块",
+          "instructions": "产出改动清单与影响面；不确定处先问用户。",
+          "next": "impl-branch"
+        },
+        {
+          "id": "impl-branch",
+          "kind": "branch",
+          "name": "实现策略",
+          "next": [
+            {
+              "target": "prototype",
+              "condition": "方案不确定或风险高，先低成本验证"
+            },
+            {
+              "target": "full-impl",
+              "condition": "需求明确、改动范围清晰，直接正式实现"
+            }
+          ]
+        },
+        {
+          "id": "prototype",
+          "kind": "stage",
+          "name": "快速原型",
+          "goal": "最小成本验证方案可行性",
+          "instructions": "只写关键路径，不做边界打磨。",
+          "next": "merge"
+        },
+        {
+          "id": "full-impl",
+          "kind": "stage",
+          "name": "完整实现",
+          "goal": "完成正式代码修改",
+          "instructions": "小步快跑，优先根治不打补丁。",
+          "next": "merge"
+        },
+        {
+          "id": "merge",
+          "kind": "branch",
+          "name": "汇总",
+          "next": [
+            {
+              "target": "verify-gate",
+              "condition": ""
+            }
+          ]
+        },
+        {
+          "id": "verify-gate",
+          "kind": "review",
+          "name": "验证审核",
+          "prompt": "验证证据是否真实可复现：构建与测试输出必须实际运行过",
+          "next": "document",
+          "rejectTo": "impl-branch",
+          "maxRejects": 3
+        },
+        {
+          "id": "document",
+          "kind": "stage",
+          "name": "文档收尾",
+          "goal": "更新相关文档",
+          "instructions": "同步 AGENTS.md 与相关 doc。",
+          "next": "end-1"
+        },
+        {
+          "id": "end-1",
+          "kind": "end",
+          "name": "结束"
+        }
+      ]
+    },
+    "research-report": {
+      "name": "research-report",
+      "description": "调研报告流程：搜集、分析、撰写、校对",
+      "reviewMode": "readonly",
+      "maxStageRounds": 15,
+      "endConditions": "报告定稿且事实核查通过",
+      "updatedAt": "",
+      "body": "## 工作方式\n信息必须标注来源。\n\n## 验证方式\n关键事实至少两个来源交叉验证。\n\n## 结束方式\n输出 markdown 报告。",
+      "source": "builtin",
+      "nodes": [
+        {
+          "id": "start-1",
+          "kind": "start",
+          "name": "开始",
+          "next": "collect"
+        },
+        {
+          "id": "collect",
+          "kind": "stage",
+          "name": "资料搜集",
+          "goal": "收集目标主题的权威资料",
+          "instructions": "官方文档优先，其次第三方报道；记录 URL。",
+          "next": "analyze"
+        },
+        {
+          "id": "analyze",
+          "kind": "stage",
+          "name": "分析整理",
+          "goal": "归纳核心观点与分歧",
+          "instructions": "按主题分组，标注共识与争议点。",
+          "next": "draft"
+        },
+        {
+          "id": "draft",
+          "kind": "stage",
+          "name": "撰写初稿",
+          "goal": "输出结构化报告初稿",
+          "instructions": "先骨架后填充；每个结论标注来源类型。",
+          "next": "draft-gate"
+        },
+        {
+          "id": "draft-gate",
+          "kind": "review",
+          "name": "初稿审核",
+          "prompt": "事实是否都有来源标注",
+          "next": "polish",
+          "rejectTo": "collect",
+          "maxRejects": 3
+        },
+        {
+          "id": "polish",
+          "kind": "stage",
+          "name": "校对定稿",
+          "goal": "事实核查与文字打磨",
+          "instructions": "逐条核对来源；压缩冗余表述。",
+          "next": "polish-gate"
+        },
+        {
+          "id": "polish-gate",
+          "kind": "review",
+          "name": "终稿审核",
+          "prompt": "结论确定性分级是否准确",
+          "next": "end-1",
+          "rejectTo": "draft",
+          "maxRejects": 3
+        },
+        {
+          "id": "end-1",
+          "kind": "end",
+          "name": "结束"
+        }
+      ]
+    }
+  },
+  "list": {
+    "workflows": [
+      {
+        "name": "bug-fix-triage",
+        "description": "缺陷分诊修复流程：复现确认、按严重程度三向分流、热修/常规双轨、统一回归把关",
+        "source": "builtin",
+        "updatedAt": "",
+        "nodeCount": 11
+      },
+      {
+        "name": "code-review-pipeline",
+        "description": "代码评审标准流程：探索改动、逐项评审、输出结构化报告",
+        "source": "builtin",
+        "updatedAt": "",
+        "nodeCount": 7
+      },
+      {
+        "name": "feature-development",
+        "description": "功能开发流程：需求理解、按策略分支实现、汇总验证、文档收尾",
+        "source": "builtin",
+        "updatedAt": "",
+        "nodeCount": 9
+      },
+      {
+        "name": "research-report",
+        "description": "调研报告流程：搜集、分析、撰写、校对",
+        "source": "builtin",
+        "updatedAt": "",
+        "nodeCount": 8
+      }
+    ]
+  },
+  "state_markdown": "---\nname: research-report\ndescription: 调研报告流程：搜集、分析、撰写、校对\nreview_mode: readonly\nmax_stage_rounds: 15\nend_conditions: 报告定稿且事实核查通过\nupdated_at: 2026-11-13 16:30\nnodes:\n- id: start-1\n  kind: start\n  name: 开始\n  next: collect\n- id: collect\n  kind: stage\n  name: 资料搜集\n  goal: 收集目标主题的权威资料\n  instructions: 官方文档优先，其次第三方报道；记录 URL。\n  next: analyze\n- id: analyze\n  kind: stage\n  name: 分析整理\n  goal: 归纳核心观点与分歧\n  instructions: 按主题分组，标注共识与争议点。\n  next: draft\n- id: draft\n  kind: stage\n  name: 撰写初稿\n  goal: 输出结构化报告初稿\n  instructions: 先骨架后填充；每个结论标注来源类型。\n  next: draft-gate\n- id: draft-gate\n  kind: review\n  name: 初稿审核\n  prompt: 事实是否都有来源标注\n  next: polish\n  reject_to: collect\n  max_rejects: 3\n- id: polish\n  kind: stage\n  name: 校对定稿\n  goal: 事实核查与文字打磨\n  instructions: 逐条核对来源；压缩冗余表述。\n  next: polish-gate\n- id: polish-gate\n  kind: review\n  name: 终稿审核\n  prompt: 结论确定性分级是否准确\n  next: end-1\n  reject_to: draft\n  max_rejects: 3\n- id: end-1\n  kind: end\n  name: 结束\n---\n\n## 工作方式\n信息必须标注来源。\n\n## 验证方式\n关键事实至少两个来源交叉验证。\n\n## 结束方式\n输出 markdown 报告。\n",
+  "state": {
+    "active": true,
+    "workflow_name": "research-report",
+    "status": "active",
+    "exit_reason": null,
+    "current_node_id": "analyze",
+    "stage_rounds": 1,
+    "round_limit_notified": false,
+    "stage_start_msg_index": 9,
+    "reject_counts": {
+      "first-review": 1
+    },
+    "history": [
+      {
+        "node_id": "first-review",
+        "kind": "review",
+        "name": "初稿审核",
+        "decision": "reject",
+        "message": "补充出处",
+        "at": 1794587460.0
+      },
+      {
+        "node_id": "collect",
+        "kind": "stage",
+        "name": "资料搜集",
+        "summary": "资料已核对",
+        "rounds": 1,
+        "at": 1794587460.0
+      }
+    ],
+    "pending_notices": [
+      {
+        "type": "workflow",
+        "message": "保留 Python 队列中的通知",
+        "created_at": 1794587460.0
+      }
+    ],
+    "started_at": 1794587460.0
+  },
+  "snapshot": {
+    "active": true,
+    "name": "research-report",
+    "status": "active",
+    "history": [
+      {
+        "name": "资料搜集",
+        "rounds": 1
+      }
+    ],
+    "current": {
+      "name": "分析整理",
+      "rounds": 1
+    },
+    "next": "撰写初稿",
+    "reviewing": false,
+    "footnote": null
+  }
+}

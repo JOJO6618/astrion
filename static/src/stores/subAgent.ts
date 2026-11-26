@@ -31,6 +31,17 @@ interface SubAgentActivityEntry {
   error?: string;
 }
 
+interface ActivityPage {
+  start: number;
+  entries: SubAgentActivityEntry[];
+}
+
+const PAGE_SIZE = 200;
+/** 详情面板可见条目上限：实时页最多两页，兼容旧后端一次性返回全量时也只保留尾部一页。 */
+const VISIBLE_ENTRY_LIMIT = PAGE_SIZE * 2;
+const activityRequests = new WeakMap<object, AbortController>();
+type ActivityDirection = 'live' | 'older' | 'newer';
+
 interface SubAgentState {
   subAgents: SubAgent[];
   activityTimer: ReturnType<typeof setInterval> | null;
@@ -38,7 +49,9 @@ interface SubAgentState {
   /** QuickDock 静默查看的 task_id（不设 activeAgent，避免弹出旧进度窗口） */
   silentActivityTaskId: string | null;
   stoppingTaskIds: Record<string, boolean>;
-  activityEntries: SubAgentActivityEntry[];
+  livePages: ActivityPage[];
+  liveOffset: number | null;
+  historyPage: (ActivityPage & { end: number }) | null;
   activityLoading: boolean;
   activityError: string | null;
 }
@@ -53,10 +66,22 @@ export const useSubAgentStore = defineStore('subAgent', {
     /** QuickDock 静默查看的 task_id：拉 activity/轮询但不设 activeAgent（避免弹出旧进度窗口） */
     silentActivityTaskId: null,
     stoppingTaskIds: {},
-    activityEntries: [],
+    livePages: [],
+    liveOffset: null,
+    historyPage: null,
     activityLoading: false,
     activityError: null
   }),
+  getters: {
+    activityEntries(state): SubAgentActivityEntry[] {
+      const entries = state.historyPage?.entries ?? state.livePages.flatMap(page => page.entries);
+      // 防御性上界：任何仍未按页裁剪的旧返回也不能把 20 万条直接交给模板渲染。
+      return entries.length > VISIBLE_ENTRY_LIMIT ? entries.slice(-VISIBLE_ENTRY_LIMIT) : entries;
+    },
+    activityStart(state): number {
+      return state.historyPage?.start ?? state.livePages[0]?.start ?? 0;
+    }
+  },
   actions: {
     async fetchSubAgents() {
       const owns = beginAuxiliaryStoreRequest(this, 'sub-agents');
@@ -108,62 +133,99 @@ export const useSubAgentStore = defineStore('subAgent', {
       if (!agent || !agent.task_id) {
         return;
       }
+      this.closeSubAgent();
       if (options?.silent) {
         this.silentActivityTaskId = agent.task_id;
       } else {
         this.activeAgent = agent;
         this.silentActivityTaskId = null;
       }
-      this.activityEntries = [];
-      this.activityError = null;
-      this.fetchSubAgentActivity(agent.task_id);
-      this.startActivityPolling();
+      void this.fetchSubAgentActivity(agent.task_id);
     },
     closeSubAgent() {
       this.stopActivityPolling();
       this.activeAgent = null;
       this.silentActivityTaskId = null;
-      this.activityEntries = [];
+      this.livePages = [];
+      this.liveOffset = null;
+      this.historyPage = null;
       this.activityError = null;
       this.activityLoading = false;
     },
-    startActivityPolling() {
-      if (this.activityTimer) {
-        return;
-      }
-      this.activityTimer = setInterval(() => {
-        const taskId = this.activeAgent?.task_id || this.silentActivityTaskId;
-        if (taskId) {
-          this.fetchSubAgentActivity(taskId);
-        }
-      }, 2000);
-    },
     stopActivityPolling() {
+      activityRequests.get(this)?.abort();
+      activityRequests.delete(this);
       invalidateAuxiliaryRequest(this, 'sub-activity');
       this.activityLoading = false;
       if (this.activityTimer) {
-        clearInterval(this.activityTimer);
+        clearTimeout(this.activityTimer);
         this.activityTimer = null;
       }
     },
-    async fetchSubAgentActivity(taskId: string) {
-      const owns = beginAuxiliaryStoreRequest(this, 'sub-activity');
-      if (!taskId) return;
+    async fetchSubAgentActivity(taskId: string, direction: ActivityDirection = 'live') {
+      const selected = () => (this.activeAgent?.task_id || this.silentActivityTaskId) === taskId;
+      if (!taskId || !selected() || activityRequests.has(this)) return;
+      if (direction === 'older' && !this.activityStart) return;
+      if (direction === 'newer' && !this.historyPage) return;
+      if (this.activityTimer) clearTimeout(this.activityTimer);
+      this.activityTimer = null;
+      const controller = new AbortController();
+      activityRequests.set(this, controller);
+      const owns = beginAuxiliaryStoreRequest(this, 'sub-activity', undefined, selected);
+      const cursor = direction === 'older' ? this.activityStart
+        : direction === 'newer' ? this.historyPage!.end : this.liveOffset;
       this.activityLoading = true;
+      let delay = 2000;
       try {
         // 携带 conversation_id：子智能体跑在对话级 terminal，服务 terminal 的
         // sub_agent_manager.tasks 里查不到该任务（404 → 前端永远「暂无进度」）。
         const convId = useConversationStore().currentConversationId;
-        const query = convId ? `&conversation_id=${encodeURIComponent(convId)}` : '';
-        const resp = await fetch(`/api/sub_agents/${taskId}/activity?limit=100000${query}`);
+        const params = new URLSearchParams();
+        if (convId) params.set('conversation_id', convId);
+        params.set('limit', String(PAGE_SIZE));
+        if (cursor !== null) params.set(direction === 'older' ? 'before' : 'offset', String(cursor));
+        const resp = await fetch(`/api/sub_agents/${encodeURIComponent(taskId)}/activity?${params}`, {
+          signal: controller.signal
+        });
         if (!resp.ok) {
           throw new Error(await resp.text());
         }
         const data = await resp.json();
         if (!owns()) return;
         if (data && data.success && data.data) {
-          const entries = Array.isArray(data.data.entries) ? data.data.entries : [];
-          this.activityEntries = entries;
+          const received = Array.isArray(data.data.entries) ? data.data.entries : [];
+          const end = data.data.next_offset;
+          const safeEnd = Number.isSafeInteger(end);
+          // 旧后端响应没有 start_offset，也不支持 offset/before 游标。它即使忽略
+          // 游标仍会按 limit 返回尾部页，因此每次实时轮询都用尾部页替换而不是追加，
+          // 避免同一批旧数据每 2 秒重复堆进 livePages。
+          const legacyPayload = !Object.prototype.hasOwnProperty.call(data.data, 'start_offset');
+          const start = Number(
+            data.data.start_offset ?? (legacyPayload ? 0 : cursor ?? 0)
+          );
+          // 单页响应一律只保留尾部 PAGE_SIZE 条。新后端按 200 分页时等价于原数组；
+          // 旧后端/异常返回一次给出 20 万条时，只保留最新 200 条，DOM 不再无界。
+          const entries = received.length > PAGE_SIZE ? received.slice(-PAGE_SIZE) : received;
+          const page = { start, entries };
+          if (data.data.reset === true || cursor === null || !safeEnd) {
+            this.livePages = [page];
+            this.liveOffset = safeEnd ? end : null;
+            this.historyPage = null;
+          } else if (direction === 'live') {
+            if (legacyPayload) {
+              this.livePages = [page];
+            } else if (entries.length && end > (this.liveOffset ?? -1)) {
+              this.livePages.push(page);
+              let count = this.livePages.reduce((n, p) => n + p.entries.length, 0);
+              while (count > VISIBLE_ENTRY_LIMIT) count -= this.livePages.shift()!.entries.length;
+            }
+            this.liveOffset = end;
+          } else {
+            this.historyPage = direction === 'newer' && end >= (this.liveOffset ?? end)
+              ? null : { ...page, end };
+          }
+          this.activityError = null;
+          if (direction === 'live' && data.data.has_more_after && end > (cursor ?? 0)) delay = 0;
           if (this.activeAgent && this.activeAgent.task_id === taskId) {
             this.activeAgent = {
               ...this.activeAgent,
@@ -176,8 +238,8 @@ export const useSubAgentStore = defineStore('subAgent', {
             listItem.status = data.data.status;
           }
           const status = (data.data.status || '').toString();
-          if (TERMINAL_STATUSES.has(status)) {
-            this.stopActivityPolling();
+          if (delay && (TERMINAL_STATUSES.has(status) || status === 'idle')) {
+            delay = 5000;
           }
         }
       } catch (error: any) {
@@ -185,7 +247,13 @@ export const useSubAgentStore = defineStore('subAgent', {
         this.activityError = error?.message || String(error);
         console.error('获取子智能体活动失败:', error);
       } finally {
-        if (owns()) this.activityLoading = false;
+        if (activityRequests.get(this) === controller) {
+          activityRequests.delete(this);
+          if (owns()) {
+            this.activityLoading = false;
+            this.activityTimer = setTimeout(() => void this.fetchSubAgentActivity(taskId), delay);
+          }
+        }
       }
     },
     async terminateSubAgent(taskId: string) {

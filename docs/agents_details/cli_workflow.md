@@ -40,8 +40,7 @@
 
 - **CLI 全部走 Gateway host Bearer 通道**（规范来源：`docs/runtime_protocol.md` §6，现归档为 `_experiments/docs_archive/docs/runtime_protocol.md`）：token 读 `~/.astrion/astrion/host/data/host_api_token`，请求带 `Authorization: Bearer` 请求头；**禁止** Web 会话通道（Cookie/CSRF/host-login）。工作区经 `X-Astrion-Workspace-Id` 头绑定（`server/gateway_auth.py` 解析）。
 - **启动指令 `astrion`**：cwd = 工作区，运行内不可切换；cwd 未注册为工作区时先提示并询问创建（确认面板 **Esc = 取消退出**）。
-- **服务自启动**：CLI 不与 Web 端启动绑定——探测无服务时自动 spawn `python3 -m server.headless_app --path <cwd> --port <port> --thinking-mode`（detached + unref，显式端口）。**服务在运行但无 host token = 旧版本服务，提示重启**（token 由服务端启动时生成，在 `initialize_system` 的 host 分支）；请求 401 自动重读 token 重试一次（自愈）。**边界：CLI 只在探测无服务时启动新实例，绝不 kill/重启已在运行的进程。**
-  - ⚠️ 2026-10-08 按代码校正：原文写的是 `python3 -m server.app --port 8091 --thinking-mode`，**已过时**。真实 spawn 为 `cli/src/gateway.ts:149` 的 `['-m', 'server.headless_app', '--path', cwd, '--port', String(port), '--thinking-mode']`（headless 入口见 §2）。
+- **服务自启动**：CLI 探测无服务时默认以 `astrion-headless --workspace <cwd> --data-dir <data> --port <port>` 启动 Rust Gateway（detached + unref）。已运行的 Rust 需通过 PID 探测、选定数据目录的 token 和工作区列表校验。用 `ASTRION_API_BASE` 与 `ASTRION_HOST_TOKEN_FILE` 可显式连接已有实例，使用 `ASTRION_CLI_BACKEND=python` 可选旧版 Python headless。请求 401 自动重读 token 重试一次。**边界：CLI 只在探测无服务时启动新实例，绝不 kill/重启已在运行的进程。**
 - **审批面板自动弹出**：收到新 ID 的 `tool_approval_required` 事件即弹出（不依赖手动 `/approvals`）；**键盘 ←→ 仅选择「本次允许/拒绝」，Enter 提交人工决定**。**同 ID 更新保留用户已收起的决定**（不重新弹开）；单次完全访问在开启自动审核时须两项均通过；`decision` 接口成功**不等于**工具已经执行；面板等 `tool_approval_resolved` 终态后清理。
 - **多语言读 OS 语言设置**（`cli/src/i18n/`，`LC_ALL`/`LANG` 检测 zh/en，启动时定死，不跟随 Web 个人空间）；CLI 内所有文案**禁止按字符长度硬编码布局**——**选中反色只落文字节点**，**项间固定间距**。
 - `Enter` = 发送、`Shift+Enter` = 换行。

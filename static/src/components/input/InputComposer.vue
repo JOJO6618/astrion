@@ -768,6 +768,7 @@ import { useWorkflowStore } from '@/stores/workflow';
 import { withWorkspaceScope } from '@/app/methods/workspaceRequestScope';
 import { t, currentLocale } from '@/locales';
 import { pickComposerPlaceholderKey } from '@/utils/composerPlaceholders';
+import { modelInputCapacity } from '@/utils/modelLimits';
 import {
   hasEnterModifier,
   modEnterLabel,
@@ -868,6 +869,7 @@ const props = defineProps<{
     supportsImage?: boolean;
     supportsVideo?: boolean;
     contextWindow?: number | null;
+    maxInputTokens?: number | null;
     /** ChatGPT 订阅模型标记（额度卡片只对精确命中的模型显示） */
     isChatgptModel?: boolean;
     /** 提供商/账号标识；codex 模型此处为 OAuth 账号 id */
@@ -3025,11 +3027,7 @@ const currentExecutionShortLabel = computed(() => {
   return mode;
 });
 
-const modelContextWindow = computed(() => {
-  const list = Array.isArray(props.modelOptions) ? props.modelOptions : [];
-  const current = list.find((item) => item.key === props.currentModelKey);
-  return Number(current?.contextWindow || 0);
-});
+const modelInputTokenLimit = computed(() => modelInputCapacity(currentComposerModel.value));
 
 const autoDeepCompressEnabled = computed(() => {
   return !!personalizationStore?.form?.auto_deep_compress_enabled;
@@ -3122,10 +3120,7 @@ const contextUsageLimit = computed(() => {
     // 阈值 + 固定开销：让配置的 250k 真正留给对话内容
     return deepCompressLimit.value + contextBaselineTokens.value;
   }
-  if (modelContextWindow.value > 0) {
-    return modelContextWindow.value;
-  }
-  return 0;
+  return modelInputTokenLimit.value;
 });
 
 const contextUsagePercent = computed(() => {

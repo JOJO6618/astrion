@@ -7,6 +7,7 @@ import {
 } from '@/stores/conversation';
 import { useConversationTabsStore } from '@/stores/conversationTabs';
 import { usePersonalizationStore } from '@/stores/personalization';
+import { onConversationStorageMigrated } from '@/stores/conversationStorageMigration';
 import { fetchConversationPage } from '@/stores/workspaceConversationCache';
 import { workspaceMethods } from '@/app/methods/ui/workspace';
 import { workspaceTaskMethods } from '@/app/methods/ui/workspaceTask';
@@ -60,6 +61,7 @@ export function useDesktopSidebarData() {
   let interval = 0;
   let lastCatalogRefresh = 0;
   let mounted = false;
+  let stopMigrationListener: (() => void) | undefined;
 
   const taskIndex = reactive({
     ...workspaceTaskMethods,
@@ -323,6 +325,15 @@ export function useDesktopSidebarData() {
 
   onMounted(() => {
     mounted = true;
+    stopMigrationListener = onConversationStorageMigrated(() => {
+      void refreshChat(true);
+      const workspaceIds = new Set([
+        workspaceId.value,
+        ...list.workspaceGroups.filter((group) => group.expanded).map((group) => group.workspaceId)
+      ]);
+      for (const id of workspaceIds) void refreshAgent(id, false, true);
+      if (submittedSearch.value) void search();
+    });
     void refreshCatalog();
     void personalization.fetchPersonalization();
     void refreshVisibleLists();
@@ -338,6 +349,7 @@ export function useDesktopSidebarData() {
   });
   onBeforeUnmount(() => {
     mounted = false;
+    stopMigrationListener?.();
     searchRequest?.abort();
     window.clearTimeout(searchTimer);
     window.clearInterval(interval);

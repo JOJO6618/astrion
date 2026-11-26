@@ -31,9 +31,10 @@
           </button>
           <span v-if="stopError" class="subagent-activity-error">{{ stopError }}</span>
         </div>
+        <ActivityPager />
         <div class="subagent-activity-body">
           <div v-if="activityError" class="subagent-activity-error">{{ activityError }}</div>
-          <div v-else-if="!timelineItems.length" class="subagent-activity-empty">
+          <div v-if="!activityError && !timelineItems.length" class="subagent-activity-empty">
             {{ activityLoading ? $t('overlay.readingActivity') : $t('overlay.noActivity') }}
           </div>
           <div v-else class="subagent-activity-list">
@@ -69,6 +70,7 @@ import { computed, ref } from 'vue';
 import { storeToRefs } from 'pinia';
 import { t, currentLocale } from '@/locales';
 import CloseButton from '@/components/common/CloseButton.vue';
+import ActivityPager from '@/components/chat/quickdock/ActivityPager.vue';
 import { useSubAgentStore } from '@/stores/subAgent';
 import { buildSubAgentToolText } from '@/components/chat/quickdock/subAgentToolText';
 

@@ -37,7 +37,7 @@ from config import (
 
 DEFAULT_PORT = WEB_SERVER_PORT
 
-from server.host_startup import initialize_host, start_background_jobs
+from server.host_startup import hold_backend_instance_lock, initialize_host, start_background_jobs
 from server.model_catalog import model_catalog_bp
 from server.gateway_api import gateway_bp
 from server.tasks.web import get_tasks_blueprint
@@ -61,76 +61,7 @@ HEADLESS_BLUEPRINTS = (
     ("schedules", schedules_bp),
 )
 
-_HEADLESS_LANDING_HTML = """<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Astrion · API 后端实例</title>
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #faf9f5;
-    color: #1f1f1f;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
-      "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-  }
-  .card { max-width: 560px; padding: 40px 44px; }
-  .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
-  .brand-name { font-size: 22px; font-weight: 650; letter-spacing: 0.2px; }
-  .badge {
-    font-size: 12px;
-    font-weight: 600;
-    padding: 3px 10px;
-    border-radius: 999px;
-    background: rgba(204, 120, 92, 0.14);
-    color: #b05c3f;
-    letter-spacing: 0.4px;
-  }
-  h1 { font-size: 17px; font-weight: 600; margin-bottom: 10px; }
-  p { font-size: 14px; line-height: 1.75; color: #55534e; margin-bottom: 10px; }
-  code {
-    font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
-    font-size: 12.5px;
-    background: #efe9de;
-    padding: 2px 6px;
-    border-radius: 5px;
-  }
-  .cmd {
-    display: block;
-    margin-top: 16px;
-    padding: 12px 14px;
-    background: #f5f0e8;
-    border: 1px solid #e8e0d2;
-    border-radius: 8px;
-    font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
-    font-size: 12.5px;
-    color: #3d3929;
-  }
-  .muted { font-size: 12px; color: #8a8578; margin-top: 18px; }
-</style>
-</head>
-<body>
-  <div class="card">
-    <div class="brand">
-      <span class="brand-name">Astrion</span>
-      <span class="badge">HEADLESS</span>
-    </div>
-    <h1>这是 Astrion 的 API 后端实例，运行正常。</h1>
-    <p>
-      本实例以 <strong>headless 形态</strong>启动，供 CLI 使用 Gateway / Runtime API。
-    </p>
-    <p>如需 Web 界面，请改用 full 形态启动：</p>
-    <span class="cmd">python -m server.app</span>
-    <p class="muted">Astrion headless backend · same runtime, API-only surface</p>
-  </div>
-</body>
-</html>
-"""
+_HEADLESS_LANDING_HTML = (Path(__file__).resolve().parents[1] / "static" / "headless.html").read_text(encoding="utf-8")
 
 
 def create_headless_app() -> Flask:
@@ -205,13 +136,14 @@ def create_headless_app() -> Flask:
 
 def run_headless(path: str, thinking_mode: bool = False, port: int = DEFAULT_PORT, debug: bool = False):
     """初始化并以 headless 形态运行（与 full 形态共享初始化与后台任务）。"""
+    writer = hold_backend_instance_lock(use_reloader=debug)
     app = create_headless_app()
     # 与 full 形态一致：同机多实例时 Cookie 按端口隔离，避免互相覆盖
     app.config['SESSION_COOKIE_NAME'] = os.environ.get(
         "WEB_SESSION_COOKIE_NAME", f"agents_session_{port}"
     )
-    initialize_host(app, path, thinking_mode)
-    if not debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
+    if writer:
+        initialize_host(app, path, thinking_mode)
         start_background_jobs()
     app.run(
         host=WEB_SERVER_HOST,

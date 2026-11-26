@@ -2,8 +2,46 @@
 import { useConversationStore } from '../../../stores/conversation';
 import { fetchConversationPage } from '../../../stores/workspaceConversationCache';
 import { hasDesktopSidebar } from '@/components/chrome/desktopSidebarBridge';
+import { useConversationStorageMigrationStore } from '@/stores/conversationStorageMigration';
+import { ownsConversationSession } from './session';
+import { refreshNavigationAuxiliary } from '../ui/navigationRefresh';
+import { t } from '@/locales';
 
 export const loadMethods = {
+  async refreshAfterConversationMigration() {
+    const store = useConversationStore();
+    if (!hasDesktopSidebar()) {
+      void this.loadConversationsList({ background: true, silent: true, autoEnter: false });
+      for (const group of store.workspaceGroups) {
+        if (group.expanded)
+          void store.loadWorkspaceConversations(group.workspaceId, { refresh: true });
+      }
+    }
+    const blocked = useConversationStorageMigrationStore().blockedAgent;
+    if (!blocked || this.historyLoading) return;
+    const { id, workspaceId } = blocked;
+    const session = this.beginConversationView(id, workspaceId);
+    try {
+      const result = await this.enterConversation(id, {
+        session,
+        workspaceId,
+        urlMode: 'none',
+        source: 'migration',
+        preserveListPosition: true,
+        navigationReady: Promise.all([{}, this.prepareComposerDraftState(workspaceId, id)])
+      });
+      if (!ownsConversationSession(this, session)) return;
+      if (result.success) refreshNavigationAuxiliary(this, session, result.conversation_id || id);
+      else if (!result.migrationRequired && !result.superseded) throw new Error(result.error || '');
+    } catch (error) {
+      if (!ownsConversationSession(this, session)) return;
+      this.uiPushToast({
+        title: t('appMessages.loadConversationErrorTitle'),
+        message: String(error?.message || error),
+        type: 'error'
+      });
+    }
+  },
   async loadConversationsList(options = {}) {
     if (hasDesktopSidebar()) return;
     const store = useConversationStore();

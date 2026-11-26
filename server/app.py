@@ -1,44 +1,25 @@
-"""统一入口：复用 app_legacy，便于逐步替换/收敛。"""
-import argparse
+"""Host Web process entry and compatibility exports for Flask integrations."""
 
-from .app_legacy import (
-    app,
-    run_server as _run_server,
-    parse_arguments as _parse_arguments,
-    initialize_system,
-    DEFAULT_PORT,
-)
+if __name__ == "__main__" and not __package__:
+    import sys
+    from pathlib import Path
 
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-def parse_arguments():
-    """向后兼容的参数解析，默认端口、路径等与 app_legacy 一致。"""
-    return _parse_arguments()
+from server.launch_host import main
+
+__all__ = ["app", "run_server", "parse_arguments", "initialize_system", "main", "DEFAULT_PORT"]
 
 
-def run_server(path: str, thinking_mode: bool = False, port: int = DEFAULT_PORT, debug: bool = False):
-    """统一 run_server 入口，便于 future 替换实现。"""
-    return _run_server(path=path, thinking_mode=thinking_mode, port=port, debug=debug)
+def __getattr__(name):
+    if name in __all__ and name != "main":
+        from server import app_legacy
 
-
-def main():
-    args = parse_arguments()
-    run_server(
-        path=args.path,
-        thinking_mode=args.thinking_mode,
-        port=args.port,
-        debug=args.debug,
-    )
-
-
-__all__ = [
-    "app",
-    "run_server",
-    "parse_arguments",
-    "initialize_system",
-    "main",
-    "DEFAULT_PORT",
-]
+        value = getattr(app_legacy, name)
+        globals()[name] = value
+        return value
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

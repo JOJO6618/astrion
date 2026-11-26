@@ -18,6 +18,10 @@
     </transition>
 
     <ProjectMemoryMigrationDialog />
+    <ConversationStorageMigrationDialog
+      :check-on-mount="!persistentDesktopSidebar"
+      @migrated="refreshAfterConversationMigration"
+    />
     <SettingsShell v-if="settingsRoute" @close="closeSettingsPage" />
     <SchedulesShell v-else-if="schedulesRoute" @close="closeSettingsPage" />
     <div v-else-if="!isConnected && messages.length === 0" class="app-loading-state">
@@ -67,7 +71,7 @@
           :format-time="formatTime"
           :running-tasks="runningWorkspaceTasks"
           :current-task-in-progress="taskInProgress"
-          :current-conversation-id="currentConversationId"
+          :current-conversation-id="migration.blockedAgent?.id || currentConversationId"
           :current-workspace-id="currentHostWorkspaceId"
           :default-workspace-id="defaultHostWorkspaceId"
           :workspaces="hostWorkspaces"
@@ -124,7 +128,7 @@
           <div v-if="titleRibbonVisible" class="conversation-ribbon" ref="titleRibbon">
             <ConversationModelHeader
               :header-menu-open="headerMenuOpen"
-              :is-connected="isConnected"
+              :is-connected="isConnected && !migration.blockedAgent"
               :current-model-label="currentModelLabel"
               :header-effort-label="headerEffortLabel"
               :title-typing-text="titleTypingText"
@@ -152,8 +156,9 @@
             />
           </div>
 
+          <ConversationMigrationRequired v-if="migration.blockedAgent" />
           <ChatArea
-            v-show="chatDisplayMode === 'chat'"
+            v-show="!migration.blockedAgent && chatDisplayMode === 'chat'"
             ref="messagesArea"
             :messages="messages"
             :icon-style="iconStyle"
@@ -174,15 +179,18 @@
             @stick-state-change="handleStickStateChange"
             @user-scroll-intent="handleUserScrollIntent"
           />
-          <VirtualMonitorSurface v-if="chatDisplayMode === 'monitor'" />
+          <VirtualMonitorSurface v-if="!migration.blockedAgent && chatDisplayMode === 'monitor'" />
 
-          <div v-if="blankHeroActive" class="blank-hero-overlay">
+          <div v-if="!migration.blockedAgent && blankHeroActive" class="blank-hero-overlay">
             <StatusAvatar v-if="showStatusAvatar" mode="idle" :size="58" tracking />
             <p class="blank-hero-text">{{ blankWelcomeText }}</p>
           </div>
 
           <transition name="scroll-to-bottom-fade">
-            <div v-if="showScrollToBottomButton" class="scroll-lock-toggle">
+            <div
+              v-if="!migration.blockedAgent && showScrollToBottomButton"
+              class="scroll-lock-toggle"
+            >
               <button @click="toggleScrollLock" class="scroll-lock-btn">
                 <svg
                   viewBox="0 0 24 24"
@@ -197,7 +205,11 @@
             </div>
           </transition>
 
-          <div class="composer-container" :class="{ 'blank-hero-mode': composerHeroActive }">
+          <div
+            v-show="!migration.blockedAgent"
+            class="composer-container"
+            :class="{ 'blank-hero-mode': composerHeroActive }"
+          >
             <InputComposer
               ref="inputComposer"
               :input-message="inputMessage"
@@ -205,7 +217,7 @@
               :input-is-focused="inputIsFocused"
               :is-connected="isConnected"
               :streaming-message="streamingUi"
-              :input-locked="displayLockEngaged"
+              :input-locked="!!migration.blockedAgent || displayLockEngaged"
               :uploading="uploading"
               :media-uploading="mediaUploading"
               :thinking-mode="thinkingMode"
@@ -619,7 +631,7 @@
               :format-time="formatTime"
               :running-tasks="runningWorkspaceTasks"
               :current-task-in-progress="taskInProgress"
-              :current-conversation-id="currentConversationId"
+              :current-conversation-id="migration.blockedAgent?.id || currentConversationId"
               :current-workspace-id="currentHostWorkspaceId"
               :default-workspace-id="defaultHostWorkspaceId"
               :workspaces="hostWorkspaces"
@@ -714,6 +726,9 @@ import ConversationModelHeader from './components/chat/ConversationModelHeader.v
 import ModelEffortPanel from './components/chat/ModelEffortPanel.vue';
 import ImageLightbox from './components/overlay/ImageLightbox.vue';
 import ProjectMemoryMigrationDialog from './components/overlay/ProjectMemoryMigrationDialog.vue';
+import ConversationStorageMigrationDialog from './components/overlay/ConversationStorageMigrationDialog.vue';
+import ConversationMigrationRequired from './components/chat/ConversationMigrationRequired.vue';
+import { useConversationStorageMigrationStore } from './stores/conversationStorageMigration';
 import QuickDock from './components/chat/quickdock/QuickDock.vue';
 import FilePreviewPanel from './components/chat/quickdock/FilePreviewPanel.vue';
 import PreviewPanel from './components/chat/quickdock/PreviewPanel.vue';
@@ -818,4 +833,5 @@ onBeforeUnmount(() => {
 });
 
 defineOptions(appOptions);
+const migration = useConversationStorageMigrationStore();
 </script>

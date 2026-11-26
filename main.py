@@ -8,6 +8,11 @@ from pathlib import Path
 import json
 from datetime import datetime
 
+if __name__ == "__main__":
+    from server.launch_host import main as launch_host
+
+    raise SystemExit(launch_host())
+
 # 添加项目根目录到Python路径
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -26,6 +31,10 @@ class AgentSystem:
         
     async def initialize(self):
         """初始化系统"""
+        from server.host_startup import hold_backend_instance_lock
+
+        # This entry creates legacy data files before handing off to server.app.
+        hold_backend_instance_lock()
         print("\n" + "="*50)
         print("🤖 Astrion 启动")
         print("="*50)
@@ -256,35 +265,3 @@ async def main():
     """主函数"""
     system = AgentSystem()
     await system.run()
-
-if __name__ == "__main__":
-    try:
-        # 设置控制台编码为UTF-8（Windows中文路径支持）
-
-
-        if sys.platform == "win32":
-            import locale
-            # 尝试设置为UTF-8
-            try:
-                os.system("chcp 65001 > nul")  # 设置控制台代码页为UTF-8
-            except:
-                pass
-            # 后代 Python 进程默认编码兜底：chcp 只改控制台显示，不改 Python
-            # 的 open()/stdout 默认编码（仍是 locale 的 cp936）；这两个变量会
-            # 被 agent 启动的所有子 Python 进程继承，避免脚本按 GBK 读写/输出
-            os.environ.setdefault("PYTHONUTF8", "1")
-            os.environ.setdefault("PYTHONIOENCODING", "utf-8")
-            # 当前进程 stdout/stderr 同样强制 UTF-8，防止 print 中文按 cp936 输出
-            for _stream in (sys.stdout, sys.stderr):
-                try:
-                    _stream.reconfigure(encoding="utf-8", errors="replace")
-                except (AttributeError, ValueError):
-                    pass
-
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        print("\n\n👋 再见！")
-        sys.exit(0)
-    except Exception as e:
-        print(f"\n{OUTPUT_FORMATS['error']} 程序异常退出: {e}")
-        sys.exit(1)

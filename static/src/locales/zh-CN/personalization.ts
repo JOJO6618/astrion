@@ -325,6 +325,8 @@ export default {
   silentToolDisableDesc: '禁用工具时不通知模型',
   toolIntentTitle: '工具意图提示',
   toolIntentDesc: '调用工具前先说明要做什么',
+  readBeforeEditTitle: '编辑前必须先读取文件',
+  readBeforeEditDesc: '要求智能体在修改或覆盖已有文件前，先在当前对话中读取该文件。',
   skillHintsTitle: 'Skill 提示系统',
   skillHintsDesc: '提醒模型在合适的时候阅读相关 skill',
   strictSkillTitle: '强约束系统',
