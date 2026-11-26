@@ -157,15 +157,21 @@ export class ViewManager {
   }
   /** 乐观切换：chrome 点击标签先显示（缺失则立即创建），随后以后端快照为准再收敛。
    *  保护期内旧意图的快照不会切走它（避免闪回）。 */
-  show(key) {
+  show(key, requestId) {
     if (this.disposed || !this.snapshot || typeof key !== 'string') return false;
     const tab = this.snapshot.tabs.find((row) => row.key === key);
     if (!tab || !isMainPlacement(tab)) return false;
     this.dropLegacy();
     this.display(this.entries.get(key) || this.createForTab(tab));
     this.evict();
-    this.guard(key);
+    if (requestId) this.optimistic = { key, requestId };
+    else this.guard(key);
     return true;
+  }
+  settleShow(requestId) {
+    if (!requestId || this.optimistic?.requestId !== requestId) return;
+    this.optimistic = null;
+    this.reconcile();
   }
   guard(key) {
     const until = this.now() + OPTIMISTIC_MS;

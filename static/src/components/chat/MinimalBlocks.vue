@@ -9,7 +9,12 @@
           class="summary-line-text"
           :class="{ running: isSummaryRunning(group.actions, group.id) }"
           :data-group-id="group.id"
+          role="button"
+          tabindex="0"
+          :aria-expanded="expandedGroups.has(group.id)"
           @click="toggleExpand(group.id)"
+          @keydown.enter.prevent="toggleExpand(group.id)"
+          @keydown.space.prevent="toggleExpand(group.id)"
         >
           <div class="summary-content-wrapper">
             <span class="summary-preview">
@@ -48,54 +53,61 @@
         <!-- 步骤容器（展开时显示所有步骤） -->
         <div
           class="steps-container"
-          :class="{
-            show: expandedGroups.has(group.id),
-            'collapse-animating': collapsingGroups.has(group.id)
-          }"
-          @transitionend.self="handleGroupTransitionEnd(group.id, $event)"
+          :class="{ show: expandedGroups.has(group.id) }"
+          :inert="!expandedGroups.has(group.id)"
         >
           <div
+            v-if="expandedGroups.has(group.id) || collapsingGroups.has(group.id)"
             class="steps-wrapper"
             :class="{ 'height-limited': heightLimited }"
             :ref="(el) => registerStepsWrapper(group.id, el)"
           >
-            <div v-for="step in getSummarySteps(group.actions)" :key="step.id" class="step-item">
-              <div class="step-timeline">
-                <span
-                  class="step-icon icon icon-sm"
-                  :style="getStepIconStyle(step)"
-                  aria-hidden="true"
-                ></span>
-                <div class="step-line"></div>
-              </div>
-              <div class="step-content">
-                <div v-if="step.type === 'thinking'" class="step-body">
-                  <div
-                    class="thinking-content"
-                    :ref="(el) => registerThinking(step.id, el)"
-                    @scroll="handleScroll(step.id, $event)"
-                  >
-                    <MarkdownRenderer
-                      :content="step.content"
-                      :is-streaming="step.streaming"
-                      thinking
-                    />
+            <MinimalStepWindow
+              :actions="group.actions"
+              :limited="heightLimited"
+              :expanded="expandedGroups.has(group.id)"
+              v-slot="{ action, index }"
+            >
+              <div class="step-item">
+                <div class="step-timeline">
+                  <span
+                    class="step-icon icon icon-sm"
+                    :style="getStepIconStyle(action)"
+                    aria-hidden="true"
+                  ></span>
+                  <div class="step-line"></div>
+                </div>
+                <div class="step-content">
+                  <div v-if="action.type === 'thinking'" class="step-body">
+                    <div
+                      class="thinking-content"
+                      :ref="(el) => registerThinking(group.id, stepId(action, index), el, action.streaming)"
+                      @scroll="handleScroll(stepId(action, index), $event)"
+                    >
+                      <MarkdownRenderer
+                        :content="action.content || ''"
+                        :is-streaming="!!action.streaming"
+                        thinking
+                      />
+                    </div>
+                  </div>
+                  <div v-else class="step-body">
+                    <div class="step-header">{{ getToolName(action) }}</div>
+                    <div v-if="action.tool?.intent" class="tool-intent">{{ action.tool.intent }}</div>
+                    <div class="tool-result">
+                      <MinimalToolResult
+                        v-if="action.tool?.result"
+                        :action="action"
+                        :format-search-topic="formatSearchTopic"
+                        :format-search-time="formatSearchTime"
+                        :format-search-domains="formatSearchDomains"
+                      />
+                      <div v-else class="result-item">{{ $t('chat.executing') }}</div>
+                    </div>
                   </div>
                 </div>
-                <div v-else-if="step.type === 'tool'" class="step-body">
-                  <div class="step-header">{{ getToolName(step.action) }}</div>
-                  <div class="tool-intent" v-if="getToolIntent(step.action)">
-                    {{ getToolIntent(step.action) }}
-                  </div>
-                  <div class="tool-result" v-if="step.action.tool?.result">
-                    <div v-html="renderToolResult(step.action)"></div>
-                  </div>
-                  <div v-else class="tool-result">
-                    <div class="result-item">{{ $t('chat.executing') }}</div>
-                  </div>
-                </div>
               </div>
-            </div>
+            </MinimalStepWindow>
           </div>
         </div>
       </div>
@@ -148,7 +160,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, onBeforeUnmount, Component } from 'vue';
+import { ref, computed, nextTick, onBeforeUnmount, Component } from 'vue';
 import { t, currentLocale } from '@/locales';
 import { usePersonalizationStore } from '@/stores/personalization';
 import { useSummaryToolReel } from '@/composables/useSummaryToolReel';
@@ -158,7 +170,8 @@ import {
 } from '@/composables/elementScrollFollow';
 import SummarySweepText from './SummarySweepText.vue';
 import type { SummarySweepInput } from './summarySweepController';
-import { renderEnhancedToolResult } from './actions/toolRenderers';
+import MinimalToolResult from './MinimalToolResult.vue';
+import MinimalStepWindow from './MinimalStepWindow.vue';
 import { getLatestToolBatch as getLatestToolSegment } from './toolSummaryBatch';
 import { getToolStateText } from '@/utils/chatDisplay';
 
@@ -189,14 +202,6 @@ interface Action {
     arguments?: any;
     result?: any;
   };
-}
-
-interface Step {
-  id: string;
-  type: 'thinking' | 'tool';
-  content: string;
-  streaming: boolean;
-  action: Action;
 }
 
 interface BlockGroup {
@@ -233,17 +238,12 @@ const emit = defineEmits<{
 }>();
 
 const expandedGroups = ref(new Set<string>());
-// 收起动画宽限期：收起后 300ms（grid 过渡时长）内保持子树渲染，动画播完再跳过。
-// WebKit（Safari/桌面壳 WKWebView）对 content-visibility 的离散过渡不生效——
-// transition-behavior: allow-discrete 无法把「隐藏」延迟到动画结束，收起瞬间跳过
-// 渲染会导致内容瞬消 + contain-intrinsic-size:0 高度瞬塌（展开正常、收起瞬消）。
-// 故放弃纯 CSS 离散过渡方案，改为 JS 定时控制跳过渲染的时机，全引擎行为一致。
-const collapsingGroups = ref(new Set<string>());
-const collapseSkipTimers = new Map<string, ReturnType<typeof setTimeout>>();
-const COLLAPSE_ANIMATION_MS = 300;
+// 每次收起独立标记，快速重新展开时旧动画不能卸载新详情。
+const collapsingGroups = ref(new Map<string, symbol>());
 const thinkingRefs = new Map<string, HTMLElement>();
 const stepsWrapperRefs = new Map<string, HTMLElement>();
 const stepsWrapperFollowers = new Map<string, ElementScrollFollow>();
+
 const summaryLoaders = new Map<string, Component>();
 
 const getFirstLine = (raw: string) => {
@@ -790,16 +790,7 @@ const getSummarySweepInput = (actions: Action[], groupId: string): SummarySweepI
   };
 };
 
-// 获取摘要组的所有步骤（用于展开显示）
-const getSummarySteps = (actions: Action[]) => {
-  return actions.map((action, idx) => ({
-    id: action.id || action.blockId || `step-${idx}`,
-    type: action.type as 'thinking' | 'tool',
-    content: action.content || '',
-    streaming: action.streaming || false,
-    action
-  }));
-};
+const stepId = (action: Action, index: number) => action.id || action.blockId || `step-${index}`;
 
 const registerStepsWrapper = (groupId: string, el: Element | null) => {
   if (stepsWrapperRefs.get(groupId) === el) return;
@@ -827,100 +818,46 @@ const registerStepsWrapper = (groupId: string, el: Element | null) => {
   }
 };
 
-const scrollStepsWrapperToBottom = (groupId: string) => {
-  stepsWrapperFollowers.get(groupId)?.requestFollow();
-};
-
-const handleGroupTransitionEnd = (groupId: string, event: TransitionEvent) => {
-  if (event.propertyName === 'grid-template-rows' && !expandedGroups.value.has(groupId)) {
-    emit('group-collapse-finished', { groupId });
-  }
+const finishCollapse = async (groupId: string, token: symbol) => {
+  await nextTick();
+  if (collapsingGroups.value.get(groupId) !== token) return;
+  const container = stepsWrapperRefs.get(groupId)?.parentElement;
+  const transitions = container?.getAnimations().filter(
+    (animation) => 'transitionProperty' in animation && animation.transitionProperty === 'grid-template-rows'
+  ) || [];
+  await Promise.allSettled(transitions.map((animation) => animation.finished));
+  if (collapsingGroups.value.get(groupId) !== token) return;
+  collapsingGroups.value.delete(groupId);
+  emit('group-collapse-finished', { groupId });
 };
 
 const toggleExpand = (groupId: string) => {
   if (expandedGroups.value.has(groupId)) {
     expandedGroups.value.delete(groupId);
-    // 收起动画（grid 0.3s）期间保持子树渲染，播完才跳过（见状态声明处注释）
-    collapsingGroups.value.add(groupId);
-    clearTimeout(collapseSkipTimers.get(groupId));
-    collapseSkipTimers.set(
-      groupId,
-      setTimeout(() => {
-        collapsingGroups.value.delete(groupId);
-        collapseSkipTimers.delete(groupId);
-        // 无高度变化时不会发 transitionend；用已有宽限期计时器收尾。
-        // 若 CSS 过渡仍在运行，则由真实 transitionend 通知，避免提前结束回锁检查。
-        const container = stepsWrapperRefs.get(groupId)?.parentElement;
-        const transitioning = container
-          ?.getAnimations()
-          .some(
-            (animation) =>
-              animation.playState === 'running' &&
-              'transitionProperty' in animation &&
-              animation.transitionProperty === 'grid-template-rows'
-          );
-        if (!transitioning && !expandedGroups.value.has(groupId)) {
-          emit('group-collapse-finished', { groupId });
-        }
-      }, COLLAPSE_ANIMATION_MS)
-    );
+    const token = Symbol(groupId);
+    collapsingGroups.value.set(groupId, token);
+    void finishCollapse(groupId, token);
     emit('group-toggle', { groupId, expanded: false });
-
-    // 折叠后，取消注册该组中的思考内容 ref
-    nextTick(() => {
-      const group = blockGroups.value.find((g) => g.id === groupId);
-      if (group && group.actions) {
-        group.actions.forEach((action) => {
-          if (action.type === 'thinking') {
-            const blockId = action.id || action.blockId;
-            if (blockId && typeof props.registerThinkingRef === 'function') {
-              props.registerThinkingRef(blockId, null);
-            }
-          }
-        });
-      }
-    });
   } else {
     expandedGroups.value.add(groupId);
-    // 展开立即恢复渲染；若还在收起宽限期内（快速往返），取消待执行的跳过
-    clearTimeout(collapseSkipTimers.get(groupId));
-    collapseSkipTimers.delete(groupId);
     collapsingGroups.value.delete(groupId);
     emit('group-toggle', { groupId, expanded: true });
 
-    // 展开后，注册该组中的思考内容 ref
     nextTick(() => {
-      const group = blockGroups.value.find((g) => g.id === groupId);
-      if (group && group.actions) {
-        // 运行中重新展开时重置锁定，并在 DOM 提交后跟随到底部。
-        if (isSummaryRunning(group.actions, groupId)) {
-          stepsWrapperFollowers.get(groupId)?.reset();
-        }
-        group.actions.forEach((action) => {
-          if (action.type === 'thinking') {
-            const blockId = action.id || action.blockId;
-            if (blockId) {
-              const el = thinkingRefs.get(blockId);
-              if (el && typeof props.registerThinkingRef === 'function') {
-                props.registerThinkingRef(blockId, el);
-                // 如果正在 streaming，滚动到底部
-                if (action.streaming) {
-                  el.scrollTop = el.scrollHeight;
-                }
-              }
-            }
-          }
-        });
+      if (!expandedGroups.value.has(groupId)) return;
+      const group = blockGroups.value.find((item) => item.id === groupId);
+      if (group?.actions && isSummaryRunning(group.actions, groupId)) {
+        stepsWrapperFollowers.get(groupId)?.reset();
       }
     });
   }
 };
 
-const getStepIconStyle = (step: Step) => {
-  if (step.type === 'thinking') {
+const getStepIconStyle = (action: Action) => {
+  if (action.type === 'thinking') {
     return props.iconStyle ? props.iconStyle('brain') : {};
-  } else if (step.type === 'tool' && step.action.tool) {
-    const iconKey = props.getToolIcon ? props.getToolIcon(step.action.tool) : 'terminal';
+  } else if (action.type === 'tool' && action.tool) {
+    const iconKey = props.getToolIcon ? props.getToolIcon(action.tool) : 'terminal';
     return props.iconStyle ? props.iconStyle(iconKey) : {};
   }
   return props.iconStyle ? props.iconStyle('terminal') : {};
@@ -943,57 +880,14 @@ const getToolName = (action: Action) => {
   return getToolStateText(tool) || tool.name || t('chat.runTool');
 };
 
-const getToolIntent = (action: Action) => {
-  return action.tool?.intent || '';
-};
-
-const renderToolResult = (action: Action) => {
-  void currentLocale.value;
-  const rendered = renderEnhancedToolResult(
-    action,
-    props.formatSearchTopic || (() => ''),
-    props.formatSearchTime || (() => ''),
-    props.formatSearchDomains || (() => '')
-  );
-  if (rendered) return rendered;
-
-  const result = action.tool?.result;
-  if (!result) return `<div class="result-item">${escapeHtml(t('chat.executing'))}</div>`;
-
-  if (typeof result === 'string') {
-    return `<div class="result-item"><pre>${escapeHtml(result)}</pre></div>`;
-  }
-
-  return `<div class="result-item"><pre>${escapeHtml(JSON.stringify(result, null, 2))}</pre></div>`;
-};
-
-const escapeHtml = (text: string) => {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-};
-
-const registerThinking = (key: string, el: Element | null) => {
-  // 本地保存一份，用于展开/折叠时管理
-  if (el instanceof HTMLElement) {
+const registerThinking = (groupId: string, key: string, el: Element | null, streaming?: boolean) => {
+  if (el instanceof HTMLElement && expandedGroups.value.has(groupId)) {
+    if (thinkingRefs.get(key) === el) return;
     thinkingRefs.set(key, el);
-  } else {
-    thinkingRefs.delete(key);
+    props.registerThinkingRef?.(key, el);
+    if (streaming) el.scrollTop = el.scrollHeight;
+  } else if (thinkingRefs.delete(key)) {
     props.registerThinkingRef?.(key, null);
-    return;
-  }
-
-  // 检查当前思考内容所在的摘要是否展开
-  const group = blockGroups.value.find(
-    (g) =>
-      g.type === 'summary' && g.actions && g.actions.some((a) => a.id === key || a.blockId === key)
-  );
-
-  // 只有展开的摘要中的思考内容才注册到父组件
-  if (group && expandedGroups.value.has(group.id)) {
-    if (typeof props.registerThinkingRef === 'function') {
-      props.registerThinkingRef(key, el);
-    }
   }
 };
 
@@ -1003,29 +897,8 @@ const handleScroll = (blockId: string, event: Event) => {
   }
 };
 
-watch(
-  () => props.actions,
-  () => {
-    // 对展开的 running 摘要组，若用户未主动向上滚动，自动将展开区滚动到底部
-    nextTick(() => {
-      blockGroups.value.forEach((group) => {
-        if (
-          group.type === 'summary' &&
-          group.actions &&
-          expandedGroups.value.has(group.id) &&
-          isSummaryRunning(group.actions, group.id)
-        ) {
-          scrollStepsWrapperToBottom(group.id);
-        }
-      });
-    });
-  },
-  { deep: true, immediate: true }
-);
-
 onBeforeUnmount(() => {
-  collapseSkipTimers.forEach((timer) => clearTimeout(timer));
-  collapseSkipTimers.clear();
+  collapsingGroups.value.clear();
   thinkingRefs.forEach((_, key) => props.registerThinkingRef?.(key, null));
   thinkingRefs.clear();
   stepsWrapperFollowers.forEach((follow) => follow.dispose());
@@ -1152,15 +1025,10 @@ body[data-theme='light'] .summary-content-wrapper {
   min-height: 0;
 }
 
-/* 折叠态跳过整个子树渲染：0fr 折叠只裁视觉，DOM 仍全量参与布局，
-   几千节点的步骤组会在窗口拖拽时逐帧重排导致卡顿。
-   收起动画的宽限期（.collapse-animating，JS 定时 300ms）内不跳过，
-   动画播完宽限期结束才真正跳过；展开时立即恢复渲染。
-   不用 content-visibility 离散过渡（transition-behavior）的原因：
-   WebKit 不生效，收起瞬间跳过会导致内容瞬消（见脚本区注释）。 */
-.steps-container:not(.show):not(.collapse-animating) .steps-wrapper {
-  content-visibility: hidden;
-  contain-intrinsic-size: 0;
+@media (prefers-reduced-motion: reduce) {
+  .steps-container {
+    transition: none;
+  }
 }
 
 .steps-wrapper.height-limited {

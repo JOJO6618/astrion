@@ -33,7 +33,8 @@ export interface ShellBridge {
   } | null>;
   onTabsState?: (callback: (state: any) => void) => () => void;
   forwardTabsState?: (state: any) => void;
-  show?: (key: string) => void;
+  show?: (key: string, requestId: string) => void;
+  settleShow?: (requestId: string) => void;
   focusMain?: () => void;
   focusTab?: (key: string) => void;
   onPlacement?: (callback: (payload: { key: string; placement: string }) => void) => () => void;
@@ -110,7 +111,8 @@ export const useConversationTabsStore = defineStore('conversationTabs', {
     viewKey: '',
     placement: 'main' as 'main' | 'detached',
     tabs: [] as ConversationTab[],
-    activeKey: '',
+    confirmedActiveKey: '',
+    pendingShow: null as { key: string; id: string } | null,
     workspaceId: '',
     renderers: {} as Record<string, string>,
     revision: -1,
@@ -126,8 +128,10 @@ export const useConversationTabsStore = defineStore('conversationTabs', {
     bootAt: 0
   }),
   getters: {
-    activeTab: (state): ConversationTab | null =>
-      state.tabs.find((tab) => tab.key === state.activeKey) || null,
+    activeKey: (state): string => state.pendingShow?.key || state.confirmedActiveKey,
+    activeTab(): ConversationTab | null {
+      return this.tabs.find((tab) => tab.key === this.activeKey) || null;
+    },
     viewTab: (state): ConversationTab | null =>
       (state.viewKey && state.tabs.find((tab) => tab.key === state.viewKey)) || null,
     /** 本视图当前在独立对话窗口（P2）：隐藏侧边栏，顶部自绘标题栏。 */
@@ -204,9 +208,12 @@ export const useConversationTabsStore = defineStore('conversationTabs', {
         return false;
       this.responseSequence = sequence;
       // Consumers observe after this patch; synchronous nested-field watchers are unsafe.
+      const tabs: ConversationTab[] = raw.tabs.map(normalizeTab);
       this.$patch({
-        tabs: raw.tabs.map(normalizeTab),
-        activeKey: String(raw.active_key || ''),
+        tabs,
+        pendingShow: tabs.some(tab => tab.key === this.pendingShow?.key && tab.placement === 'main')
+          ? this.pendingShow : null,
+        confirmedActiveKey: String(raw.active_key || ''),
         workspaceId: String(raw.workspace_id || ''),
         renderers: { ...(raw.renderers || {}) },
         revision: raw.revision,
@@ -366,13 +373,22 @@ export const useConversationTabsStore = defineStore('conversationTabs', {
       return this.command('activate', { key });
     },
     /** 标签栏点击：先让壳层乐观显示，再发 activate（以后端快照为准）。 */
-    showTab(key: string) {
+    async showTab(key: string) {
+      const shell = shellBridge();
+      if (!shell?.show || !this.mainTabs.some(tab => tab.key === key)) return this.setActive(key);
+      const id = navigationId();
       try {
-        shellBridge()?.show?.(key);
+        shell.show(key, id);
+        this.pendingShow = { key, id };
       } catch {
-        // 乐观显示失败时仍以 activate 的快照为准。
+        return this.setActive(key);
       }
-      return this.setActive(key);
+      try {
+        return await this.setActive(key);
+      } finally {
+        if (this.pendingShow?.id === id) this.pendingShow = null;
+        shell.settleShow?.(id);
+      }
     },
     reorderTab(key: string, beforeKey: string) {
       return this.command('reorder', { key, before_key: beforeKey });

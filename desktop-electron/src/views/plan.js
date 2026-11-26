@@ -83,7 +83,9 @@ export function successorKey(state, key) {
 
 /** 乐观显示保护：短时间内不让“旧意图”的快照把可见视图切走。返回应强制显示的 key 或空串。 */
 export function guardedActive(state, guard, now) {
-  if (!guard || now >= guard.until || state.active_key === guard.key) return '';
+  if (!guard) return '';
+  // A matching snapshot can belong to an older click (A → B → A).
+  if (!guard.requestId && (now >= guard.until || state.active_key === guard.key)) return '';
   const tab = state.tabs.find((row) => row.key === guard.key);
   return tab && isMainPlacement(tab) ? guard.key : '';
 }

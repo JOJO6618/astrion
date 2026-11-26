@@ -43,6 +43,8 @@ CrossPet 聚焦：create/open/workspace/activate/page/focus/detach/dock/close �
 
 ## 壳层与视图角色（`desktop-electron/src/views/`）
 
+顶部标签点击带有独立的显示请求 ID。命令等待期间，标签高亮和主窗口内容都跟随最近一次点击；其它快照仍更新标题、顺序和运行态。对应 `activate` 完成或失败后按最新已确认快照收敛。标签关闭或移出主窗口、chrome 文档重载或崩溃时释放临时显示状态。
+
 - ViewManager 持有每标签一个视图；只接受 revision 更大的快照并广播给 chrome 与所有视图（不回显给转发者）。最多 6 个 conv/new 视图常驻（LRU），page 与独立窗口视图不淘汰；淘汰视图再次激活冷加载。
 - **chrome 视图**：唯一轮询 `GET`（500ms）并转发每个更新快照；点击标签 `astrionShell.show(key)` 后发 `activate`；拖拽排序发 `reorder`；拖出对话标签或空白新对话标签在指针离开标签条 >40px 后发 `dragTab`（tear/move/drop），壳层建独立窗口并回调 `onRequestDetach`→`detach`；独立窗口关闭 `onRequestDock`→`dock`；窗口聚焦 `onWindowFocus`→`focus`；`onRequestPage`→`page`（快捷入口设置深链）。页面标签不可拖出，Esc 取消。
 - **内容视图**：`astrionShell.identity()` 取得固定 `key/placement/visible/state`，`attach {key, renderer_id}`，此后不再切换标签；不轮询标签快照，订阅 `onTabsState`；每个命令响应都 `forwardTabsState`。legacy 兜底页（key 为空）整体降级为网页行为。

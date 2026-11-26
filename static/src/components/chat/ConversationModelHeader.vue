@@ -1,9 +1,6 @@
 <template>
   <div :class="mobile ? 'mobile-panel-topbar' : 'conversation-header-content'">
-    <div
-      :class="mobile ? 'mobile-panel-topbar__blur' : 'conversation-ribbon__blur'"
-      aria-hidden="true"
-    ></div>
+    <div v-if="mobile" class="mobile-panel-topbar__blur" aria-hidden="true"></div>
     <slot name="leading" />
     <button
       type="button"
