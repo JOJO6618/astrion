@@ -31,11 +31,16 @@ pub(crate) struct Store {
     pub workspace_tools: HashMap<String, ToolSet>,
     pub tasks: HashMap<String, Task>,
     pub approvals: ApprovalStore,
+    pub(super) review_snapshot: std::cell::RefCell<Option<super::approval::CachedReview>>,
     pub(super) interactions: crate::interactions::InteractionStore,
+    pub(super) native_browser: Option<super::DesktopBrowser>,
     pub(super) process_resources: crate::process_runtime::ProcessResources,
     pub(super) mcp_clients: HashMap<(String, String), Arc<crate::mcp::Runtime>>,
     pub(super) draft_categories: HashMap<String, Value>,
     pub(super) cleared_through: HashMap<(String,String),usize>,
+    pub(super) compression_requests: HashMap<String,VecDeque<std::time::Instant>>,
+    pub(super) title_catalog: Option<crate::catalog::CatalogSource>,
+    pub(super) pending_titles: std::collections::HashSet<(String, String)>,
     pub shutting_down: bool,
 }
 
@@ -88,11 +93,13 @@ pub(super) struct Task {
     committed_event_offset: u64,
     api_request_pending: bool,
     stream: Option<LiveText>,
-    tool_batches: Vec<Vec<Value>>,
+    thinking_stream: Option<LiveText>,
+    tool_batches: Vec<ring::digest::Digest>,
     monitor_execution_ids: HashMap<String, String>,
     pub cancel_requested: bool,
     pub cancel: Option<oneshot::Sender<()>>,
     pub approval: Option<TaskApprovalSettings>,
+    pub(super) pending_host_modes: bool,
     pub execution_root: Option<PathBuf>,
     pub goal_run: Option<GoalRun>,
     pub goal_progress: Value,
@@ -103,9 +110,13 @@ pub(super) struct Task {
 #[derive(Serialize)]
 struct LiveText {
     start_idx: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    response_message_id: Option<String>,
     timestamp: f64,
     content: String,
     streaming: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    summary: Option<Value>,
 }
 
 #[derive(Default, Clone, Serialize, Deserialize)]
@@ -157,11 +168,16 @@ impl Store {
             workspace_tools: HashMap::new(),
             tasks: HashMap::new(),
             approvals: ApprovalStore::default(),
+            review_snapshot: Default::default(),
             interactions: Default::default(),
+            native_browser: None,
             process_resources: Default::default(),
             mcp_clients: HashMap::new(),
             draft_categories: HashMap::new(),
             cleared_through: HashMap::new(),
+            compression_requests: Default::default(),
+            title_catalog: None,
+            pending_titles: Default::default(),
             shutting_down: false,
         };
         // Legacy files remain read-only until an explicit migration.
@@ -273,13 +289,14 @@ impl Store {
         if !dir.exists(){return Ok(vec![]);}
         let db=if dir.join(crate::conversation_db::FILENAME).exists(){Some(crate::conversation_db::Database::open(&dir).map_err(RuntimeError::storage)?)}else{None};
         let mut rows=match &db{Some(db)=>db.rows().map_err(RuntimeError::storage)?,None=>vec![]};
+        let known=match &db {Some(db)=>db.known_ids().map_err(RuntimeError::storage)?,None=>Default::default()};
         let mut legacy_index=None;
         for entry in fs::read_dir(&dir).map_err(RuntimeError::storage)?{
             let entry=entry.map_err(RuntimeError::storage)?;
             if !entry.file_type().map_err(RuntimeError::storage)?.is_file(){continue;}
             let name=entry.file_name();
             let Some(id)=name.to_str().and_then(|n|n.strip_suffix(".json")).filter(|id|id.strip_prefix("conv_").is_some_and(valid_component)) else{continue;};
-            if let Some(db)=&db && (db.imported(id).map_err(RuntimeError::storage)?||db.contains(id).map_err(RuntimeError::storage)?){continue;}
+            if known.contains(id){continue;}
             let index=legacy_index.get_or_insert_with(||read_index(&dir.join("index.json")).unwrap_or_else(|_|json!({})));
             rows.push(legacy_row(id,index));
         }
@@ -322,6 +339,10 @@ impl Store {
     }
 
     pub fn append_messages(&self,workspace_id:&str,id:&str,messages:Vec<Value>,ts:f64,usage:Option<&TokenStats>,model_key:Option<&str>)->Result<(),RuntimeError>{
+        self.append_with_metadata(workspace_id,id,messages,ts,usage,model_key,|_|())
+    }
+
+    pub(super) fn append_with_metadata(&self,workspace_id:&str,id:&str,messages:Vec<Value>,ts:f64,usage:Option<&TokenStats>,model_key:Option<&str>,update:impl FnOnce(&mut Value))->Result<(),RuntimeError>{
         let path=self.conversation_path(workspace_id,id)?;
         let mut db=crate::conversation_db::Database::open(path.parent().unwrap()).map_err(RuntimeError::storage)?;
         db.append(id,messages,|header,batch,count,calls,prior|{
@@ -335,6 +356,7 @@ impl Store {
                 saved["metadata"]["total_messages"]=json!(count+saved["messages"].as_array().unwrap().len());
                 saved["metadata"]["total_tools"]=json!(calls+saved["metadata"]["total_tools"].as_u64().unwrap_or(0) as usize);
             }
+            update(&mut saved["metadata"]);
             let row=index_row(&saved,Some(&prior));Ok((saved,row))
         }).map_err(RuntimeError::storage)
     }
@@ -352,7 +374,7 @@ impl Store {
         let invalid = || RuntimeError::storage("invalid tool batch checkpoint");
         let index = sequence.checked_sub(1).ok_or_else(invalid)?;
         if let Some(previous) = task.tool_batches.get(index) {
-            return if *previous == messages {
+            return if previous.as_ref() == checkpoint_hash(messages).as_ref() {
                 Ok(Vec::new())
             } else {
                 Err(invalid())
@@ -374,7 +396,7 @@ impl Store {
         };
         let task = self.tasks.get_mut(id).expect("existing task");
         task.emit_tool_batch(&messages, ts);
-        task.tool_batches.push(messages);
+        task.tool_batches.push(checkpoint_hash(messages));
         let injected = guidance.publish(task);
         task.checkpoint_events();
         Ok(injected)
@@ -420,7 +442,13 @@ impl Store {
             data.extend(activity);
         }
         let queue = super::guidance::finish(self, task, status != Status::Succeeded, messages, ts);
+        if self.review_snapshot.get_mut().as_ref().is_some_and(|cached|cached.task_id==id) {
+            self.review_snapshot.get_mut().take();
+        }
         super::interactions::expire_task(self, id);
+        if let Err(error) = super::host_modes::apply_pending_to_task(self, id, false) {
+            self.tasks.get_mut(id).expect("existing task").emit("runtime_mode_error", json!({"message":error.message}));
+        }
         let task = self.tasks.get_mut(id).expect("existing task");
         task.guidance_closed = true;
         task.guidance_count = 0;
@@ -453,6 +481,8 @@ pub(super) fn append_document(
     model_key: Option<&str>,
 ) -> Result<LegacyDocument, RuntimeError> {
     let loaded_tools = super::tool_loading::checkpoint(document.raw(), &messages);
+    let knowledge_reads = super::knowledge_tools::checkpoint(&messages).cloned();
+    let acknowledged_worktree = super::worktree::complete_notice(document.raw(), &messages);
     let was_empty = document.raw()["messages"]
         .as_array()
         .is_some_and(Vec::is_empty);
@@ -483,10 +513,16 @@ pub(super) fn append_document(
     document
         .append_agent_messages(messages, ts, usage.as_ref())
         .map_err(legacy_error)?;
-    if title.is_none() && model_key.is_none() && loaded_tools.is_none() {
+    if title.is_none() && model_key.is_none() && loaded_tools.is_none() && knowledge_reads.is_none() && !acknowledged_worktree {
         return Ok(document);
     }
     let mut raw = document.into_raw();
+    if acknowledged_worktree && let Some(meta) = raw["metadata"].as_object_mut() {
+        meta.shift_remove("git_worktree_notice");
+    }
+    if let Some(reads) = knowledge_reads {
+        super::knowledge_tools::persist(&mut raw, reads);
+    }
     if let Some(state) = loaded_tools {
         raw["metadata"]["tool_loading"] = state;
     }
@@ -501,6 +537,19 @@ pub(super) fn append_document(
 
 pub(super) fn legacy_error(error: LegacyError) -> RuntimeError {
     RuntimeError::new(error.status, error.message)
+}
+
+/// Retain one digest per committed batch. Sorting the private copy preserves JSON object equality on retries.
+fn checkpoint_hash(mut messages:Vec<Value>) -> ring::digest::Digest {
+    struct Sink(ring::digest::Context);
+    impl std::io::Write for Sink {
+        fn write(&mut self, bytes:&[u8]) -> std::io::Result<usize> { self.0.update(bytes); Ok(bytes.len()) }
+        fn flush(&mut self)->std::io::Result<()> {Ok(())}
+    }
+    for message in &mut messages {message.sort_all_objects();}
+    let mut sink=Sink(ring::digest::Context::new(&ring::digest::SHA256));
+    serde_json::to_writer(&mut sink,&messages).expect("JSON values serialize into an infallible digest");
+    sink.0.finish()
 }
 
 fn validate_tool_batch(messages: &[Value]) -> Result<(), RuntimeError> {
@@ -557,11 +606,13 @@ impl Task {
             committed_event_offset: 0,
             api_request_pending: false,
             stream: None,
+            thinking_stream: None,
             tool_batches: Vec::new(),
             monitor_execution_ids: HashMap::new(),
             cancel_requested: false,
             cancel: Some(cancel),
             approval: None,
+            pending_host_modes: false,
             execution_root: None,
             goal_run: None,
             goal_progress: Value::Null,
@@ -603,6 +654,7 @@ impl Task {
     pub fn checkpoint_events(&mut self) {
         self.committed_event_offset = self.next_offset;
         self.stream = None;
+        self.thinking_stream = None;
     }
 
     pub fn terminal(&mut self, status: Status, error: Option<String>, kind: &str, data: Value, ts: f64) {
@@ -613,6 +665,7 @@ impl Task {
         self.cancel = None;
         self.approval = None;
         self.stream = None;
+        self.thinking_stream = None;
     }
 
     pub fn emit(&mut self, kind: &str, data: Value) {
@@ -630,24 +683,42 @@ impl Task {
             self.goal_progress = data.clone();
         }
         match kind {
-            "api_request_start" => self.api_request_pending = true,
-            "text_start" => {
-                self.api_request_pending = false;
-                self.stream = Some(LiveText { start_idx:self.next_offset, timestamp:ts, content:String::new(), streaming:true });
+            "api_request_start" => {
+                self.api_request_pending = true;
+                self.thinking_stream = None;
+                self.stream = None;
             }
-            "text_chunk" => {
+            "thinking_start" | "text_start" => {
                 self.api_request_pending = false;
-                if let Some(text) = &mut self.stream {
+                let stream = if kind == "thinking_start" { &mut self.thinking_stream } else { &mut self.stream };
+                *stream = Some(LiveText {
+                    start_idx:self.next_offset, timestamp:ts, content:String::new(), streaming:true,
+                    response_message_id:data["response_message_id"].as_str().map(str::to_owned),
+                    summary: None,
+                });
+            }
+            "thinking_chunk" | "text_chunk" => {
+                self.api_request_pending = false;
+                let stream = if kind == "thinking_chunk" { &mut self.thinking_stream } else { &mut self.stream };
+                if let Some(text) = stream {
                     text.content.push_str(data["content"].as_str().unwrap_or_default());
                 }
             }
-            "text_end" => {
-                if let Some(text) = &mut self.stream {
+            "thinking_end" | "text_end" => {
+                let stream = if kind == "thinking_end" { &mut self.thinking_stream } else { &mut self.stream };
+                if let Some(text) = stream {
                     if let Some(content) = data["full_content"].as_str() { text.content = content.into(); }
                     text.streaming = false;
                 }
             }
-            "stream_reset" => self.stream = None,
+            "thinking_summary" => {
+                if let Some(thinking) = &mut self.thinking_stream
+                    && thinking.response_message_id.as_deref() == data["response_message_id"].as_str()
+                {
+                    thinking.summary = Some(data.clone());
+                }
+            }
+            "stream_reset" => { self.stream = None; self.thinking_stream = None; }
             "tool_start" | "error" | "task_complete" | "task_stopped" => self.api_request_pending = false,
             _ => {}
         }
@@ -691,7 +762,8 @@ impl Task {
             "task_type":self.kind,"goal_mode":self.goal_run.is_some(),"goal_progress":self.goal_progress,"events":events,
             "next_offset":self.next_offset,"window_start":window_start,
             "runtime_queue_paused":self.runtime_queue["paused"],"runtime_queued_messages":self.runtime_queue["messages"],
-            "committed_event_offset":self.committed_event_offset,"api_request_pending":self.api_request_pending,"stream":self.stream
+            "committed_event_offset":self.committed_event_offset,"api_request_pending":self.api_request_pending,
+            "cancel_requested":self.cancel_requested,"stream":self.stream,"thinking_stream":self.thinking_stream
         })
     }
 }
@@ -847,7 +919,7 @@ fn replace_file(from: &Path, to: &Path) -> io::Result<()> {
     fs::rename(from, to)
 }
 
-fn valid_component(value: &str) -> bool {
+pub(super) fn valid_component(value: &str) -> bool {
     !value.is_empty()
         && value
             .bytes()

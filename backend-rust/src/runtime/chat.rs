@@ -13,6 +13,20 @@ pub struct ChatTaskStart {
 }
 
 impl Runtime {
+    pub(crate) fn with_chat_display<T, E>(
+        &self, id: &str, action: impl FnOnce(&std::path::Path, Value) -> Result<T, E>,
+    ) -> Result<T, E>
+    where E: From<RuntimeError> {
+        let store = self.store()?;
+        let mut task = store.tasks.values().filter(|task| task.workspace_id.is_empty() && task.conversation_id == id)
+            .max_by(|a, b| {
+                (a.status == Status::Running).cmp(&(b.status == Status::Running))
+                    .then(a.start.created_at.total_cmp(&b.start.created_at))
+            }).map_or(Value::Null, |task| task.activity(u64::MAX));
+        task["title_pending"] = json!(store.pending_titles.contains(&(String::new(), id.to_owned())));
+        action(&store.data_dir.join("chat"), task)
+    }
+
     pub fn register_chat_task(
         &self,
         start: ChatTaskStart,

@@ -10,8 +10,8 @@
 
 - **后端入口**
   - `main.py`: 统一启动入口（默认走 Host Web + thinking_mode=True）
-  - `server/app.py`: Host Web 和桌面端入口（转发至 `server/app_legacy.py`）
-  - `server/headless_app.py`: CLI 入口。与 full 共用 `server/host_startup.py`，装配自己的 Flask 蓝图。
+  - `backend-rust/src/main.rs` 按启动参数装配 Host Web 或 headless。Electron 默认运行包内 `astrion-headless --web`，CLI 默认探测并复用本机 Rust Gateway。
+  - `server/app.py` 默认启动 Rust Host Web，显式 `--backend python` 进入 Flask。旧 Python headless 保留在 `server/headless_app.py`。
   - `web_server.py`: 兼容入口，已标记 deprecated，但仍可启动
 - **后端核心目录**
   - `server/`: Flask 业务主线（chat/task/status/context 已拆分为子包：`server/chat/`、`server/status/`、`server/tasks/`、`server/context/`（用户资源/身份/个性化，原 `server/context.py` 已拆包并保留兼容 re-export）；**REST 任务轮询为唯一实时通道**——Socket.IO 已于 2026-09-11 整体移除，详见 §12.5）

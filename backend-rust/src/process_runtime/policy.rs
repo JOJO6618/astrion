@@ -46,6 +46,42 @@ pub(crate) struct HostPolicy {
     data: PathBuf,
 }
 
+fn shell_script(script: Option<&str>) -> &str {
+    script.unwrap_or("builtin printf '\\036ASTRION_TERMINAL_READY\\037'; exec /bin/bash --noprofile --norc -s")
+}
+
+fn clean_env(mut command: Command, cwd: &Path) -> Command {
+    command.env_clear().current_dir(cwd)
+        .env("PATH",std::env::var_os("PATH").unwrap_or_else(||"/usr/bin:/bin:/usr/sbin:/sbin".into()))
+        .env("GIT_CONFIG_GLOBAL","/dev/null").env("PYTHONUNBUFFERED","1");
+    for key in ["HOME","LANG","LC_ALL","LC_CTYPE","TMPDIR","TERM","SystemRoot","WINDIR"] {
+        if let Some(value) = std::env::var_os(key) { command.env(key,value); }
+    }
+    command
+}
+
+fn plugin_interpreter(mode: ExecutionMode) -> io::Result<PathBuf> {
+    #[cfg(windows)]
+    if mode == ExecutionMode::Sandbox {
+        return super::windows::plugin_interpreter().map(PathBuf::from);
+    }
+    let _ = mode;
+    let available = |path: &Path| path.is_absolute() && path.is_file();
+    if let Some(override_path) = std::env::var_os("ASTRION_CUSTOM_PYTHON").filter(|value|!value.is_empty()) {
+        let path = PathBuf::from(override_path);
+        return if available(&path) { Ok(path) } else { Err(denied("ASTRION_CUSTOM_PYTHON 必须指向可用的绝对 Python 3 路径")) };
+    }
+    #[cfg(windows)]
+    let candidates = std::env::var_os("PATH").map(|path|std::env::split_paths(&path).map(|dir|dir.join("python.exe"))
+        .collect::<Vec<_>>()).unwrap_or_default();
+    #[cfg(not(windows))]
+    let candidates = ["/opt/homebrew/bin/python3","/usr/local/bin/python3","/usr/bin/python3"].map(PathBuf::from);
+    candidates.into_iter().find(|path|available(path))
+        .ok_or_else(||denied("缺少自定义工具解释器，请安装 Python 3 或设置 ASTRION_CUSTOM_PYTHON"))
+}
+
+enum Launch<'a> { Shell(Option<&'a str>), Fixed(&'a [&'a str]) }
+
 impl HostPolicy {
     pub(crate) fn new(deploy: &Path, data: &Path) -> io::Result<Self> {
         fs::create_dir_all(deploy)?;
@@ -99,6 +135,22 @@ impl HostPolicy {
         access: SandboxAccess,
         mode: ExecutionMode,
         script: Option<&str>,
+        fixed_write_root: Option<&Path>,
+    ) -> io::Result<Command> {
+        self.launch(workspace,cwd,access,mode,Launch::Shell(script),fixed_write_root)
+    }
+
+    pub(super) fn command_plugin(&self, workspace: &Path, cwd: &Path, access: SandboxAccess, mode: ExecutionMode)
+        -> io::Result<Command> {
+        let python = plugin_interpreter(mode)?;
+        let program=python.to_str().ok_or_else(||denied("插件解释器路径必须为 UTF-8"))?;
+        let argv = [program,"-I","-X","utf8","-u","-c",include_str!("custom_plugin.py")];
+        self.launch(workspace,cwd,access,mode,Launch::Fixed(&argv),None)
+    }
+
+    fn launch(
+        &self, workspace: &Path, cwd: &Path, access: SandboxAccess, mode: ExecutionMode, launch: Launch<'_>,
+        fixed_write_root: Option<&Path>,
     ) -> io::Result<Command> {
         if !(match mode { ExecutionMode::Sandbox => self.supports_processes(), ExecutionMode::Direct => self.supports_direct() }) {
             return Err(denied("The selected Host execution environment is unavailable"));
@@ -109,9 +161,24 @@ impl HostPolicy {
         {
             return Err(denied("The bound execution directory is outside the sandbox scope"));
         }
+        if let Some(root) = fixed_write_root
+            && (mode != ExecutionMode::Sandbox || !access.write || !root.starts_with(workspace)
+                || root.canonicalize()? != root || !root.is_dir())
+        {
+            return Err(denied("The fixed write directory is outside the sandbox scope"));
+        }
         #[cfg(windows)]
         {
-            if mode == ExecutionMode::Direct { return super::windows::direct(cwd, script); }
+            if mode == ExecutionMode::Direct {
+                return match launch {
+                    Launch::Shell(script) => super::windows::direct(cwd,script),
+                    Launch::Fixed(argv) => {
+                        let mut command = clean_env(Command::new(argv[0]),cwd);
+                        command.args(&argv[1..]);
+                        Ok(command)
+                    }
+                };
+            }
             if self.data.starts_with(workspace) || self.deploy.starts_with(workspace) {
                 return Err(denied("A work directory containing private application data cannot be mounted"));
             }
@@ -125,12 +192,19 @@ impl HostPolicy {
                 }
                 path_text(&path).map(str::to_owned)
             }).collect::<io::Result<Vec<_>>>();
-            let script = script.unwrap_or("builtin printf '\\036ASTRION_TERMINAL_READY\\037'; exec /bin/bash --noprofile --norc -s");
-            return super::windows::command(workspace, cwd, access, script, resolve(readable)?, resolve(writable)?);
+            let writable = if fixed_write_root.is_some() { Vec::new() } else { resolve(writable)? };
+            return match launch {
+                Launch::Shell(script) => super::windows::command(workspace,cwd,access,shell_script(script),resolve(readable)?,writable,fixed_write_root),
+                Launch::Fixed(argv) => super::windows::command_argv(workspace,cwd,access,argv,resolve(readable)?,writable,fixed_write_root),
+            };
         }
         #[cfg(not(windows))]
         {
-        let script = script.unwrap_or("builtin printf '\\036ASTRION_TERMINAL_READY\\037'; exec /bin/bash --noprofile --norc -s");
+        let shell;
+        let argv: &[&str] = match launch {
+            Launch::Shell(script) => { shell = ["/bin/bash","--noprofile","--norc","-c",shell_script(script)]; &shell }
+            Launch::Fixed(argv) => argv,
+        };
         #[cfg(target_os = "linux")]
         if mode == ExecutionMode::Sandbox {
             if self.data.starts_with(workspace) || self.deploy.starts_with(workspace) {
@@ -146,27 +220,24 @@ impl HostPolicy {
                 }
                 path_text(&path).map(str::to_owned)
             }).collect::<io::Result<Vec<_>>>();
-            return super::linux::command(workspace, cwd, access, script, expand(readable)?, expand(writable)?);
+            let writable = if fixed_write_root.is_some() { Vec::new() } else { expand(writable)? };
+            return super::linux::command_argv(workspace, cwd, access, argv, expand(readable)?, writable, fixed_write_root);
         }
-        let mut command = match mode {
+        let command = match mode {
             ExecutionMode::Sandbox => {
-                let profile = self.profile(workspace, access)?;
+                let profile = self.profile(workspace, access, fixed_write_root)?;
                 let mut command = Command::new("/usr/bin/sandbox-exec");
-                command.args(["-p", &profile, "/bin/bash"]);
+                command.args(["-p",&profile]).args(argv);
                 command
             }
-            ExecutionMode::Direct => Command::new("/bin/bash"),
-        };
-        command.args(["--noprofile", "--norc"]);
-        command.args(["-c", script]);
-        command.env_clear().current_dir(cwd)
-            .env("PATH", std::env::var_os("PATH").unwrap_or_else(|| "/usr/bin:/bin:/usr/sbin:/sbin".into()))
-            .env("GIT_CONFIG_GLOBAL", "/dev/null").env("PYTHONUNBUFFERED", "1");
-        for key in ["HOME", "LANG", "LC_ALL", "LC_CTYPE", "TMPDIR", "TERM"] {
-            if let Some(value) = std::env::var_os(key) {
-                command.env(key, value);
+            ExecutionMode::Direct => {
+                let mut command = Command::new(argv[0]);
+                command.args(&argv[1..]);
+                command
             }
-        }
+        };
+        let mut command = clean_env(command,cwd);
+        if let Some(root) = fixed_write_root { command.env("TMPDIR", root); }
         Ok(command)
         }
     }
@@ -194,7 +265,7 @@ impl HostPolicy {
         Ok((policy, writable, readable))
     }
 
-    fn profile(&self, workspace: &Path, access: SandboxAccess) -> io::Result<String> {
+    fn profile(&self, workspace: &Path, access: SandboxAccess, fixed_write_root: Option<&Path>) -> io::Result<String> {
         let (policy, mut writable, mut readable) = self.configured_paths(workspace)?;
         readable.extend([
             "/bin", "/sbin", "/usr", "/lib", "/System", "/Library/Apple",
@@ -227,15 +298,19 @@ impl HostPolicy {
         }
         rule(&mut profile, "allow file-write*", "literal", Path::new("/dev/null"))?;
         if access.write {
-            writable.extend([path_text(workspace)?.to_owned(), "/tmp".into(), "/private/tmp".into()]);
-            if let Some(temp) = std::env::var_os("TMPDIR") {
-                let temp = PathBuf::from(temp);
-                if let Some(path) = canonical_if_present(&temp)?
-                    && path.starts_with("/private/var/folders") && path.components().count() == 7
-                    && path.file_name().is_some_and(|name| name == "T")
-                    && let Some(parent) = path.parent()
-                {
-                    writable.push(path_text(parent)?.to_owned());
+            if let Some(root) = fixed_write_root {
+                writable = vec![path_text(root)?.to_owned()];
+            } else {
+                writable.extend([path_text(workspace)?.to_owned(), "/tmp".into(), "/private/tmp".into()]);
+                if let Some(temp) = std::env::var_os("TMPDIR") {
+                    let temp = PathBuf::from(temp);
+                    if let Some(path) = canonical_if_present(&temp)?
+                        && path.starts_with("/private/var/folders") && path.components().count() == 7
+                        && path.file_name().is_some_and(|name| name == "T")
+                        && let Some(parent) = path.parent()
+                    {
+                        writable.push(path_text(parent)?.to_owned());
+                    }
                 }
             }
             let mut write_paths = BTreeSet::new();

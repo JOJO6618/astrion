@@ -291,6 +291,9 @@ export function useChatPage() {
   );
   watch(title, (value) => {
     conversations.currentConversationTitle = value;
+    if (chat.cid && chat.document?.metadata.title_locked === true) {
+      tabs.updateTitle(chat.cid, value, '');
+    }
   });
   watch(
     () => chat.model,

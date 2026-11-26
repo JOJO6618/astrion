@@ -369,6 +369,7 @@ fn spawn_backend(
     cmd.current_dir(backend_dir)
         .args([
             "-m", "server.app",
+            "--backend", "python",
             "--port", &port.to_string(),
             "--path", &default_ws.to_string_lossy(),
         ])

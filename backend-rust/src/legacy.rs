@@ -121,6 +121,21 @@ pub struct LegacyDocument {
     kind: LegacyKind,
 }
 
+fn ensure_local_compact_file(path: &str, workspace: &Path, execution_root: &Path) -> Result<(), LegacyError> {
+    use crate::{conversation_transfer::assets, knowledge::storage::open_canonical_dir};
+
+    let normalized = path.replace('\\', "/");
+    let valid = normalized.strip_prefix(".astrion/compact_result/")
+        .is_some_and(|name| !name.contains('/') && name.ends_with(".md"));
+    if valid && [execution_root, workspace].into_iter().any(|root| {
+        open_canonical_dir(root).and_then(|directory| assets::open_file(&directory, &normalized))
+            .and_then(|file| file.metadata()).is_ok_and(|meta| meta.len() > 0)
+    }) {
+        return Ok(());
+    }
+    Err(LegacyError::unsupported(&["The saved compression record is unavailable in this conversation's workspace".into()]))
+}
+
 impl LegacyDocument {
     /// Reads only the explicitly selected regular file, with no writes or migrations.
     pub fn read(path: impl AsRef<Path>) -> Result<Self, LegacyError> {
@@ -255,6 +270,19 @@ impl LegacyDocument {
         self.project_chat_history(&tree::chat_turn_path(&self.raw, turn_id)?)
     }
 
+    pub(crate) fn chat_turn_history_with_media(
+        &self, turn_id: &str, account: &Path,
+    ) -> Result<Vec<Value>, LegacyError> {
+        self.require_chat()?;
+        let path = tree::chat_turn_path(&self.raw, turn_id)?;
+        let frozen = self.raw["metadata"]["frozen_system_prompt"].as_str().filter(|prompt| !prompt.trim().is_empty());
+        let mut history = agent::project_history(&path, frozen, true, true)
+            .map_err(|reason| LegacyError::unsupported(&[reason]))?;
+        media::attach_chat_blobs(&path, &mut history[usize::from(frozen.is_some())..], account)
+            .map_err(|reason| LegacyError::unsupported(&[reason]))?;
+        Ok(history)
+    }
+
     pub fn chat_revision(&self) -> Result<u64, LegacyError> {
         self.require_chat()?;
         tree::revision(&self.raw)
@@ -336,7 +364,7 @@ impl LegacyDocument {
         let frozen = self.raw["metadata"]["frozen_system_prompt"]
             .as_str()
             .filter(|prompt| !prompt.trim().is_empty());
-        agent::project_history(messages, frozen, true)
+        agent::project_history(messages, frozen, true, false)
             .map_err(|reason| LegacyError::unsupported(&[reason]))
     }
 
@@ -371,13 +399,16 @@ impl LegacyDocument {
         let rows = self.raw["messages"].as_array().expect("validated message list");
         let deep = |m: &Value| m["metadata"]["deep_compacted"] == true;
         let shallow = |m: &Value| m["role"] == "tool" && m["metadata"]["auto_shallow_compacted"] == true;
-        if !rows.iter().any(|m|deep(m) || shallow(m)) {
+        let meta = &self.raw["metadata"];
+        let record = meta["last_deep_compression_record"].as_object().map(|_| &meta["last_deep_compression_record"])
+            .or_else(|| meta["deep_compression_records"].as_array()?.last());
+        let has_deep = record.is_some() || rows.iter().any(deep);
+        if !has_deep && !rows.iter().any(shallow) {
             let mut history = self.agent_history()?;
             media::attach(&self.raw, &mut history[1..], data, workspace, execution_root);
             return Ok(history);
         }
-        let meta = &self.raw["metadata"];
-        let summary = meta["last_deep_compression_record"]["summary"].as_str().filter(|s| !s.trim().is_empty());
+        let summary = record.and_then(|record| record["summary"].as_str()).filter(|s| !s.trim().is_empty());
         let mut active: Vec<_> = rows.iter().filter(|m| !deep(m)).cloned().collect();
         let options = crate::web_assets::personalization::shallow_options(data).map_err(|e|LegacyError::unsupported(&[e.to_string()]))?;
         if options.is_some() {
@@ -385,11 +416,23 @@ impl LegacyDocument {
                 message["content"] = json!(crate::runtime::shallow::PLACEHOLDER);
             }
         }
-        let has_guide = active.iter().any(|m| m["metadata"]["message_source"] == "compression_handoff" ||
-            m["role"]=="user" && m["content"].as_str().is_some_and(|s|s.contains("压缩记录文件：") && s.contains("本次压缩摘要：")));
-        let reasons = agent::state_blockers_in_context(&self.raw, has_guide || summary.is_some() || !rows.iter().any(deep));
+        let guide = active.iter().rev().find_map(|message| {
+            let body = message["content"].as_str()?;
+            (message["role"] == "user" && (message["metadata"]["message_source"] == "compression_handoff"
+                || body.contains("压缩记录文件：") && body.contains("本次压缩摘要："))).then_some(body)
+        });
+        let restored_summary = guide.is_some_and(|body| !body.trim().is_empty()) || summary.is_some();
+        let reasons = agent::state_blockers_in_context(&self.raw, restored_summary || !has_deep);
         if !reasons.is_empty() { return Err(LegacyError::unsupported(&reasons)); }
-        if !has_guide && let Some(summary) = summary { active.insert(0,json!({"role":"user","content":summary})); }
+        if has_deep && !agent::verified_transfer(&self.raw) {
+            let guide_path = guide.map(|body| body.replace('\\', "/"));
+            let reference = record.and_then(|state| state["compact_file"].as_str()).filter(|path| !path.trim().is_empty())
+                .or_else(|| guide_path.as_deref().and_then(crate::conversation_transfer::assets::logical_path));
+            if let Some(path) = reference {
+                ensure_local_compact_file(path, workspace, execution_root)?;
+            }
+        }
+        if guide.is_none() && let Some(summary) = summary { active.insert(0,json!({"role":"user","content":summary})); }
         let projected = json!({"messages":active,"metadata":meta});
         let mut history = agent::model_history(&projected).map_err(|e| LegacyError::unsupported(&[e]))?;
         media::attach(&projected,&mut history[1..],data,workspace,execution_root);

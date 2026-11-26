@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
+import { migrate, readDocument } from '../2026-11-27_Rust对话格式迁移/fixture.mjs';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
-import { createServer } from 'node:http';
+import { createServer, get as httpGet } from 'node:http';
 import { join, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -133,6 +134,7 @@ test('the authenticated Web binary publishes one isolated preview origin from ta
   }
   const { session, csrf } = await login(request, origin);
   const headers = { cookie: session };
+  await migrate(origin,{...headers,origin,'x-csrf-token':csrf});
   const targetData = await asJson(await request(targets, { headers }));
   const bootstrapData = (await asJson(await request(bootstrap, { headers }))).data;
   const messagesData = (await asJson(await request(messages, { headers }))).data;
@@ -153,7 +155,14 @@ test('the authenticated Web binary publishes one isolated preview origin from ta
   assert.equal(asset.headers.get('content-type'), 'image/png');
   assert.deepEqual(new Uint8Array(await asset.arrayBuffer()), new Uint8Array([1, 2, 3, 4]));
   assert.equal((await isolated(`/incorrect-preview-token/file/${filePath}`)).status, 404);
-  assert.equal((await isolated(`${tokenPath}/file/${filePath}`, { headers: { host: 'forged.invalid' } })).status, 403);
+  // Fetch normalizes Host to the URL authority. Use the HTTP client for this protocol check.
+  const hostStatus=await new Promise((resolve,reject)=>{
+    httpGet(targetData.preview_base+tokenPath+'/file/'+filePath,{headers:{host:'forged.invalid'}},response=>{
+      response.resume();
+      resolve(response.statusCode);
+    }).on('error',reject);
+  });
+  assert.equal(hostStatus,403);
   assert.equal((await isolated('/api/preview/targets')).status, 404);
 
   const proxy = `${tokenPath}/proxy/${mock.port}/page?x=%26`;
@@ -168,7 +177,7 @@ test('the authenticated Web binary publishes one isolated preview origin from ta
   const secondTargets = await asJson(await request(`/api/preview/targets?conversation_id=${second}`, { headers }));
   assert.equal(secondTargets.preview_base, targetData.preview_base);
   assert.notEqual(secondTargets.preview_token, tokenFromPython);
-  const secondDoc = JSON.parse(await readFile(join(dataDir, 'conversations', 'default', `${second}.json`), 'utf8'));
+  const secondDoc=readDocument(join(dataDir,'conversations','default'),second);
   assert.equal(secondDoc.metadata.preview_token, secondTargets.preview_token);
   assert.equal((await isolated(`/${secondTargets.preview_token}/proxy/${mock.port}/page?conversation_id=${first}`)).status, 403);
 

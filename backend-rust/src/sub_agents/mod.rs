@@ -2,9 +2,12 @@
 mod activity;
 mod casefold;
 mod communication;
+mod compression;
+mod context_rows;
 mod execution;
 mod mcp;
 mod migration;
+mod processes;
 pub(crate) mod protocol;
 mod registry;
 mod routes;
@@ -12,6 +15,8 @@ mod scope;
 mod worker;
 
 pub(crate) use execution::{Create, Parent};
+pub(crate) use migration::{discover_legacy, ChildMigration};
+#[cfg(test)]
 pub(crate) use migration::{legacy_pending, migrate_legacy};
 pub(crate) use scope::ParentAccess;
 
@@ -56,6 +61,11 @@ impl SubAgents {
     ) -> Self {
         self.live = Arc::new(read);
         self
+    }
+
+    pub(crate) fn names_for_summary(&self, workspace:&RegisteredWorkspace, parent:&str) -> Result<Vec<String>,String> {
+        let records=self.records(workspace,parent).map_err(|error|error.to_string())?;
+        Ok(records.values().filter_map(|record|record.get("name")?.as_str().map(str::to_owned)).collect())
     }
 
     /// Report only live children owned by the registered workspace and conversation.

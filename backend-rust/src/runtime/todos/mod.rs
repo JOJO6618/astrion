@@ -1,4 +1,4 @@
-mod operations;
+pub(crate) mod operations;
 
 use super::{
     LegacyDocument, Runtime, RuntimeError, Status, goals::verify_conversation_root, legacy_error,

@@ -77,6 +77,10 @@ impl ReadFile {
         Workspace::open(workspace, data_dir).map(Self)
     }
 
+    pub(crate) fn checked_relative_path(&self, path: &str) -> Result<std::path::PathBuf, String> {
+        self.0.relative_path(path)
+    }
+
     pub(crate) fn read_bytes(&self, path: &str) -> Result<Vec<u8>, String> {
         self.0.read(path).map(|(_, bytes, _)| bytes)
     }

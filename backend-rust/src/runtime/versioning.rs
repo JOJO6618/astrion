@@ -17,7 +17,7 @@ use super::{
     open_data_directory, python_bool, shallow_write, storage, transaction, verify_record_owner,
     verify_workspace_binding,
 };
-use crate::{legacy::LegacyKind, workspace_catalog::RegisteredWorkspace};
+use crate::workspace_catalog::RegisteredWorkspace;
 
 /// Browser-only mutation routes. The caller supplies CSRF and registered workspace scoping.
 pub fn mutation_router(runtime: Runtime) -> Router {
@@ -147,8 +147,8 @@ fn recover_source(
             Some(id)
         },
     )?;
-    let document = store.read(workspace, id)?;
-    let root = execution_root(store, workspace, document.raw())?;
+    let (header, _) = store.header(workspace, id)?;
+    let root = execution_root(store, workspace, &header)?;
     transaction::recover(store, &marker, records, workspace, id, &root, journal)?;
     Ok(true)
 }
@@ -246,21 +246,20 @@ pub(in crate::runtime) fn record_finished(
     if !python_bool(&header["metadata"]["versioning"]["enabled"]) {
         return Ok(());
     }
-    let document = store.read(&task.workspace_id, &task.conversation_id)?;
-    if document.kind() != LegacyKind::Agent {
+    if header["metadata"]["conversation_kind"] == "chat" {
         return Ok(());
     }
-    let Some((index, message_id)) = task_message(task, document.raw()) else {
+    let Some((index, message_id)) = task_message(store, task)? else {
         return Ok(());
     };
     let root = task_root(store, task)?;
     mutations::checkpoint(
         store,
         task,
-        document.raw(),
+        &header,
         root,
         index,
-        message_id,
+        &message_id,
         run_status,
     )
 }
@@ -273,27 +272,16 @@ fn task_root<'a>(store: &'a Store, task: &'a Task) -> Result<&'a FilePath, Runti
         .unwrap_or(&store.workspaces[&task.workspace_id]))
 }
 
-fn task_message<'a>(task: &'a Task, document: &'a Value) -> Option<(usize, &'a str)> {
+fn task_message(store: &Store, task: &Task) -> Result<Option<(usize, String)>, RuntimeError> {
     let time = OffsetDateTime::from_unix_timestamp_nanos(
         (task.start.created_at * 1_000_000_000.0).round() as i128,
     )
-    .ok()?
-    .format(&Rfc3339)
-    .ok()?;
-    let (index, message) =
-        document["messages"]
-            .as_array()?
-            .iter()
-            .enumerate()
-            .find(|(_, message)| {
-                message["role"] == "user"
-                    && message["content"] == task.start.message
-                    && message["timestamp"] == time
-            })?;
-    Some((
-        index,
-        message["message_id"].as_str().unwrap_or(&task.start.id),
-    ))
+    .ok().and_then(|stamp| stamp.format(&Rfc3339).ok());
+    let Some(time) = time else { return Ok(None); };
+    let anchor = mutations::database(store, &task.workspace_id, &task.conversation_id)?
+        .checkpoint_anchor(&task.conversation_id, task.version_message_id.as_deref(), &time, &task.start.message)
+        .map_err(RuntimeError::storage)?;
+    Ok(anchor.map(|(index, id)| (index, id.unwrap_or_else(|| task.start.id.clone()))))
 }
 
 fn eligible(task: &Task) -> bool {

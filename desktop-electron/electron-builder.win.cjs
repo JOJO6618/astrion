@@ -12,7 +12,8 @@ module.exports = {
   extraResources: [
     { from: '../static/src/locales/zh-CN/updatePolicy.json', to: 'update-policy-locales/zh-CN.json' },
     { from: '../static/src/locales/en-US/updatePolicy.json', to: 'update-policy-locales/en-US.json' },
-    { from: '../desktop/src-tauri/runtime', to: 'runtime' },
+    { from: '.cache/windows-rust-backend', to: 'runtime/rust' },
+    { from: '../desktop/src-tauri/runtime/python', to: 'runtime/python' },
     { from: '.cache/astrion-windows-helper.exe', to: 'astrion-windows-helper.exe' },
     { from: '../desktop/src-tauri/icons/icon.ico', to: 'icon.ico' },
     { from: '../desktop/browser-migration-extension', to: 'browser-migration-extension' },

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readDocument, readSummary, withDb } from '../2026-11-27_Rust对话格式迁移/fixture.mjs';
 import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
@@ -99,6 +100,9 @@ test('Agent lifecycle preserves workspace selection and returns authoritative de
     web: true, workspaceIds: ['default', 'other'], model: 'lifecycle-fixture', startMock: startModel, prepare,
   });
   const api = await browser(gateway);
+  await api('/api/conversation-storage/migration',{method:'POST'});
+  await waitFor('history migration',async()=>{const s=await api('/api/conversation-storage/migration');return !s.running && s.migrated===3 && s.failed===1;});
+  const directory=join(dataDir,'conversations','default');
   const deleteConvo = (id, workspace = 'default', status = 200) => api(documentPath(id, workspace), { method: 'DELETE', status });
   const load = (id, workspace, status = 200) => api(loadPath(id, workspace), { method: 'PUT', status });
   const command = (action, payload) => api(`${TABS}/commands`, {
@@ -126,8 +130,8 @@ test('Agent lifecycle preserves workspace selection and returns authoritative de
   assert.equal((await api(`${currentPath}?conversation_id=${ACTIVE.slice(5)}`)).data.id, ACTIVE);
   await api(`${currentIn('other')}&conversation_id=${ACTIVE}`, { status: 404 });
   await load(ACTIVE, 'other', 404);
-  await load(CHAT, 'default', 404);
-  await deleteConvo(CHAT, 'default', 404);
+  await load(CHAT, 'default', 409);
+  await deleteConvo(CHAT, 'default', 409);
   await api(loadPath(ACTIVE, 'default'), { method: 'PUT', headers: { 'x-astrion-workspace-id': 'other' }, status: 400 });
 
   const loaded = await load(ACTIVE, 'default');
@@ -169,12 +173,11 @@ test('Agent lifecycle preserves workspace selection and returns authoritative de
   assert.equal((await api(TABS)).tabs.some((tab) => tab.key === 'active' && tab.running), true);
 
   // A deletion error leaves both its document and tabs available for retry.
-  const indexDuringRun = await readFile(indexFile, 'utf8');
-  await writeFile(indexFile, 'malformed index');
-  await deleteConvo(OTHER, 'default', 500);
+  withDb(directory,db=>db.exec("CREATE TRIGGER reject_delete BEFORE DELETE ON conversations BEGIN SELECT RAISE(ABORT,'fixture'); END;"),false);
+  await deleteConvo(OTHER, 'default', 503);
   assert.equal(await readFile(otherFile, 'utf8'), otherBefore);
   assert.equal((await api(TABS)).tabs.some((tab) => tab.key === 'detached'), true);
-  await writeFile(indexFile, indexDuringRun);
+  withDb(directory,db=>db.exec("DROP TRIGGER reject_delete"),false);
 
   const detached = await deleteConvo(OTHER);
   assert.equal(detached.success, true);
@@ -183,8 +186,8 @@ test('Agent lifecycle preserves workspace selection and returns authoritative de
   assert.deepEqual(snapshot(detached.desktop_navigation), snapshot(await api(TABS)));
   assert.deepEqual(detached.desktop_navigation.tabs.map((tab) => tab.key), ['active', 'foreign']);
   assert.equal(await readFile(foreignFile, 'utf8'), foreignBefore);
-  await assert.rejects(readFile(otherFile), { code: 'ENOENT' });
-  assert.equal(JSON.parse(await readFile(indexFile, 'utf8'))[OTHER], undefined);
+  assert.equal(await readFile(otherFile,'utf8'),otherBefore);
+  assert.equal(readSummary(directory,OTHER),null);
   assert.equal((await api('/api/conversations')).data.conversations.some((row) => row.id === OTHER), false);
   assert.equal((await api('/api/conversations/search?q=Detached')).data.count, 0);
   await load(OTHER, 'default', 404);
@@ -197,15 +200,15 @@ test('Agent lifecycle preserves workspace selection and returns authoritative de
   await task.until('the original Agent task to finish', (poll) => poll.status === 'succeeded');
   assert.equal(mock.requests.length, 1);
   assert.equal(mock.requests[0].messages.at(-1).content, 'Continue the selected Agent');
-  const history = JSON.parse(await readFile(activeFile, 'utf8')).messages;
+  const history=readDocument(directory,ACTIVE).messages;
   assert.equal(history.at(-1).content, 'Still running');
   const deleted = await deleteConvo(ACTIVE);
   assert.equal(deleted.desktop_navigation.active_key, 'foreign');
   assert.deepEqual(snapshot(deleted.desktop_navigation), snapshot(await api(TABS)));
   assert.equal((await api(currentPath)).data.id, null);
   assert.equal((await api(currentIn('other'))).data.id, OTHER);
-  await assert.rejects(readFile(activeFile), { code: 'ENOENT' });
-  assert.equal(JSON.parse(await readFile(indexFile, 'utf8'))[ACTIVE], undefined);
+  assert.equal(await readFile(activeFile,'utf8'),activeBefore);
+  assert.equal(readSummary(directory,ACTIVE),null);
   assert.match(await readFile(join(dataDir, 'save', ACTIVE, 'inputs.jsonl'), 'utf8'), /python-tree/);
 
   const restarted = await restart();

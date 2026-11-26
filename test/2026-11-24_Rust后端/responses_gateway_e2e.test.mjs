@@ -2,6 +2,8 @@
 //   node --test test/2026-11-24_Rust后端/responses_gateway_e2e.test.mjs
 // Set ASTRION_HEADLESS_BIN when the binary is outside the default Cargo debug directory.
 import assert from 'node:assert/strict';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import test from 'node:test';
 import { COMPLETED, createTask, startGatewayFixture, streamedText } from './gateway_harness.mjs';
 import { ANSWER_REASONING, RESPONSES, TOOL_REASONING, startResponsesMock } from './responses_gateway_mock.mjs';
@@ -68,7 +70,15 @@ async function finishTask(gateway, conversationId, prompt, answer) {
 }
 
 test('real GatewayClient drives Responses tool continuation and keeps encrypted context private across restarts', { timeout: 45_000 }, async (t) => {
-  const fixture = await startGatewayFixture(t, { model, apiKey, startMock: startResponsesMock });
+  const auxiliary = 'unused-local-summary-model';
+  const fixture = await startGatewayFixture(t, { model, apiKey, startMock: startResponsesMock, async prepare({ dataDir, mock }) {
+    const directory = join(dataDir, 'config');
+    await mkdir(directory);
+    await writeFile(join(directory, 'custom_models.json'), JSON.stringify({ models: [{ model_name: auxiliary,
+      model_id: auxiliary, url: new URL('/v1', mock.endpoint).href, apikey: 'isolated-summary-probe', reasoning_capability: 'fast' }] }));
+    await writeFile(join(dataDir, 'personalization.json'), JSON.stringify({ auto_generate_title: false,
+      thinking_summary_enabled: true, thinking_summary_model: auxiliary }));
+  } });
   const { gateway, mock } = fixture;
   const freshInput = [user(RESPONSES.firstPrompt)];
   const toolInput = [
@@ -101,11 +111,21 @@ test('real GatewayClient drives Responses tool continuation and keeps encrypted 
     assert.deepEqual(first.events[started].data.arguments, { text: echo });
     assert.equal(first.events[completed].data.id, callId);
     assert.equal(first.events[completed].data.result, echo);
+    const reasoning = first.events.find((event) => event.type === 'thinking_start');
+    const summary = first.events.find((event) => event.type === 'thinking_summary');
+    assert.equal(summary.data.response_message_id, reasoning.data.response_message_id);
+    assert.equal(summary.data.summary, RESPONSES.reasoningSummary);
+    assert(first.events.some((event) => event.type === 'thinking_end' && event.data.full_content === RESPONSES.reasoningSummary));
+    assert(!JSON.stringify(first.events).includes(TOOL_REASONING.encrypted_content));
+    const sidecar = JSON.parse(await readFile(join(fixture.dataDir, 'conversations', 'default', 'thinking_summaries', `${conversationId}.json`), 'utf8'));
+    assert.equal(sidecar.responses[reasoning.data.response_message_id].text, RESPONSES.reasoningSummary);
 
     mock.releaseContinuation();
     await first.until('the completed Responses tool turn', (poll) => COMPLETED.has(poll.status));
     assert.equal(streamedText(first.events), firstAnswer);
     const firstHistory = await readPublicHistory(gateway, conversationId);
+    const ledger = JSON.parse(await readFile(join(fixture.dataDir, 'api_costs', `${conversationId}.json`), 'utf8'));
+    assert.equal(ledger.actors.thinking_summary, undefined, 'Responses native summaries never make a billed auxiliary request');
     assert.deepEqual(firstHistory.map((message) => message.role), ['user', 'assistant', 'tool', 'assistant']);
     assert.equal(firstHistory[0].content, RESPONSES.firstPrompt);
     assert.equal(firstHistory[1].reasoning_content, RESPONSES.reasoningSummary);

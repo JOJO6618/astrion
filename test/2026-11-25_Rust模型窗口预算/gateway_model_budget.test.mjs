@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readDocument, seedDocument } from '../2026-11-27_Rust对话格式迁移/fixture.mjs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { dirname, join } from 'node:path';
@@ -58,7 +59,9 @@ async function startBudgetMock() {
 }
 
 async function startCatalog(t) {
-  const fixture = await startGatewayFixture(t, { startMock: startBudgetMock });
+  const fixture = await startGatewayFixture(t, { startMock: startBudgetMock,
+    prepare:({dataDir})=>writeJson(join(dataDir,'personalization.json'),{auto_deep_compress_enabled:false}),
+  });
   const { dataDir, workspace, mock } = fixture;
   await writeJson(join(dataDir, 'config/custom_models.json'), [
     {
@@ -92,8 +95,8 @@ async function startCatalog(t) {
 
 async function savedConversation(fixture, metadata, usage) {
   const { conversation_id: id } = await fixture.gateway.createSession();
-  const file = join(fixture.dataDir, 'conversations', WORKSPACE_ID, `${id}.json`);
-  const raw = JSON.parse(await readFile(file));
+  const directory = join(fixture.dataDir,'conversations',WORKSPACE_ID);
+  const raw=readDocument(directory,id);
   // Mimic a pre-existing Python document, including settings absent from older files.
   delete raw.metadata.thinking_mode;
   delete raw.metadata.run_mode;
@@ -101,8 +104,8 @@ async function savedConversation(fixture, metadata, usage) {
   raw.messages = [{ role: 'user', content: 'old question' }, { role: 'assistant', content: 'old reply' }];
   if (usage === undefined) delete raw.token_statistics;
   else raw.token_statistics = { current_context_tokens: usage };
-  await writeJson(file, raw);
-  return { id, file };
+  seedDocument(directory,raw);
+  return {id,directory};
 }
 
 async function finish(gateway, id, message, options = {}) {
@@ -141,7 +144,7 @@ test('saved Chat Completions caps output each turn and restores mode preferences
   const reopened = await fixture.restart();
   await finish(reopened, saved.id, 'use the saved fast mode');
   assert.equal(mock.requests.at(-1).body.model, 'qwen/qwen-fast');
-  const durable = JSON.parse(await readFile(saved.file));
+  const durable=readDocument(saved.directory,saved.id);
   assert.equal(durable.metadata.thinking_mode, false);
   assert.equal(durable.metadata.run_mode, 'fast');
   assert.equal(durable.metadata.reasoning_effort, 'high');

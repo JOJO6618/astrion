@@ -81,7 +81,10 @@
                   <div v-if="action.type === 'thinking'" class="step-body">
                     <div
                       class="thinking-content"
-                      :ref="(el) => registerThinking(group.id, stepId(action, index), el, action.streaming)"
+                      :ref="
+                        (el) =>
+                          registerThinking(group.id, stepId(action, index), el, action.streaming)
+                      "
                       @scroll="handleScroll(stepId(action, index), $event)"
                     >
                       <MarkdownRenderer
@@ -93,7 +96,9 @@
                   </div>
                   <div v-else class="step-body">
                     <div class="step-header">{{ getToolName(action) }}</div>
-                    <div v-if="action.tool?.intent" class="tool-intent">{{ action.tool.intent }}</div>
+                    <div v-if="action.tool?.intent" class="tool-intent">
+                      {{ action.tool.intent }}
+                    </div>
                     <div class="tool-result">
                       <MinimalToolResult
                         v-if="action.tool?.result"
@@ -822,9 +827,13 @@ const finishCollapse = async (groupId: string, token: symbol) => {
   await nextTick();
   if (collapsingGroups.value.get(groupId) !== token) return;
   const container = stepsWrapperRefs.get(groupId)?.parentElement;
-  const transitions = container?.getAnimations().filter(
-    (animation) => 'transitionProperty' in animation && animation.transitionProperty === 'grid-template-rows'
-  ) || [];
+  const transitions =
+    container
+      ?.getAnimations()
+      .filter(
+        (animation) =>
+          'transitionProperty' in animation && animation.transitionProperty === 'grid-template-rows'
+      ) || [];
   await Promise.allSettled(transitions.map((animation) => animation.finished));
   if (collapsingGroups.value.get(groupId) !== token) return;
   collapsingGroups.value.delete(groupId);
@@ -880,7 +889,12 @@ const getToolName = (action: Action) => {
   return getToolStateText(tool) || tool.name || t('chat.runTool');
 };
 
-const registerThinking = (groupId: string, key: string, el: Element | null, streaming?: boolean) => {
+const registerThinking = (
+  groupId: string,
+  key: string,
+  el: Element | null,
+  streaming?: boolean
+) => {
   if (el instanceof HTMLElement && expandedGroups.value.has(groupId)) {
     if (thinkingRefs.get(key) === el) return;
     thinkingRefs.set(key, el);

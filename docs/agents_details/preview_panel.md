@@ -12,7 +12,7 @@
 
 ### 16.1 检测与存储
 
-- **检测模块唯一权威**：`modules/preview_targets.py`。**两类捕获源**（2026-09-29 简化，原为三类）：
+- **检测实现**：Rust 使用 `backend-rust/src/runtime/preview_tracking.rs`，旧版 Python 使用 `modules/preview_targets.py`。**两类捕获源**（2026-09-29 简化，原为三类）：
   1. `write_file`/`edit_file` 的 `.html`/`.htm` 文件（挂钩 `tools_execution._record_edited_file`）
   2. 模型流式输出的 localhost/127.0.0.1/[::1] 链接（`chat_flow_stream_loop` 滚动缓冲 120 字符增量扫描，防 URL 跨 chunk 断裂；每次回复内去重）
   - **run_command/terminal_input/terminal_snapshot 输出检测已删除**（2026-09-29 用户拍板）：实测命令输出是脏数据主来源（浏览器控制台 `@ url:行号` 后缀、代码模板 `f"http://127.0.0.1:{port}/"` 假地址），且放行条件「输出非空」几乎恒真形同虚设；服务器地址改由 prompt（`prompts/preview_panel.txt`）要求模型在回复中主动写出完整 URL

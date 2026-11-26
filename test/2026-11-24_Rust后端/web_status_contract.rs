@@ -378,7 +378,7 @@ async fn conversation_bootstrap_projects_disk_data_and_workspace_scope() {
     .await;
     assert_eq!(
         metadata["data"],
-        json!({"id":ID,"workspace_id":WORKSPACE,"title":"Existing Host chat","title_locked":true})
+        json!({"id":ID,"workspace_id":WORKSPACE,"title":"Existing Host chat","title_locked":true,"title_pending":false})
     );
     let response = fixture
         .request(

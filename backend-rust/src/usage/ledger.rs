@@ -108,6 +108,18 @@ impl Ledger {
         entry: &CostEntry,
         timing: &RequestTiming,
     ) -> io::Result<bool> {
+        self.record_request_with_actor(conversation_id,request_id,actor,entry,timing)
+            .map(|actor|actor.is_some())
+    }
+
+    pub(crate) fn record_request_with_actor(
+        &self,
+        conversation_id: &str,
+        request_id: &str,
+        actor: &Actor<'_>,
+        entry: &CostEntry,
+        timing: &RequestTiming,
+    ) -> io::Result<Option<Value>> {
         let path = self.path(conversation_id)?;
         if request_id.is_empty() || actor.id.is_empty() || actor.kind.is_empty() {
             return Err(io::Error::new(
@@ -119,7 +131,7 @@ impl Ledger {
         let _lock = exclusive_lock(&self.directory.join(".usage-ledger.lock"))?;
         let mut ledger = read_ledger(&path)?;
         if ledger.requests.contains_key(request_id) {
-            return Ok(false);
+            return Ok(None);
         }
         let stats = ledger.actors.entry(actor.id).or_insert_with(|| json!({
             "id": actor.id, "name": actor.name, "kind": actor.kind, "cost_usd": "0",
@@ -129,6 +141,7 @@ impl Ledger {
             "local_requests": 0, "subscription_requests": 0, "historical_unpriced": actor.historical_unpriced,
         }));
         update_actor(stats, actor.name, entry)?;
+        let committed = stats.clone();
         #[derive(Serialize)]
         struct Request<'a> {
             actor_id: &'a str,
@@ -148,7 +161,7 @@ impl Ledger {
             })?,
         );
         atomic_json(&path, &ledger)?;
-        Ok(true)
+        Ok(Some(committed))
     }
 
     pub fn actor_statistics(

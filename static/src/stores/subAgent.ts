@@ -74,7 +74,7 @@ export const useSubAgentStore = defineStore('subAgent', {
   }),
   getters: {
     activityEntries(state): SubAgentActivityEntry[] {
-      const entries = state.historyPage?.entries ?? state.livePages.flatMap(page => page.entries);
+      const entries = state.historyPage?.entries ?? state.livePages.flatMap((page) => page.entries);
       // 防御性上界：任何仍未按页裁剪的旧返回也不能把 20 万条直接交给模板渲染。
       return entries.length > VISIBLE_ENTRY_LIMIT ? entries.slice(-VISIBLE_ENTRY_LIMIT) : entries;
     },
@@ -172,8 +172,12 @@ export const useSubAgentStore = defineStore('subAgent', {
       const controller = new AbortController();
       activityRequests.set(this, controller);
       const owns = beginAuxiliaryStoreRequest(this, 'sub-activity', undefined, selected);
-      const cursor = direction === 'older' ? this.activityStart
-        : direction === 'newer' ? this.historyPage!.end : this.liveOffset;
+      const cursor =
+        direction === 'older'
+          ? this.activityStart
+          : direction === 'newer'
+            ? this.historyPage!.end
+            : this.liveOffset;
       this.activityLoading = true;
       let delay = 2000;
       try {
@@ -183,10 +187,14 @@ export const useSubAgentStore = defineStore('subAgent', {
         const params = new URLSearchParams();
         if (convId) params.set('conversation_id', convId);
         params.set('limit', String(PAGE_SIZE));
-        if (cursor !== null) params.set(direction === 'older' ? 'before' : 'offset', String(cursor));
-        const resp = await fetch(`/api/sub_agents/${encodeURIComponent(taskId)}/activity?${params}`, {
-          signal: controller.signal
-        });
+        if (cursor !== null)
+          params.set(direction === 'older' ? 'before' : 'offset', String(cursor));
+        const resp = await fetch(
+          `/api/sub_agents/${encodeURIComponent(taskId)}/activity?${params}`,
+          {
+            signal: controller.signal
+          }
+        );
         if (!resp.ok) {
           throw new Error(await resp.text());
         }
@@ -200,9 +208,7 @@ export const useSubAgentStore = defineStore('subAgent', {
           // 游标仍会按 limit 返回尾部页，因此每次实时轮询都用尾部页替换而不是追加，
           // 避免同一批旧数据每 2 秒重复堆进 livePages。
           const legacyPayload = !Object.prototype.hasOwnProperty.call(data.data, 'start_offset');
-          const start = Number(
-            data.data.start_offset ?? (legacyPayload ? 0 : cursor ?? 0)
-          );
+          const start = Number(data.data.start_offset ?? (legacyPayload ? 0 : (cursor ?? 0)));
           // 单页响应一律只保留尾部 PAGE_SIZE 条。新后端按 200 分页时等价于原数组；
           // 旧后端/异常返回一次给出 20 万条时，只保留最新 200 条，DOM 不再无界。
           const entries = received.length > PAGE_SIZE ? received.slice(-PAGE_SIZE) : received;
@@ -221,8 +227,8 @@ export const useSubAgentStore = defineStore('subAgent', {
             }
             this.liveOffset = end;
           } else {
-            this.historyPage = direction === 'newer' && end >= (this.liveOffset ?? end)
-              ? null : { ...page, end };
+            this.historyPage =
+              direction === 'newer' && end >= (this.liveOffset ?? end) ? null : { ...page, end };
           }
           this.activityError = null;
           if (direction === 'live' && data.data.has_more_after && end > (cursor ?? 0)) delay = 0;

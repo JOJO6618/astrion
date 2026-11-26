@@ -21,6 +21,7 @@ const EFFORTS: [&str; 5] = ["low", "medium", "high", "xhigh", "max"];
 
 #[derive(Clone, Default)]
 pub(super) struct ChatTasks {
+    admission: Arc<Mutex<()>>,
     operations: Arc<Mutex<HashMap<String, String>>>,
 }
 
@@ -44,6 +45,7 @@ struct BeginInfo {
     turn_id: String,
     title: String,
     revision: u64,
+    title_pending: bool,
 }
 
 impl ChatMode {
@@ -51,6 +53,7 @@ impl ChatMode {
     /// task payload; the caller can poll `/api/chat/tasks/<id>`.
     pub(super) fn create_task(&self, payload: &Value) -> Result<Value, ChatError> {
         let operation = validate_payload(payload)?;
+        let admission = self.tasks.admission.lock().map_err(ChatError::storage)?;
         let timestamp_now = now();
         if let Some(conversation) = operation.conversation_hint.as_deref()
             && let Some(task_id) = self.tasks.operation(conversation, &operation.id)
@@ -63,6 +66,12 @@ impl ChatMode {
 
         let effective = super::settings::apply_new_conversation_defaults(self, payload)?;
         let payload = &effective;
+        let mut media = Vec::new();
+        for (field, kind) in [("images", "image"), ("videos", "video")] {
+            if let Some(values) = payload.get(field).filter(|value| !value.is_null()) {
+                media.extend(super::media::resolve_typed_refs(&self.root, values, Some(kind))?);
+            }
+        }
         let plan = self.preflight(payload, &operation, timestamp_now)?;
         let model = super::model::resolve(
             &self.model,
@@ -70,8 +79,12 @@ impl ChatMode {
             plan.thinking,
             plan.reasoning_effort.as_deref(),
             &operation.id,
-        )?
-        .with_session(&plan.conversation_id, plan.chatgpt_fast_mode);
+        )?;
+        if media.iter().any(|entry| entry["kind"] == "image") && !model.supports_images()
+            || media.iter().any(|entry| entry["kind"] == "video") && !model.supports_videos()
+        {
+            return Err(ChatError::bad_request("The selected Chat model does not support this media type"));
+        }
         let handle = tokio::runtime::Handle::try_current()
             .map_err(|_| ChatError::unavailable("No Tokio runtime is available"))?;
 
@@ -83,7 +96,7 @@ impl ChatMode {
             created_at: timestamp_now,
         })?;
 
-        let begin = match self.begin(payload, &operation, &plan, timestamp_now) {
+        let begin = match self.begin(payload, &operation, &plan, timestamp_now, media) {
             Ok(begin) => begin,
             Err(error) => {
                 let _ = self.runtime.finish_chat_task(
@@ -97,12 +110,17 @@ impl ChatMode {
 
         self.tasks
             .set_operation(&plan.conversation_id, &operation.id, &task_id);
+        drop(admission);
         let mode = self.clone();
         let conversation_id = plan.conversation_id.clone();
         let turn_id = begin.turn_id.clone();
         let title = begin.title.clone();
         let op_key = operation.id.clone();
         let message = payload["message"].as_str().unwrap_or_default().to_owned();
+        let model = self.runtime.with_conversation_session(model, "", &conversation_id, plan.chatgpt_fast_mode);
+        if begin.title_pending {
+            self.runtime.spawn_automatic_title("", &conversation_id, &title, &message);
+        }
         let worker_task_id = task_id.clone();
         handle.spawn(async move {
             mode.run_worker(
@@ -171,7 +189,7 @@ impl ChatMode {
         }
         self.storage(|paths| {
             if let Some(id) = requested {
-                let raw = paths.read_raw(id)?;
+                let (raw, _) = paths.read_header(id)?;
                 if raw["metadata"]["chat"]["commands"]
                     .get(&operation.id)
                     .is_some()
@@ -239,6 +257,7 @@ impl ChatMode {
         operation: &Operation,
         plan: &Plan,
         timestamp_now: f64,
+        media: Vec<Value>,
     ) -> Result<BeginInfo, ChatError> {
         let configured = configured(payload);
         let parent_id = payload["parent_id"].as_str().filter(|id| !id.is_empty());
@@ -262,7 +281,7 @@ impl ChatMode {
                     "role": "user",
                     "content": message,
                     "message_id": format!("msg_{}", Uuid::new_v4().simple()),
-                    "media_refs": [],
+                    "media_refs": media,
                     "metadata": {"visibility":"chat","starts_work":true},
                 }),
             },
@@ -272,62 +291,33 @@ impl ChatMode {
                 ));
             }
         };
-        let created = plan.created;
         let result = self.storage(|paths| {
-            let mut created_file = false;
-            if created {
-                let document = paths.initial_document(&plan.conversation_id, timestamp_now, payload)?;
-                paths.create(&plan.conversation_id, document)?;
-                created_file = true;
-            }
-            let outcome = (|| {
-                let raw = paths.read_raw(&plan.conversation_id)?;
-                if let Some(active) = tree::active_turn(&raw).map(str::to_owned) {
-                    // A previous worker retired without finishing; retire the turn
-                    // before this new admission owns the conversation.
-                    tree::recover(
-                        paths,
-                        &plan.conversation_id,
-                        &active,
-                        "failed",
-                        timestamp_now,
-                    )?;
+            let initial = if plan.created {
+                Some(paths.initial_document(&plan.conversation_id, timestamp_now, payload)?)
+            } else {
+                let (header, count) = paths.read_header(&plan.conversation_id)?;
+                if let Some(active) = tree::active_turn(&header) {
+                    // Retire stale work before this admission takes ownership.
+                    tree::recover(paths, &plan.conversation_id, active, "failed", timestamp_now)?;
                 }
-                let raw = paths.read_raw(&plan.conversation_id)?;
-                let has_messages = raw["messages"].as_array().is_some_and(|m| !m.is_empty());
-                if has_messages
-                    && parent_id.is_none()
-                    && regenerate.is_none()
-                    && edit_message.is_none()
-                {
-                    return Err(ChatError::bad_request(
-                        "Continuing a Chat requires an explicit parent message",
-                    ));
+                if count != 0 && parent_id.is_none() && regenerate.is_none() && edit_message.is_none() {
+                    return Err(ChatError::bad_request("Continuing a Chat requires an explicit parent message"));
                 }
-                let receipt = tree::begin(
-                    paths,
-                    &plan.conversation_id,
-                    &operation.id,
-                    selection,
-                    false,
-                    None,
-                    presentation,
-                    &configured,
-                    timestamp_now,
-                )?;
-                let title = paths
-                    .read_raw(&plan.conversation_id)?
-                    .get("title")
-                    .cloned()
-                    .unwrap_or(Value::Null);
-                Ok(json!({"receipt": receipt, "title": title}))
-            })();
-            if outcome.is_err() && created_file {
-                let _ = paths.delete(&plan.conversation_id);
-            }
-            outcome
+                None
+            };
+            let receipt = tree::begin(
+                paths, &plan.conversation_id, &operation.id, selection, initial, None, presentation,
+                &configured, timestamp_now,
+            )?;
+            let (header, count) = paths.read_header(&plan.conversation_id)?;
+            let title_pending = count == 1 && parent_id.is_none() && regenerate.is_none() && edit_message.is_none()
+                && header["metadata"]["chat"]["turns"].as_array().is_some_and(|turns| {
+                    turns.len() == 1 && turns[0]["id"] == receipt["value"]["id"]
+                })
+                && crate::runtime::automatic_title::eligible(&header).is_some();
+            Ok((receipt, header["title"].as_str().unwrap_or("新对话").to_owned(), title_pending))
         })?;
-        let receipt = &result["receipt"];
+        let (receipt, title, title_pending) = result;
         let turn = receipt["value"]
             .as_object()
             .ok_or_else(|| ChatError::storage("Chat begin receipt is incomplete"))?;
@@ -336,8 +326,9 @@ impl ChatMode {
                 .as_str()
                 .ok_or_else(|| ChatError::storage("Chat begin receipt is incomplete"))?
                 .to_owned(),
-            title: result["title"].as_str().unwrap_or("新对话").to_owned(),
+            title,
             revision: receipt["revision"].as_u64().unwrap_or_default(),
+            title_pending,
         })
     }
 
@@ -352,17 +343,23 @@ impl ChatMode {
         mut cancel: oneshot::Receiver<()>,
     ) {
         let pending = Arc::new(Mutex::new(String::new()));
+        let thinking = crate::runtime::thinking_auxiliary::ThinkingWork::for_task(&self.runtime, &task_id, &model);
         let outcome = tokio::select! {
             biased;
             _ = &mut cancel => Outcome::stopped(),
-            result = self.model_loop(
+            result = async {
+                let result = self.model_loop(
                 &task_id,
                 &conversation_id,
                 &turn_id,
                 &model,
                 message,
                 pending.clone(),
-            ) => result,
+                thinking.as_ref(),
+                ).await;
+                if result.status == "succeeded" && let Some(thinking) = &thinking { thinking.finish().await; }
+                result
+            } => result,
         };
 
         if outcome.status == "stopped" {
@@ -402,7 +399,10 @@ impl ChatMode {
         model: &ModelConfig,
         _message: String,
         pending: Arc<Mutex<String>>,
+        work: Option<&crate::runtime::thinking_auxiliary::ThinkingWork>,
     ) -> Outcome {
+        use crate::model::{RoundBudget, StreamDelta};
+
         if let Err(error) = self
             .storage(|paths| tree::consume_network_notices(paths, conversation_id, turn_id, now()))
         {
@@ -421,6 +421,7 @@ impl ChatMode {
             .collect();
 
         for round in 0..MAX_MODEL_ROUNDS {
+            let response_message_id = format!("msg_{}", Uuid::new_v4().simple());
             if !self.emit(task_id, "api_request_start", json!({"attempt":1,"max_attempts":1})) {
                 return Outcome::stopped();
             }
@@ -429,14 +430,22 @@ impl ChatMode {
                 text.clear();
             }
             let mut started = false;
+            let mut thinking = crate::runtime::thinking::ThinkingStream::new(&self.runtime, task_id, &response_message_id, work);
             let mut completion = match model
-                .complete(&messages, &tools, |delta| {
+                .complete_with_updates(&messages, &tools, &mut RoundBudget::default(), |update| {
+                    let delta = match update {
+                        StreamDelta::Thinking(delta) => { let _ = thinking.push(delta); return; }
+                        StreamDelta::NativeSummary(summary) => { thinking.native_summary(summary); return; }
+                        StreamDelta::Usage(_) => return,
+                        StreamDelta::Text(delta) => delta,
+                    };
+                    let _ = thinking.end();
                     if let Ok(mut text) = pending_text.lock() {
                         text.push_str(delta);
                     }
                     if !started {
                         started = true;
-                        let _ = self.emit(task_id, "text_start", json!({}));
+                        let _ = self.emit(task_id, "text_start", json!({"response_message_id":response_message_id}));
                     }
                     let _ = self.emit(task_id, "text_chunk", json!({"content":delta}));
                 })
@@ -451,6 +460,7 @@ impl ChatMode {
                     return Outcome::failed(error);
                 }
             };
+            if thinking.end().is_err() { return Outcome::stopped(); }
             crate::tools::web::annotate(&mut completion.message, &messages);
             if started {
                 let content = completion.message["content"].as_str().unwrap_or_default();
@@ -462,29 +472,17 @@ impl ChatMode {
                     return Outcome::stopped();
                 }
             }
-            if let Some(usage) = &completion.usage
-                && let Some(stats) = usage_statistics(usage)
-                && let Err(error) = self.store_assistant(
-                    conversation_id,
-                    turn_id,
-                    assistant_message(&completion.message, model.key()),
-                    Some(&stats),
-                )
-            {
-                return Outcome::failed(error.message);
-            } else if completion.usage.is_none()
-                && let Err(error) = self.store_assistant(
-                    conversation_id,
-                    turn_id,
-                    assistant_message(&completion.message, model.key()),
-                    None,
-                )
-            {
+            let stats = completion.usage.as_ref().and_then(usage_statistics);
+            if let Err(error) = self.store_assistant(
+                conversation_id, turn_id, assistant_message(&completion.message, model.key(), &response_message_id), stats.as_ref(),
+            ) {
                 return Outcome::failed(error.message);
             }
-            if let Some(usage) = &completion.usage
-                && let Some(stats) = usage_statistics(usage)
-            {
+            thinking.keep();
+            if let Ok(mut text) = pending.lock() {
+                text.clear();
+            }
+            if let Some(stats) = stats {
                 let _ = self.emit(task_id, "token_update", stats);
             }
 
@@ -549,21 +547,16 @@ impl ChatMode {
         conversation_id: &str,
         turn_id: &str,
     ) -> Result<(Vec<Value>, bool), ChatError> {
-        self.storage(|paths| {
-            let document = paths.read_document(conversation_id)?;
-            let raw = document.raw();
-            let mut messages = document.chat_turn_history(turn_id)?;
-            if messages
-                .first()
-                .is_none_or(|message| message["role"] != "system")
-            {
-                messages.insert(0, json!({
-                    "role": "system",
-                    "content": self.system_prompt(raw)?,
-                }));
-            }
-            Ok((messages, raw["metadata"]["network_enabled"] == true))
-        })
+        let document = self.storage(|paths| paths.read_document(conversation_id))?;
+        let raw = document.raw();
+        let mut messages = document.chat_turn_history_with_media(turn_id, &self.root)?;
+        if messages.first().is_none_or(|message| message["role"] != "system") {
+            messages.insert(0, json!({
+                "role": "system",
+                "content": self.system_prompt(raw)?,
+            }));
+        }
+        Ok((messages, raw["metadata"]["network_enabled"] == true))
     }
 
     pub(super) fn system_prompt(&self, raw: &Value) -> Result<String, ChatError> {
@@ -647,15 +640,9 @@ impl ChatMode {
         _assistant_id: String,
         messages: Vec<Value>,
     ) -> Result<(), ChatError> {
-        // Python persists one command per message, keyed by message_id. Keep
-        // individual receipts rather than inventing a batch operation ID.
-        for message in messages {
-            self.storage(|paths| {
-                tree::append(paths, conversation_id, turn_id, message.clone(), now(), None)
-                    .map(|_| ())
-            })?;
-        }
-        Ok(())
+        self.storage(|paths| {
+            tree::append_batch(paths, conversation_id, turn_id, messages, now(), |_| {})
+        })
     }
 
     fn append_partial(
@@ -697,17 +684,13 @@ fn validate_payload(payload: &Value) -> Result<Operation, ChatError> {
     if payload["files"].as_array().is_some_and(|files| !files.is_empty()) {
         return Err(ChatError::bad_request("Chat does not accept files"));
     }
-    for field in ["images", "videos"] {
-        if payload[field].as_array().is_some_and(|items| !items.is_empty()) {
-            return Err(ChatError::bad_request(format!(
-                "{field} are not supported by this Rust Chat runtime yet"
-            )));
-        }
-    }
+    let has_media = ["images", "videos"].into_iter().any(|field| {
+        payload[field].as_array().is_some_and(|items| !items.is_empty())
+    });
     let regenerate = payload["regenerate_turn_id"]
         .as_str()
         .filter(|value| !value.is_empty());
-    if message.trim().is_empty() && regenerate.is_none() && payload["edit_message_id"].is_null() {
+    if message.trim().is_empty() && !has_media && regenerate.is_none() && payload["edit_message_id"].is_null() {
         return Err(ChatError::bad_request("Enter a message or select media"));
     }
     if let Some(thinking) = payload.get("thinking_mode")
@@ -827,9 +810,9 @@ pub(super) fn validated_calls(
         .collect()
 }
 
-fn assistant_message(message: &Value, model_key: &str) -> Value {
+fn assistant_message(message: &Value, model_key: &str, response_message_id: &str) -> Value {
     let mut stored = json!({
-        "message_id": format!("msg_{}", Uuid::new_v4().simple()),
+        "message_id": response_message_id,
         "role": "assistant",
         "content": message["content"].as_str().unwrap_or_default(),
         "metadata": {"model_key": model_key},
@@ -846,6 +829,9 @@ fn assistant_message(message: &Value, model_key: &str) -> Value {
         && !reasoning.is_empty()
     {
         stored["reasoning_content"] = json!(reasoning);
+    }
+    for field in ["_responses_connection", "responses_reasoning_items"] {
+        if let Some(value) = message.get(field) { stored["metadata"][field] = value.clone(); }
     }
     stored
 }

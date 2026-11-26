@@ -1,38 +1,71 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, writeFileSync, statSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
-import { readFileSync } from 'node:fs';
+import { stageRustBackend } from '../../desktop/scripts/prepare_rust_backend.mjs';
 
 const buildId = createRequire(import.meta.url)('../build/build-id.cjs');
 
 const desktop = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const root = path.dirname(desktop);
 const options = new Set(process.argv.slice(2));
-if (process.platform !== 'win32') throw new Error('Windows application builds require the Windows native toolchain.');
+if (process.platform !== 'win32' || process.arch !== 'x64') throw new Error('Windows application builds require native x64 Windows.');
+for (const option of options) {
+  if (!['--dir', '--skip-frontend', '--skip-native'].includes(option)) throw new Error(`Unknown build option: ${option}`);
+}
 const output = path.join(root, 'output/windows-electron');
 mkdirSync(output, { recursive: true });
+const receiptPath = path.join(output, 'build-receipt.json');
+rmSync(receiptPath, { force: true });
 const env = { ...process.env, ASTRION_BUILD_ID: buildId, PYTHONUTF8: '1', ELECTRON_MIRROR: 'https://npmmirror.com/mirrors/electron/' };
 const node = process.execPath;
 function run(command, args, cwd = desktop) {
   console.info(`[windows-build] ${path.basename(command)} ${args.join(' ')}`);
   execFileSync(command, args, { cwd, env, stdio: 'inherit', windowsHide: true });
 }
-if (!options.has('--skip-frontend')) {
+if (!options.has('--skip-frontend') && !env.ASTRION_RUST_STATIC_ROOT) {
   // npm.cmd requires cmd.exe; do not interpolate paths or user content into a shell string.
   run(process.env.ComSpec || 'C:\\Windows\\System32\\cmd.exe', ['/d', '/s', '/c', 'npm run build --silent'], root);
 }
 if (!options.has('--skip-native')) run(node, [path.join(desktop, 'scripts/build_quick_native.mjs')]);
-const python = path.join(root, 'desktop/src-tauri/runtime/python/python.exe');
-if (!existsSync(python)) throw new Error('Bundled Windows Python is missing.');
-run(python, [path.join(root, 'desktop/scripts/prepare_backend.py')], root);
+
+// The interpreter belongs to the existing private Chrome import worker.
+const chromePython = path.join(root, 'desktop/src-tauri/runtime/python/python.exe');
+if (!existsSync(chromePython)) throw new Error('The private Windows Chrome import interpreter is missing.');
+run(chromePython, ['-I', '-B', '-c', 'from cryptography.hazmat.primitives.ciphers.aead import AESGCM']);
+copyFileSync(chromePython, path.join(path.dirname(chromePython), 'astrion-backend.exe'));
+
+const target = 'x86_64-pc-windows-msvc';
+const cargoTarget = path.resolve(root, env.ASTRION_RUST_CARGO_TARGET_DIR || 'desktop-electron/.cache/windows-rust-target');
+if (!env.ASTRION_RUST_BACKEND_BIN) {
+  const installedCargo = path.join(env.USERPROFILE || '', '.cargo/bin/cargo.exe');
+  run(existsSync(installedCargo) ? installedCargo : 'cargo', [
+    'build', '--locked', '--release', '--manifest-path', 'backend-rust/Cargo.toml',
+    '--target', target, '--target-dir', cargoTarget
+  ], root);
+}
+const runtime = path.join(desktop, '.cache/windows-rust-backend');
+rmSync(runtime, { recursive: true, force: true });
+mkdirSync(path.dirname(runtime), { recursive: true });
+stageRustBackend({
+  binary: env.ASTRION_RUST_BACKEND_BIN || path.join(cargoTarget, target, 'release/astrion-headless.exe'),
+  staticRoot: env.ASTRION_RUST_STATIC_ROOT || path.join(root, 'static'),
+  destination: runtime,
+  executable: 'astrion-headless.exe'
+});
 const builder = path.join(desktop, 'node_modules/electron-builder/cli.js');
 run(node, [builder, '--config', 'electron-builder.win.cjs', '--win', '--x64', '--publish', 'never',
   ...(options.has('--dir') ? ['--dir'] : [])]);
 const executable = path.join(output, 'build/win-unpacked/astrion-desktop.exe');
-if (!existsSync(executable)) throw new Error('Windows executable was not produced.');
+const resources = path.join(path.dirname(executable), 'resources');
+const backend = path.join(resources, 'runtime/rust/astrion-headless.exe');
+for (const file of [executable, backend, path.join(resources, 'runtime/rust/scripts/setup-wsl-sandbox.ps1'),
+  path.join(resources, 'runtime/rust/static/dist/.vite/manifest.json'), path.join(resources, 'astrion-windows-helper.exe')]) {
+  if (!statSync(file).isFile()) throw new Error(`Required Windows package file is missing: ${file}`);
+}
+if (existsSync(path.join(resources, 'runtime/backend'))) throw new Error('Unexpected legacy Python Host backend in the Windows package.');
 const release = JSON.parse(readFileSync(path.join(desktop, 'windows-release.json'), 'utf8'));
 const receipt = {
   version: release.version,
@@ -41,8 +74,12 @@ const receipt = {
   executable: path.relative(root, executable),
   executable_bytes: statSync(executable).size,
   executable_sha256: createHash('sha256').update(readFileSync(executable)).digest('hex'),
+  backend: 'rust',
+  backend_executable: path.relative(root, backend),
+  backend_bytes: statSync(backend).size,
+  backend_sha256: createHash('sha256').update(readFileSync(backend)).digest('hex'),
   built_at: new Date().toISOString(),
   runtime_verified: false
 };
-writeFileSync(path.join(output, 'build-receipt.json'), JSON.stringify(receipt, null, 2) + '\n');
+writeFileSync(receiptPath, JSON.stringify(receipt, null, 2) + '\n');
 console.info('[windows-build] Build produced; run packaged smoke tests before claiming it is verified.');

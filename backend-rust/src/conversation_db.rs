@@ -6,7 +6,10 @@ use std::{collections::{BTreeMap,HashSet}, fs, io, path::Path,time::Duration};
 use std::os::unix::fs::{DirBuilderExt,OpenOptionsExt};
 type Inner<T> = Result<T,Box<dyn std::error::Error>>;
 pub mod migration;
+pub(crate) mod chat_delta;
+pub(crate) mod checkpoint_versions;
 mod shallow;
+mod title;
 pub mod reviews;
 fn private_connection(dir:&Path,filename:&str)->Inner<Connection>{
         let mut builder=fs::DirBuilder::new();
@@ -37,21 +40,30 @@ impl Database {
     fn connect(dir:&Path)->Inner<Self>{
         let mut conn=private_connection(dir,FILENAME)?;
         let version:i64=conn.query_row("PRAGMA user_version",[],|r|r.get(0))?;
-        if version != 2 {
+        if version != 3 {
             let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
             let current: i64 = tx.query_row("PRAGMA user_version", [], |row| row.get(0))?;
             match current {
                 0 => {
                     tx.execute_batch(include_str!("conversation_db/schema.sql"))?;
                     tx.execute_batch(include_str!("conversation_db/media_indexes.sql"))?;
+                    tx.execute_batch(include_str!("conversation_db/checkpoint_versions.sql"))?;
                 }
-                1 => tx.execute_batch(include_str!("conversation_db/media_indexes.sql"))?,
-                2 => (),
+                1 => {
+                    tx.execute_batch(include_str!("conversation_db/media_indexes.sql"))?;
+                    tx.execute_batch(include_str!("conversation_db/checkpoint_versions.sql"))?;
+                }
+                2 => tx.execute_batch(include_str!("conversation_db/checkpoint_versions.sql"))?,
+                3 => (),
                 _ => return Err(format!("Unsupported conversation database version {current}").into()),
             }
             tx.commit()?;
         }
         Ok(Self{conn})
+    }
+    /// This value is comparable only while this same SQLite connection stays open.
+    pub(crate) fn data_version(&self)->Result<i64,String>{
+        self.conn.query_row("PRAGMA data_version",[],|row|row.get(0)).map_err(error)
     }
     pub fn contains(&self,id:&str)->Result<bool,String>{exists(&self.conn,id).map_err(error)}
     pub fn imported(&self,id:&str)->Result<bool,String>{
@@ -70,6 +82,11 @@ impl Database {
     pub fn summary(&self,id:&str)->Result<Option<Value>,String>{
         self.conn.query_row("SELECT summary FROM conversations WHERE id=?",[id],|r|r.get::<_,String>(0)).optional().map_err(error)?
         .map(|v|serde_json::from_str(&v)).transpose().map_err(error)
+    }
+    /// Rows already stored, and legacy sources retained after migration or deletion.
+    pub(crate) fn known_ids(&self) -> Result<HashSet<String>,String> {
+        let mut query=self.conn.prepare("SELECT id FROM conversations UNION SELECT id FROM legacy_imports").map_err(error)?;
+        query.query_map([], |r|r.get(0)).map_err(error)?.collect::<Result<_,_>>().map_err(error)
     }
     pub fn rows(&self)->Result<Vec<Value>,String>{
         let mut st=self.conn.prepare("SELECT id,summary FROM conversations ORDER BY id").map_err(error)?;
@@ -120,6 +137,21 @@ impl Database {
         }
         tx.execute("INSERT INTO fields VALUES(?,?,?,?) ON CONFLICT(conversation,scope,key) DO UPDATE SET value=excluded.value WHERE fields.value<>excluded.value",
             params![id, scope, key, value.to_string()]).map_err(error)?;
+        tx.commit().map_err(error)
+    }
+    pub(crate) fn replace_metadata_fields(
+        &mut self, id: &str, before: &Map<String, Value>, after: &Map<String, Value>,
+    ) -> Result<(), String> {
+        let tx = self.conn.transaction_with_behavior(TransactionBehavior::Immediate).map_err(error)?;
+        if !exists(&tx,id).map_err(error)? { return Err("Conversation not found".into()); }
+        tx.execute("INSERT INTO fields VALUES(?,'root','metadata','{}') ON CONFLICT(conversation,scope,key) DO UPDATE SET value='{}' WHERE fields.value<>'{}'", [id]).map_err(error)?;
+        for key in before.keys().filter(|key| !after.contains_key(*key)) {
+            tx.execute("DELETE FROM fields WHERE conversation=? AND scope='metadata' AND key=?", params![id, key]).map_err(error)?;
+        }
+        for (key, value) in after.iter().filter(|(key, value)| before.get(*key) != Some(*value)) {
+            tx.execute("INSERT INTO fields VALUES(?,'metadata',?,?) ON CONFLICT(conversation,scope,key) DO UPDATE SET value=excluded.value",
+                params![id, key, value.to_string()]).map_err(error)?;
+        }
         tx.commit().map_err(error)
     }
     pub fn delete(&mut self,id:&str)->Result<bool,String>{

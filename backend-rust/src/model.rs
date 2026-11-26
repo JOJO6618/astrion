@@ -15,6 +15,7 @@ mod budget;
 pub mod codex;
 
 pub use crate::chat::RequestOptions;
+pub(crate) use crate::chat::StreamDelta;
 pub(crate) use budget::RoundBudget;
 
 const REASONING_ITEMS: &str = "responses_reasoning_items";
@@ -49,16 +50,25 @@ pub async fn complete_with_options(
     messages: &[Value],
     tools: &[Value],
     options: &RequestOptions,
-    on_text: impl FnMut(&str),
+    mut on_text: impl FnMut(&str),
+) -> Result<Completion, String> {
+    complete_with_updates(endpoint, api_key, model, messages, tools, options, |delta| {
+        if let StreamDelta::Text(text) = delta { on_text(text); }
+    }).await
+}
+
+pub(crate) async fn complete_with_updates(
+    endpoint: &str, api_key: Option<&str>, model: &str, messages: &[Value], tools: &[Value],
+    options: &RequestOptions, on_delta: impl FnMut(StreamDelta<'_>),
 ) -> Result<Completion, String> {
     if let Ok(mut url) = Url::parse(endpoint)
         && url.path().trim_end_matches('/').rsplit('/').next() == Some("responses")
     {
         url.set_fragment(None);
-        return complete_responses(&url, api_key, model, messages, tools, options, on_text).await;
+        return complete_responses(&url, api_key, model, messages, tools, options, on_delta).await;
     }
     let history = chat_history(messages);
-    chat::complete_with_options(endpoint, api_key, model, &history, tools, options, on_text).await
+    chat::complete_with_updates(endpoint, api_key, model, &history, tools, options, on_delta).await
 }
 
 async fn complete_responses(
@@ -68,7 +78,7 @@ async fn complete_responses(
     messages: &[Value],
     tools: &[Value],
     options: &RequestOptions,
-    on_text: impl FnMut(&str),
+    on_delta: impl FnMut(StreamDelta<'_>),
 ) -> Result<Completion, String> {
     let headers = chat::request_headers(&options.headers)?;
     let connection = responses_connection(endpoint, api_key, &headers);
@@ -86,20 +96,19 @@ async fn complete_responses(
     let mut body = build_responses_body(request);
     chat::apply_extra_params(&mut body, &options.extra_params);
     let response = chat::post_sse(endpoint.as_str(), api_key, &body, "Responses", headers).await?;
-    collect_responses(response, tools, connection, on_text).await
+    collect_responses(response, tools, connection, on_delta).await
 }
 
 async fn collect_responses(
     response: reqwest::Response,
     tools: &[Value],
     connection: String,
-    mut on_text: impl FnMut(&str),
+    mut on_delta: impl FnMut(StreamDelta<'_>),
 ) -> Result<Completion, String> {
     let mut stream = response.bytes_stream();
     let mut decoder = Decoder::default();
     let mut parser = ResponsesSseParser::new(tool_required_map(tools));
     let mut assistant = Assistant::default();
-    let mut reasoning_text = String::new();
     let mut responses_duration_ms = None;
     let mut on_event = |event: &str, data: &str| {
         let chunks = parser.push_data(data).map_err(responses_error)?;
@@ -110,13 +119,12 @@ async fn collect_responses(
             ));
         }
         for chunk in chunks {
-            if let Some(text) = chunk["choices"][0]["delta"]["reasoning_content"].as_str() {
-                reasoning_text.push_str(text);
-            }
             if let Some(duration) = chunk["_response_output_timing"]["duration_ms"].as_u64() {
                 responses_duration_ms = Some(duration);
             }
-            assistant.push_value(chunk, &mut on_text)?;
+            let summary = chunk["_reasoning_summary"].as_str().map(str::to_owned);
+            assistant.push_value(chunk, &mut on_delta)?;
+            if let Some(summary) = summary { on_delta(StreamDelta::NativeSummary(&summary)); }
         }
         Ok(parser.is_completed())
     };
@@ -136,14 +144,11 @@ async fn collect_responses(
 
     let mut completion = assistant.finish()?;
     completion.responses_duration_ms = responses_duration_ms;
-    if !parser.reasoning_items().is_empty() || !reasoning_text.is_empty() {
+    if !parser.reasoning_items().is_empty() || completion.message["reasoning_content"].is_string() {
         completion.message[REASONING_CONNECTION] = Value::String(connection);
     }
     if !parser.reasoning_items().is_empty() {
         completion.message[REASONING_ITEMS] = json!(parser.reasoning_items());
-    }
-    if !reasoning_text.is_empty() {
-        completion.message["reasoning_content"] = Value::String(reasoning_text);
     }
     Ok(completion)
 }

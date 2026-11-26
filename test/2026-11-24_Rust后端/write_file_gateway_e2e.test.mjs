@@ -91,7 +91,7 @@ function toolResults(mock, prompt) {
 
 test('Gateway scopes approved file mutations to the current conversation, workspace and task', { timeout: 30_000 }, async (t) => {
   const { gateway, mock, workspace, dataDir } = await startGatewayFixture(t, { model: MODEL, startMock, workspaceIds: ['default', 'other'] });
-  await writeFile(join(dataDir, 'personalization.json'), JSON.stringify({ default_permission_mode: 'approval', default_work_mode: 'execute' }));
+  await writeFile(join(dataDir, 'personalization.json'), JSON.stringify({ default_permission_mode: 'approval', default_work_mode: 'execute', require_read_before_edit: true }));
   const path = join(workspace, FILE);
   await writeFile(path, BEFORE);
   const begin = async (prompt) => {

@@ -1,6 +1,6 @@
 //! Guidance is accepted only while an Agent task owns the original conversation writer.
 
-mod media;
+pub(crate) mod media;
 
 use std::{collections::HashSet, path::Path as FsPath};
 
@@ -19,7 +19,7 @@ use crate::{
 };
 
 use super::{
-    Runtime, RuntimeError, Status, Store, Task, append_document, legacy_error, now,
+    Runtime, RuntimeError, Status, Store, Task, now,
     verify_workspace_binding,
 };
 
@@ -77,18 +77,16 @@ async fn enqueue(
         if task.guidance_count >= MAX_QUEUED {
             return Err(RuntimeError::new(409, "Guidance queue is full (max 5)"));
         }
-        let mut document = store
-            .read(&task.workspace_id, &task.conversation_id)?
-            .into_raw();
-        let state = &mut document["metadata"][QUEUE];
+        let path = store.conversation_path(&task.workspace_id,&task.conversation_id)?;
+        let mut db=crate::conversation_db::Database::open(path.parent().unwrap()).map_err(RuntimeError::storage)?;
+        let mut state=db.field(&task.conversation_id,"metadata",QUEUE).map_err(RuntimeError::storage)?.unwrap_or_default();
         if !state.is_object() {
-            *state = json!({"pending":[],"guidance":[],"paused":false});
+            state = json!({"pending":[],"guidance":[],"paused":false});
         }
         let queued = ensure_array(&mut state["guidance"]);
         queued.push(item);
         let count = task.guidance_count + 1;
-        let document = LegacyDocument::from_value(document).map_err(legacy_error)?;
-        store.persist(&task.workspace_id, document, false)?;
+        db.set_field(&task.conversation_id,"metadata",QUEUE,&state).map_err(RuntimeError::storage)?;
         let task = store.tasks.get_mut(&id).expect("task is locked");
         task.guidance_count = count;
         task.updated_at = now();
@@ -317,17 +315,12 @@ pub(super) fn finish(
         }
         return Ok(task.runtime_queue.clone());
     }
-    let document = store.read(&task.workspace_id, &task.conversation_id)?;
-    let mut queue = queue_snapshot(&document.raw()["metadata"][QUEUE], true);
+    let (header, _) = store.header(&task.workspace_id,&task.conversation_id)?;
+    let mut queue = queue_snapshot(&header["metadata"][QUEUE],true);
     queue["paused"] = json!(paused);
-    let mut document = append_document(document, messages, ts, None, None)?.into_raw();
-    document["metadata"][QUEUE] =
-        json!({"pending":queue["messages"],"guidance":[],"paused":paused});
-    store.persist(
-        &task.workspace_id,
-        LegacyDocument::from_value(document).map_err(legacy_error)?,
-        false,
-    )?;
+    store.append_with_metadata(&task.workspace_id,&task.conversation_id,messages,ts,None,None,|meta| {
+        meta[QUEUE]=json!({"pending":queue["messages"],"guidance":[],"paused":paused});
+    })?;
     Ok(queue)
 }
 
@@ -364,12 +357,12 @@ pub(super) fn consume(
     preceding: &[Value],
     ts: f64,
 ) -> Result<Consumed, RuntimeError> {
-    let document = store.read(&task.workspace_id, &task.conversation_id)?;
-    let state = &document.raw()["metadata"][QUEUE];
+    let (document,_) = store.header(&task.workspace_id,&task.conversation_id)?;
+    let state = &document["metadata"][QUEUE];
     let mut durable = Vec::new();
     let workspace = &store.workspaces[&task.workspace_id];
     let execution_root = task.execution_root.as_deref().unwrap_or(workspace);
-    let mut media = media::Writer::new(&store.data_dir, workspace, execution_root, document.raw());
+    let mut media = media::Writer::new(&store.data_dir, workspace, execution_root, &document);
     let (inherited, accepted) = entries(&state["guidance"])
         .split_at_checked(task.guidance_inherited)
         .filter(|(_, accepted)| accepted.len() == task.guidance_count)
@@ -388,16 +381,12 @@ pub(super) fn consume(
         let user = runtime_message("guidance", text, "chat");
         durable.extend(attachment_messages(&mut media, user, item)?);
     }
-    let model = model_media(&durable, &store.data_dir, workspace, execution_root, document.raw());
+    let model = model_media(&durable, &store.data_dir, workspace, execution_root, &document);
     let messages = preceding.iter().chain(&durable).cloned().collect();
     let inherited = json!(inherited);
-    let mut document = append_document(document, messages, ts, None, None)?.into_raw();
-    document["metadata"][QUEUE]["guidance"] = inherited;
-    store.persist(
-        &task.workspace_id,
-        LegacyDocument::from_value(document).map_err(legacy_error)?,
-        false,
-    )?;
+    store.append_with_metadata(&task.workspace_id,&task.conversation_id,messages,ts,None,None,|meta| {
+        meta[QUEUE]["guidance"]=inherited;
+    })?;
     // Blob paths in the committed document resolve even if the derived index is unavailable.
     if let Err(error) = media.publish_index(&task.conversation_id, &durable) {
         eprintln!("Could not update guidance media index: {error}");

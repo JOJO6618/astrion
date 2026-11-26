@@ -26,15 +26,15 @@ let quickRendererReady;
 const settingsPath = quickSettingsPath();
 
 export function quickEnabled() { return config.enabled; }
-export async function startQuickEntry({ debug = false, port, dataRoot, workspacePath, openMain, isManagedView } = {}) {
+export async function startQuickEntry({ debug = false, port, dataRoot, dataDir, staticRoot, workspacePath, openMain, isManagedView } = {}) {
   try { config = patchQuickConfig(config, JSON.parse(await fs.readFile(settingsPath, 'utf8'))); } catch (error) { if (error.code !== 'ENOENT') throw error; }
   if (debug) config.enabled = true;
   if (debug && port === undefined && dataRoot === undefined) {
     const existing = await discoverGateway();
-    port = existing.port; dataRoot = existing.dataRoot;
+    port = existing.port; dataRoot = existing.dataRoot; dataDir = existing.dataDir;
   }
-  gateway = new QuickGateway({ port, dataRoot, workspacePath, managed: !debug });
-  if (!debug) await advertiseGateway(gateway.port, gateway.root);
+  gateway = new QuickGateway({ port, dataRoot, dataDir, workspacePath, managed: !debug });
+  if (!debug) await advertiseGateway(gateway.port, gateway.root, gateway.dataDir);
   const openDesktop = route => { hideQuickEntry(); openMain?.(route); };
   const refreshTray = () => {
     if (!tray || tray.isDestroyed()) return;
@@ -48,7 +48,7 @@ export async function startQuickEntry({ debug = false, port, dataRoot, workspace
       { type: 'separator' }, { label: '退出 Astrion', click: () => app.quit() }
     ]));
   };
-  const assets = await startQuickAssets();
+  const assets = await startQuickAssets(staticRoot);
   let resolveRendererReady;
   let rejectRendererReady;
   const rendererReady = new Promise((resolve, reject) => {

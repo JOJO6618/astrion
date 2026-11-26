@@ -1,6 +1,8 @@
 <template>
   <div v-if="html" v-html="html"></div>
-  <div v-else class="result-item"><pre>{{ fallbackText }}</pre></div>
+  <div v-else class="result-item">
+    <pre>{{ fallbackText }}</pre>
+  </div>
 </template>
 
 <script setup lang="ts">

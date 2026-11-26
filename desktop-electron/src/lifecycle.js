@@ -64,7 +64,7 @@ async function startBackend(launch) {
 
 async function startRustDesktop(runtime) {
   const port = await resolveBackendPort();
-  const child = spawnRustBackend(runtime, { port, version: app.getVersion() });
+  const child = spawnRustBackend(runtime, { port, version: app.getVersion(), browserToken: runtime.browserToken });
   try {
     await waitBackendReady(port, child, 'rust');
     if (!await primeDesktopSession(port)) throw new Error('Rust desktop session unavailable');
@@ -90,7 +90,7 @@ export async function startBackendAndCreateWindow(rust = null) {
   let migrationWindowClosed = false;
   let backendReady = false;
   let bridgePort = null;
-  // AI 浏览器端点的随机凭据：只经环境变量交给本次启动的后端，不落盘。
+  // AI 浏览器端点的随机凭据：只经专用管道交给本次启动的后端，不落盘。
   const browserToken = randomBytes(32).toString('hex');
   try {
     bridgePort = await startBridge({
@@ -149,8 +149,9 @@ export async function startBackendAndCreateWindow(rust = null) {
     console.warn(`[astrion-desktop] 登录 shell PATH 加载失败 (${shellEnvironment.status})，使用原始 PATH`);
   }
 
+  const rustPaths = rust && productionRustPaths(desktopDataRoot);
   const port = rust
-    ? await startRustDesktop({ ...rust, ...productionRustPaths(desktopDataRoot), bridgePort, shellPath: shellEnvironment.path })
+    ? await startRustDesktop({ ...rust, ...rustPaths, bridgePort, browserToken: desktopSupported() ? browserToken : null, shellPath: shellEnvironment.path })
     : await startBackend({
       ...resolveRuntime(),
       bridgePort,
@@ -171,7 +172,10 @@ export async function startBackendAndCreateWindow(rust = null) {
     }
   }
   setBrowserDataRoot(desktopDataRoot);
-  await startQuickEntry({ port, dataRoot: desktopDataRoot, isManagedView, openMain: route => focusMainWindow(route) });
+  await startQuickEntry({
+    port, dataRoot: desktopDataRoot, dataDir: rustPaths?.dataDir, staticRoot: rust?.staticRoot,
+    isManagedView, openMain: route => focusMainWindow(route),
+  });
   setMainWindowBackend(port);
   startScheduleNotifications(port, route => focusMainWindow(route));
   // An explicit desktop launch always opens its main window, including when

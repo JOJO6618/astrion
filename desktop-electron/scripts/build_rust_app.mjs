@@ -6,7 +6,7 @@
 //     "Astrion Rust Experiment"、appId com.astrion.desktop.rust-experiment，要求专用空数据根。
 // 本脚本产物沿用正式标识（appId com.astrion.desktop、productName Astrion、版本取仓库版本），
 // 但只放 runtime/rust，因此壳层会默认使用包内 Rust（见 src/rust-backend.js 的默认选择）。
-// 本地产物不签名、不公证、不发布、不替换已安装应用。
+// 本地产物使用临时 ad-hoc 签名，不公证、不发布、不替换已安装应用。
 //
 // 用法（不接受任何参数）：
 //   npm --prefix desktop-electron run build:rust:app
@@ -21,6 +21,7 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { stageRustBackend } from '../../desktop/scripts/prepare_rust_backend.mjs';
+import { signLocalMacApp } from './local_mac_sign.mjs';
 
 if (process.platform !== 'darwin') {
   throw new Error('The normal macOS Rust directory build requires native macOS.');
@@ -105,6 +106,7 @@ for (const file of ['static/dist/.vite/manifest.json', 'static/dist/.vite/entry-
   fs.accessSync(path.join(resources, 'runtime/rust', file), fs.constants.R_OK);
 }
 if (fs.existsSync(path.join(resources, 'runtime/python'))) throw new Error('Python runtime must not be staged in the Rust bundle');
+await signLocalMacApp(app);
 const sha256 = createHash('sha256').update(fs.readFileSync(binary)).digest('hex');
 console.info(JSON.stringify({
   app,
@@ -114,6 +116,6 @@ console.info(JSON.stringify({
   binary,
   binaryBytes: fs.statSync(binary).size,
   binarySha256: sha256,
-  unsigned: true,
+  signing: 'ad-hoc',
   note: 'Local directory build only; not published, not installed.'
 }, null, 2));

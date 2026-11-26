@@ -138,20 +138,24 @@ impl SubAgents {
         let prompt = format!("{}\n\n你的名称：{name}\n默认工作目录：{}\n当前执行目录：{}\n\n[固定执行权限]\n{}。主智能体后续切换权限或执行环境不会改变你的档位。",
             include_str!("../../../prompts/sub_agent/system.txt"), working.display(), execution.display(), access.as_str().unwrap_or_default());
         let user = format!("任务：{summary}\n\n{task}\n\n默认工作目录：{}", working.display());
+        let prompt = super::compression::refresh_memory(&prompt,&parent.root,self.registry.data_dir()).map_err(storage)?;
         let time = now();
+        let worktree_revision = self.parent_worktree(parent)?["revision"].as_u64().unwrap_or_default();
         let mut record = json!({"task_id":task_id,"agent_id":agent_id,"name":name,"display_name":name,
             "summary":summary,"task":task,"conversation_id":parent.conversation_id,
             "access_level":access,"workspace_root":parent.root,"working_dir":working,"execution_root":execution_root,
+            "worktree_revision":worktree_revision,
             "rust_scope_identity":identity(&parent.root, &working, execution).map_err(storage)?,"rust_owner":owner,
             "model_key":model.key(),"intelligence":intelligence,"reasoning_effort":reasoning_effort,"thinking_mode":"thinking",
+            "cost_tracking_version":1,
             "status":"idle","round_id":0,"created_at":time,"updated_at":time,"pending_work":[],"work_paused":false,
             "compress_threshold_tokens":prefs["sub_agent_compress_threshold_tokens"].as_u64().unwrap_or(250_000)});
         ChildScope::bind(object(&record)?, &parent.workspace_id, &parent.root, self.registry.data_dir())?;
         queue(&mut record, &user, deadline)?;
-        let context = Context::new(&record, &prompt);
+        let mut context = Context::new(&record, &prompt);
         doc["tasks"][&task_id] = record;
         sync_instance(&mut doc, &parent.conversation_id, &task_id)?;
-        self.registry.store_with_context(&doc, Some(&context.document)).map_err(storage)?;
+        self.registry.store_with_context(&doc, Some(&mut context)).map_err(storage)?;
         live.models.insert(task_id.clone(), model);
         self.launch_locked(&mut live, &mut doc, parent, &task_id)?;
         let mut result = protocol::public_record(object(&doc["tasks"][&task_id])?);
@@ -267,6 +271,7 @@ impl SubAgents {
         self.registry.store(doc).map_err(storage)?;
         if let Some(worker) = active { worker.send_replace(stop); }
         if stop == Stop::Terminate {
+            if active.is_none() { self.retire_child_processes(parent, id); }
             live.models.remove(id);
             if let Some(manager) = live.mcp_clients.remove(id)
                 && let Ok(handle) = Handle::try_current()
@@ -309,6 +314,7 @@ impl SubAgents {
         let interrupted = running(fields);
         if !start && !interrupted { return Ok(()); }
         let mut context = Context::load(&self.registry, id)?;
+        context.threshold = record["compress_threshold_tokens"].as_u64().filter(|v| *v > 0).unwrap_or(250_000);
         if interrupted { context.complete_missing(Stop::Terminate); }
         if !start {
             context.set_status("idle", "interrupted");
@@ -317,14 +323,17 @@ impl SubAgents {
             record["end_reason"] = json!("interrupted");
             record["updated_at"] = json!(now());
             sync_instance(doc, &parent.conversation_id, id)?;
-            return self.registry.store_with_context(doc, Some(&context.document)).map_err(storage);
+            return self.registry.store_with_context(doc, Some(&mut context)).map_err(storage);
         }
         let handle = Handle::try_current().map_err(|_| "无法启动子智能体执行器。")?;
-        let scope = ChildScope::bind(fields, &parent.workspace_id, &parent.root, self.registry.data_dir())?;
+        let scope = match self.apply_parent_worktree(parent, &mut doc["tasks"][id], &mut context)? {
+            Some(scope) => scope,
+            None => ChildScope::bind(fields, &parent.workspace_id, &parent.root, self.registry.data_dir())?,
+        };
         let model = self.model(live, id, &record)?.with_session(id, false);
         let timeout = consume_work(&mut doc["tasks"][id], &mut context, true)?;
         sync_instance(doc, &parent.conversation_id, id)?;
-        self.registry.store_with_context(doc, Some(&context.document)).map_err(storage)?;
+        self.registry.store_with_context(doc, Some(&mut context)).map_err(storage)?;
         let (sender, receiver) = watch::channel(Stop::Continue);
         live.workers.insert(id.into(), sender);
         let app = self.clone();
@@ -337,8 +346,10 @@ impl SubAgents {
     pub(super) fn check_resumable(&self, live: &Live, parent: &Parent, id: &str, record: &Value) -> Result<(), String> {
         if record["status"] == "terminated" { return Err("该子智能体已终结，不能继续激活。".into()); }
         if !live.workers.contains_key(id) {
-            ChildScope::bind(object(record)?, &parent.workspace_id, &parent.root, self.registry.data_dir())?;
-            Context::load(&self.registry, id)?;
+            let mut context = Context::load(&self.registry, id)?;
+            if self.apply_parent_worktree(parent, &mut record.clone(), &mut context)?.is_none() {
+                ChildScope::bind(object(record)?, &parent.workspace_id, &parent.root, self.registry.data_dir())?;
+            }
             self.model(live, id, record)?;
         }
         Ok(())
@@ -367,6 +378,58 @@ impl SubAgents {
         }
     }
 
+    fn parent_worktree(&self, parent: &Parent) -> Result<Value, String> {
+        let directory = self.registry.data_dir().join("conversations").join(&parent.workspace_id);
+        if !directory.join(crate::conversation_db::FILENAME).is_file() {
+            return Ok(Value::Null);
+        }
+        crate::conversation_db::Database::open(&directory)?
+            .field(&parent.conversation_id, "metadata", "git_worktree")
+            .map(Option::unwrap_or_default)
+    }
+
+    fn apply_parent_worktree(
+        &self, parent: &Parent, record: &mut Value, context: &mut Context,
+    ) -> Result<Option<ChildScope>, String> {
+        let state = self.parent_worktree(parent)?;
+        let Some(revision) = state["revision"].as_u64().filter(|revision| {
+            *revision > record["worktree_revision"].as_u64().unwrap_or_default()
+        }) else { return Ok(None); };
+        let destination = state["directory"].as_str().map(Path::new).ok_or("父对话工作树缺少执行目录。")?;
+        let inside = destination.starts_with(&parent.root);
+        let verified = if inside && destination != parent.root {
+            crate::worktree::Worktree::new(&parent.root).and_then(|service| service.inspect(destination))
+                .map_err(|error| error.to_string())?.directory
+        } else {
+            parent.root.clone()
+        };
+        let working = record["working_dir"].as_str().map(Path::new).ok_or("子智能体工作目录无效。")?;
+        let binding = identity(&parent.root, working, &verified).map_err(storage)?;
+        let mut updated = record.clone();
+        updated["execution_root"] = json!(verified);
+        updated["rust_scope_identity"] = binding;
+        updated["worktree_revision"] = json!(revision);
+        let scope = ChildScope::bind(object(&updated)?, &parent.workspace_id, &parent.root, self.registry.data_dir())?;
+        let branch = state["branch"].as_str().unwrap_or_default();
+        context.append_worktree(&verified, branch, revision, inside);
+        *record = updated;
+        Ok(Some(scope))
+    }
+
+    pub(super) fn child_worktree_at_safe_point(&self, parent: &Parent, id: &str, context: &mut Context)
+        -> Result<Option<ChildScope>, String>
+    {
+        let live = self.lock()?;
+        if live.workers.get(id).is_none_or(|worker| worker.borrow().cancelled()) { return Ok(None); }
+        let mut doc = self.registry.document().map_err(storage)?;
+        let Some(scope) = self.apply_parent_worktree(parent, &mut doc["tasks"][id], context)? else {
+            return Ok(None);
+        };
+        sync_instance(&mut doc, &parent.conversation_id, id)?;
+        self.registry.store_with_context(&doc, Some(context)).map_err(storage)?;
+        Ok(Some(scope))
+    }
+
     pub(super) fn consume_guidance(&self, parent: &Parent, id: &str, context: &mut Context) -> Result<(), String> {
         let _live = self.lock()?;
         let mut doc = self.registry.document().map_err(storage)?;
@@ -374,7 +437,7 @@ impl SubAgents {
         if record["work_paused"] == true || !record["pending_work"].as_array().is_some_and(|queue| !queue.is_empty()) { return Ok(()); }
         consume_work(record, context, false)?;
         sync_instance(&mut doc, &parent.conversation_id, id)?;
-        self.registry.store_with_context(&doc, Some(&context.document)).map_err(storage)
+        self.registry.store_with_context(&doc, Some(context)).map_err(storage)
     }
 
     pub(super) fn finish(&self, parent: &Parent, id: &str, context: &mut Context, result: worker::End) -> Result<(), String> {
@@ -409,7 +472,7 @@ impl SubAgents {
         } else if notify { push_stop_notice(&mut doc, parent, &name)?; }
         sync_instance(&mut doc, &parent.conversation_id, id)?;
         self.registry.store_checkpoint(
-            &doc, Some(&context.document), output.as_ref().map(|(event, output)| (event, output)),
+            &doc, Some(context), output.as_ref().map(|(event, output)| (event, output)),
         ).map_err(storage)?;
         live.workers.remove(id);
         live.questions.retain(|_, question| question.child != id && (!terminated || question.target.as_deref() != Some(id)));

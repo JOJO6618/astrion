@@ -57,10 +57,13 @@ impl State {
     }
 
     pub(super) fn load(&mut self, arguments: &Value, complete: &[Value]) -> Value {
-        let requested = names(&arguments["tool_names"]);
-        if requested.is_empty() {
-            return failure("tool_names 需要包含至少一个工具名称。");
+        let raw = &arguments["tool_names"];
+        if raw.as_array().is_none_or(|items| items.is_empty()
+            || items.iter().any(|item| item.as_str().is_none_or(|name| name.trim().is_empty())))
+        {
+            return failure("tool_names 需要包含非空的工具名称。");
         }
+        let requested = names(raw);
         if requested.iter().any(|tool| !self.deferred.contains(tool)) {
             return failure("只能加载当前对话按需加载目录中的工具。");
         }

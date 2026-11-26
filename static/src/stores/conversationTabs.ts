@@ -211,8 +211,11 @@ export const useConversationTabsStore = defineStore('conversationTabs', {
       const tabs: ConversationTab[] = raw.tabs.map(normalizeTab);
       this.$patch({
         tabs,
-        pendingShow: tabs.some(tab => tab.key === this.pendingShow?.key && tab.placement === 'main')
-          ? this.pendingShow : null,
+        pendingShow: tabs.some(
+          (tab) => tab.key === this.pendingShow?.key && tab.placement === 'main'
+        )
+          ? this.pendingShow
+          : null,
         confirmedActiveKey: String(raw.active_key || ''),
         workspaceId: String(raw.workspace_id || ''),
         renderers: { ...(raw.renderers || {}) },
@@ -379,7 +382,7 @@ export const useConversationTabsStore = defineStore('conversationTabs', {
     /** 标签栏点击：先让壳层乐观显示，再发 activate（以后端快照为准）。 */
     async showTab(key: string) {
       const shell = shellBridge();
-      if (!shell?.show || !this.mainTabs.some(tab => tab.key === key)) return this.setActive(key);
+      if (!shell?.show || !this.mainTabs.some((tab) => tab.key === key)) return this.setActive(key);
       const id = navigationId();
       try {
         shell.show(key, id);

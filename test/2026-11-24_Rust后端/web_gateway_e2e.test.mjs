@@ -15,7 +15,7 @@ test('web binary logs in, serves the authenticated desktop APIs and isolates the
   });
   const origin = gateway.baseUrl;
   const request = (path, options = {}) => fetch(origin + path, {signal: AbortSignal.timeout(5_000), ...options});
-  const paths = ['/api/health', '/api/conversation-tabs', '/api/project-git/repositories', '/api/usage-stats'];
+  const paths = ['/api/health', '/api/conversation-tabs', '/api/project-git/repositories?workspace_id='+gateway.workspaceId, '/api/usage-stats'];
   for (const path of paths) {
     const response = await request(path);
     assert.equal(response.status, 401, path);
@@ -31,7 +31,7 @@ test('web binary logs in, serves the authenticated desktop APIs and isolates the
   const authenticated = sessionCookie(login);
   assert.notEqual(authenticated, cookie);
   for (const path of [...paths, '/api/tasks?status=active', '/api/tool-approvals/pending']) {
-    const response = await request(path, {headers: {cookie: authenticated}});
+    const response = await request(path, {headers: {cookie: authenticated,'x-astrion-workspace-id':gateway.workspaceId}});
     assert.equal(response.status, 200, path);
     assert.equal((await response.json()).success, true, path);
   }

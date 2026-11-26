@@ -81,7 +81,12 @@ const toggleDeferredCategory = (cat: { tools: string[] }, checked: boolean) => {
         <input
           type="checkbox"
           :checked="form.require_read_before_edit"
-          @change="personalization.updateField({ key: 'require_read_before_edit', value: $event.target.checked })"
+          @change="
+            personalization.updateField({
+              key: 'require_read_before_edit',
+              value: $event.target.checked
+            })
+          "
         />
         <UiSwitch decorative :checked="form.require_read_before_edit" />
       </label>

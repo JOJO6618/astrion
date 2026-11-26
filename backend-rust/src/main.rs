@@ -13,7 +13,7 @@ mod lifecycle;
 use astrion_headless::{
     catalog::CatalogSource,
     instance_lock::InstanceLock,
-    runtime::{Runtime, WorkflowRuntime},
+    runtime::{DesktopBrowser, Runtime, WorkflowRuntime},
     schedules::{RuntimeScheduleAdapter, ScheduleService, WorkspaceOption},
     tools::ToolSet,
     web_assets::{WebAssets, personalization::Personalization},
@@ -49,6 +49,7 @@ async fn serve() -> io::Result<()> {
             format!("{e}\n{}", launch::USAGE),
         )
     })?;
+    let desktop_browser = if config.web { DesktopBrowser::from_parent()? } else { None };
     let paths = host_paths::HostPaths::resolve(&config.data, config.static_root.as_deref())?;
     let workspace = host_paths::Workspace::resolve(
         &config.workspace,
@@ -61,6 +62,7 @@ async fn serve() -> io::Result<()> {
         .map_err(io::Error::other)?
         .with_pricing(paths.resources.join("config"));
     runtime.configure_host_processes(&paths.deploy).map_err(io::Error::other)?;
+    runtime.configure_desktop_browser(desktop_browser).map_err(io::Error::other)?;
     let registered = paths.catalog()?;
     for entry in &registered.workspaces {
         if entry.path.is_dir() {
@@ -72,6 +74,7 @@ async fn serve() -> io::Result<()> {
     }
     let token = launch::read_or_create_token(&config.data)?;
     let catalog = CatalogSource::with_paths(&paths.resources, &paths.deploy, &config.data);
+    runtime.configure_automatic_titles(catalog.clone()).map_err(io::Error::other)?;
     let workflows = WorkflowRegistry::new(
         paths.resources.join("workflows"),
         paths.host_libraries.join("workflows"),
@@ -96,6 +99,7 @@ async fn serve() -> io::Result<()> {
         global_skills,
         paths.host_libraries.join("agentskills"),
     );
+    let runtime = runtime.with_personalization(preferences.clone());
     let web = if config.web {
         let mut auth_cfg = WebAuthConfig::new(&config.data, listener.local_addr()?.port());
         auth_cfg.cookie_name = env::var("WEB_SESSION_COOKIE_NAME")
@@ -138,6 +142,7 @@ async fn serve() -> io::Result<()> {
     .with_registry(&paths.workspace_config, &paths.resources);
     let schedules = ScheduleService::open(&config.data, std::sync::Arc::new(adapter))
         .map_err(io::Error::other)?;
+    runtime.set_schedule_service(&schedules);
     let navigation = astrion_headless::navigation::Navigation::new(&config.data);
     let provider_config = catalog.providers().clone();
     let crosspet_config = astrion_headless::crosspet::CrossPetConfig::for_host(&paths.deploy);
@@ -197,7 +202,10 @@ async fn serve() -> io::Result<()> {
         .merge(session_guard.protect_api(project_storage.router()))
         .merge(session_guard.protect_api(astrion_headless::usage::quota_router()))
     };
-    let router = gateway::router(gateway)?.merge(routes);
+    let routes = gateway::router(gateway)?.merge(routes);
+    // The method router attaches Allow after its own layers return.
+    let router = Router::new().fallback_service(routes)
+        .layer(axum::middleware::from_fn(route_options));
     eprintln!(
         "Astrion Rust server listening on {}",
         listener.local_addr()?
@@ -205,6 +213,26 @@ async fn serve() -> io::Result<()> {
     let result = lifecycle::serve(listener, router, runtime, schedules).await;
     crosspet.shutdown();
     result
+}
+
+/// Preserve Flask's automatic OPTIONS for registered methods on both host surfaces.
+async fn route_options(request: axum::extract::Request, next: axum::middleware::Next) -> axum::response::Response {
+    use axum::http::{header, HeaderValue, Method, StatusCode};
+    let options = request.method() == Method::OPTIONS;
+    let mut response = next.run(request).await;
+    if options && response.status() == StatusCode::METHOD_NOT_ALLOWED {
+        if let Some(allowed) = response.headers().get(header::ALLOW).and_then(|v| v.to_str().ok()) {
+            if !allowed.is_empty() && !allowed.split(',').any(|v| v.trim() == "OPTIONS") {
+                if let Ok(value) = HeaderValue::from_str(&format!("{allowed}, OPTIONS")) {
+                    *response.status_mut() = StatusCode::OK;
+                    response.headers_mut().insert(header::ALLOW, value);
+                    response.headers_mut().remove(header::CONTENT_LENGTH);
+                    *response.body_mut() = axum::body::Body::empty();
+                }
+            }
+        }
+    }
+    response
 }
 
 async fn headless_landing() -> impl axum::response::IntoResponse {

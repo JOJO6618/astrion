@@ -1,10 +1,10 @@
 use serde_json::{Value, json};
 
-pub(in crate::runtime) const CREATE: &str = "todo_create";
-pub(in crate::runtime) const UPDATE: &str = "todo_update_task";
+pub(crate) const CREATE: &str = "todo_create";
+pub(crate) const UPDATE: &str = "todo_update_task";
 const MAX_TEXT: usize = 999;
 
-pub(in crate::runtime) fn schemas() -> [Value; 2] {
+pub(crate) fn schemas() -> [Value; 2] {
     let intent = json!({"type":"string", "description":"用不超过15个字说明操作目的。"});
     [
         json!({"type":"function","function":{"name":CREATE,"description":"创建待办列表，最多 8 条；覆盖已有列表。","parameters":{"type":"object","properties":{"intent":intent,"overview":{"type":"string"},"tasks":{"type":"array","minItems":1,"maxItems":8,"items":{"type":"object","properties":{"title":{"type":"string"}},"required":["title"]}}},"required":["overview","tasks"]}}}),
@@ -16,7 +16,7 @@ fn language(en: bool, zh: &str, english: &str) -> String {
     if en { english } else { zh }.to_owned()
 }
 
-pub(super) fn create(args: &Value, en: bool) -> Result<(Value, String), String> {
+pub(crate) fn create(args: &Value, en: bool) -> Result<(Value, String), String> {
     let overview = args["overview"].as_str().unwrap_or_default().trim();
     let length = overview.chars().count();
     if length == 0 {
@@ -81,7 +81,7 @@ pub(super) fn create(args: &Value, en: bool) -> Result<(Value, String), String> 
     ))
 }
 
-pub(super) fn update(mut todo: Value, args: &Value, en: bool) -> Result<(Value, String), String> {
+pub(crate) fn update(mut todo: Value, args: &Value, en: bool) -> Result<(Value, String), String> {
     if !todo.is_object() {
         return Err(language(
             en,
@@ -179,7 +179,7 @@ pub(super) fn update(mut todo: Value, args: &Value, en: bool) -> Result<(Value, 
     Ok((todo, message))
 }
 
-pub(super) fn snapshot(mut todo: Value) -> Value {
+pub(crate) fn snapshot(mut todo: Value) -> Value {
     if !todo.is_object() {
         return Value::Null;
     }

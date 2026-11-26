@@ -44,7 +44,7 @@ impl Runtime {
         let Ok((scope, metadata)) = live_scope(&store, task_id) else { return Ok(Vec::new()); };
         if !store.process_resources.available_mode(scope.mode) { return Ok(Vec::new()); }
         let mut names = super::tool_categories::category_tools(&store.data_dir,"terminal_realtime",&metadata)?;
-        if !terminal_allowed(&store.data_dir).unwrap_or(false) || cfg!(windows) && scope.mode == ExecutionMode::Direct {
+        if !terminal_allowed(&store.data_dir).unwrap_or(false) {
             names.retain(|name| name == "sleep");
         }
         names.extend(super::tool_categories::category_tools(&store.data_dir,"terminal_command",&metadata)?);
@@ -152,7 +152,7 @@ impl Runtime {
     pub fn stop_conversation_processes(&self, workspace: &str, conversation: &str) -> Result<usize, RuntimeError> {
         let mut store = self.store()?;
         verify_workspace_binding(&store, workspace, None)?;
-        let owner = Owner { user: HOST.into(), workspace_id: workspace.into(), workspace: store.workspaces[workspace].clone(), conversation: conversation.into() };
+        let owner = Owner { user: HOST.into(), workspace_id: workspace.into(), workspace: store.workspaces[workspace].clone(), conversation: conversation.into(), actor: None };
         Ok(store.process_resources.stop_background(&owner))
     }
 
@@ -168,7 +168,7 @@ impl Runtime {
 
     pub(super) fn conversation_has_background(store: &Store, workspace: &str, conversation: &str) -> bool {
         store.workspaces.get(workspace).is_some_and(|path| store.process_resources.has_pending(&Owner {
-            user: HOST.into(), workspace_id: workspace.into(), workspace: path.clone(), conversation: conversation.into(),
+            user: HOST.into(), workspace_id: workspace.into(), workspace: path.clone(), conversation: conversation.into(), actor: None,
         }))
     }
 
@@ -276,9 +276,6 @@ fn process_admission(
     if !store.process_resources.available_mode(scope.mode) {
         return Err("The selected Host execution environment is unavailable".into());
     }
-    if cfg!(windows) && scope.mode == ExecutionMode::Direct && invocation.requires_terminal_panel() {
-        return Err("The direct Windows environment supports commands without a persistent terminal".into());
-    }
     if !super::tool_categories::category_tools(&store.data_dir,category,&metadata)?.iter().any(|tool| tool == name) {
         return Err("Process tool is disabled by the current tool policy".into());
     }
@@ -351,10 +348,10 @@ fn live_owner(store: &Store, task_id: &str) -> Result<Owner, String> {
         return Err("Task process owner does not match its authenticated workspace".into());
     }
     verify_workspace_binding(store, &task.workspace_id, None).map_err(|error| error.message)?;
-    Ok(Owner { user: HOST.into(), workspace_id: task.workspace_id.clone(), workspace: store.workspaces[&task.workspace_id].clone(), conversation: task.conversation_id.clone() })
+    Ok(Owner { user: HOST.into(), workspace_id: task.workspace_id.clone(), workspace: store.workspaces[&task.workspace_id].clone(), conversation: task.conversation_id.clone(), actor: None })
 }
 
-fn live_scope(store: &Store, task_id: &str) -> Result<(Scope, Value), String> {
+pub(super) fn live_scope(store: &Store, task_id: &str) -> Result<(Scope, Value), String> {
     let owner = live_owner(store, task_id)?;
     let task = &store.tasks[task_id];
     let (header, _) = store.header(&owner.workspace_id, &owner.conversation).map_err(|error| error.message)?;
@@ -406,7 +403,7 @@ fn request_owner(store: &Store, workspace: &RegisteredWorkspace, conversation: O
 }
 
 fn registered_owner(workspace: &RegisteredWorkspace, conversation: &str) -> Owner {
-    Owner { user: HOST.into(), workspace_id: workspace.id.clone(), workspace: workspace.path.clone(), conversation: conversation.into() }
+    Owner { user: HOST.into(), workspace_id: workspace.id.clone(), workspace: workspace.path.clone(), conversation: conversation.into(), actor: None }
 }
 
 /// Mount inside the existing Gateway authorization and workspace middleware.

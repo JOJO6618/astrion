@@ -10,8 +10,6 @@ use serde_json::{Map, Value, json};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-// Agent tools are capability-scoped. Native terminal execution and its network
-// policy do not yet consume these conversation controls.
 const PERMISSIONS: &[&str] = &["readonly", "approval", "auto_approval", "unrestricted"];
 const WORK_MODES: &[&str] = &["plan", "ask", "execute"];
 const EXECUTION_MODES: &[&str] = &["sandbox", "direct"];
@@ -70,6 +68,25 @@ impl Mode {
             .copied()
             .find(|mode| mode.eq_ignore_ascii_case(value))
             .ok_or_else(|| WebError::invalid("Invalid mode"))
+    }
+
+    fn pending_key(self) -> Option<&'static str> {
+        match self {
+            Self::Work => None,
+            Self::Permission => Some("pending_permission_mode"),
+            Self::Execution => Some("pending_execution_mode"),
+            Self::Network => Some("pending_network_permission"),
+        }
+    }
+
+    fn validate_target(self, prefs: &Personalization, metadata: &Value, target: &str) -> std::result::Result<(), crate::runtime::RuntimeError> {
+        if matches!(self, Self::Execution) && target == "direct" {
+            let current = prefs.modes(metadata);
+            if current.work_mode == "plan" || current.permission_mode == "readonly" {
+                return Err(crate::runtime::RuntimeError::new(409, "Direct execution is unavailable in plan or read-only mode"));
+            }
+        }
+        Ok(())
     }
 
     fn response(self, prefs: &Personalization, metadata: &Value, id: Option<&str>, direct_enabled: bool, network_enabled: bool) -> Value {
@@ -159,6 +176,52 @@ impl Mode {
             }
         }
     }
+}
+
+pub(crate) fn apply_pending_host_modes(data: &std::path::Path, before: &Value, direct: bool, network: bool) -> Value {
+    let Some(mut metadata) = before.as_object().cloned() else { return before.clone(); };
+    let prefs = Personalization::load(data);
+    for mode in [Mode::Permission, Mode::Execution, Mode::Network] {
+        let key = mode.pending_key().expect("queueable mode");
+        let Some(pending) = metadata.remove(key) else { continue; };
+        let Some(target) = mode.options().iter().copied().find(|target| pending == *target) else { continue; };
+        if matches!(mode, Mode::Execution) && target == "direct" && !direct
+            || matches!(mode, Mode::Network) && !network
+            || mode.validate_target(&prefs, &Value::Object(metadata.clone()), target).is_err()
+        {
+            continue;
+        }
+        mode.apply(&mut metadata, &prefs, target);
+    }
+    Value::Object(metadata)
+}
+
+pub(crate) fn recover_pending_host_modes(
+    data: &std::path::Path, before: &Value, direct: bool, network: bool,
+) -> std::result::Result<Value, crate::runtime::RuntimeError> {
+    let prefs = Personalization::load(data);
+    let current = prefs.modes(before);
+    let mut pending = before.clone();
+    for (mode, effective, ordered) in [
+        (Mode::Permission, current.permission_mode, PERMISSIONS),
+        (Mode::Execution, current.execution_mode, EXECUTION_MODES),
+        (Mode::Network, current.network_permission, &["none", "restricted", "full"][..]),
+    ] {
+        let key = mode.pending_key().expect("host mode can be queued");
+        if pending[key].is_null() || pending[key] == false { continue; }
+        let value = pending[key].as_str().ok_or_else(|| crate::runtime::RuntimeError::new(422, "Invalid previous host mode"))?;
+        let target = value.trim().to_ascii_lowercase();
+        if target.is_empty() {
+            pending[key] = Value::Null;
+            continue;
+        }
+        let rank = |name: &str| ordered.iter().position(|value| *value == name);
+        let requested = rank(&target).ok_or_else(|| crate::runtime::RuntimeError::new(422, "Invalid previous host mode"))?;
+        // A stale request has no live approval context. Apply restrictions and
+        // leave any wider authority for a new authenticated settings change.
+        pending[key] = if requested <= rank(effective).unwrap_or_default() { json!(target) } else { Value::Null };
+    }
+    Ok(apply_pending_host_modes(data, &pending, direct, network))
 }
 
 struct Settings {
@@ -283,19 +346,26 @@ async fn set_mode(
     }
     snapshot(move || {
         let prefs = Personalization::load(&settings.app.data_dir);
-        settings.edit(id.as_deref(), |metadata| {
-            if matches!(mode, Mode::Execution) && target == "direct" {
-                let current = prefs.modes(&Value::Object(metadata.clone()));
-                if current.work_mode == "plan" || current.permission_mode == "readonly" {
-                    return Err(WebError(
-                        StatusCode::CONFLICT,
-                        "Direct execution is unavailable in plan or read-only mode",
-                    ));
-                }
+        if let Some(id) = id.as_deref()
+            && let Some(key) = mode.pending_key()
+            && let Some(metadata) = settings.app.runtime.queue_running_host_mode(
+                &settings.app.workspace_id, id, key, target,
+                |metadata| mode.validate_target(&prefs, metadata, target),
+            )?
+        {
+            let mut response = mode.response(&prefs, &metadata, Some(id), direct_enabled, network_enabled);
+            if matches!(mode, Mode::Execution) {
+                response["state"]["mode"] = json!(target);
+            } else {
+                response["mode"] = json!(target);
             }
+            return Ok(response);
+        }
+        settings.edit(id.as_deref(), |metadata| {
+            mode.validate_target(&prefs, &Value::Object(metadata.clone()), target)?;
             mode.apply(metadata, &prefs, target);
-            Ok(mode.response(&prefs, &Value::Object(metadata.clone()), id.as_deref(), direct_enabled, network_enabled))
-        })?
+            Ok::<_, crate::runtime::RuntimeError>(mode.response(&prefs, &Value::Object(metadata.clone()), id.as_deref(), direct_enabled, network_enabled))
+        })?.map_err(Into::into)
     })
     .await
 }

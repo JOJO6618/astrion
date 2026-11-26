@@ -61,7 +61,7 @@ async fn start(State(setup): State<Setup>, payload: Payload) -> Reply {
         if progress["active"] == true {
             return Err(RuntimeError::new(409, "Sandbox installation is already running"));
         }
-        let launcher = setup.installer(enable_if_needed, platform["state"] == "wsl_missing")
+        let launcher = setup.installer(enable_if_needed, missing_windows_features(&platform))
             .ok_or_else(|| RuntimeError::new(409, "Automatic sandbox installation is unavailable"))?;
         let handle = tokio::runtime::Handle::try_current().map_err(RuntimeError::storage)?;
         *progress = initial_progress();
@@ -75,6 +75,10 @@ async fn start(State(setup): State<Setup>, payload: Payload) -> Reply {
 struct Installer {
     install: std::process::Command,
     enable: Option<std::process::Command>,
+}
+
+fn missing_windows_features(status: &Value) -> bool {
+    matches!(status["state"].as_str(), Some("wsl_missing" | "vm_platform_missing"))
 }
 
 impl Setup {
@@ -92,16 +96,16 @@ impl Setup {
         let mut value = json!({"applicable":false,"platform":"darwin","state":"not_applicable","detail":""});
         value["sandbox_available"] = json!(sandbox_available && (value["state"] == "ready" || !value["applicable"].as_bool().unwrap_or(false)));
         value["can_install"] = json!(value["state"] != "unsupported" && value["state"] != "ordinary_user_required"
-            && self.installer(true, value["state"] == "wsl_missing").is_some());
+            && self.installer(true, missing_windows_features(&value)).is_some());
         *cached = Some((Instant::now(), value.clone()));
         value
     }
 
-    fn installer(&self, _enable_if_needed: bool, _wsl_missing: bool) -> Option<Installer> {
+    fn installer(&self, _enable_if_needed: bool, _missing_features: bool) -> Option<Installer> {
         #[cfg(target_os = "linux")]
         return linux_installer(&self.resources);
         #[cfg(windows)]
-        return windows_installer(&self.resources, _enable_if_needed, _wsl_missing);
+        return windows_installer(&self.resources, _enable_if_needed, _missing_features);
         #[cfg(not(any(target_os = "linux", windows)))]
         { None }
     }
@@ -111,7 +115,8 @@ impl Setup {
             if let Some(enable) = launcher.enable {
                 self.run(enable).await?;
                 #[cfg(windows)]
-                if !tokio::task::spawn_blocking(crate::process_runtime::windows::host_usable).await.unwrap_or(false) {
+                if !tokio::task::spawn_blocking(|| crate::process_runtime::windows::host_usable()
+                    && crate::process_runtime::windows::virtual_machine_platform_ready()).await.unwrap_or(false) {
                     return Ok(());
                 }
             }
@@ -127,7 +132,7 @@ impl Setup {
                 progress["phase"] = json!("done");
                 progress["step_index"] = progress["step_total"].clone();
             }
-            Ok(()) if cfg!(windows) && state["state"] == "wsl_missing" => {
+            Ok(()) if cfg!(windows) && missing_windows_features(&state) => {
                 progress["phase"] = json!("needs_reboot");
             }
             failure => {
@@ -214,7 +219,7 @@ fn linux_installer(resources: &std::path::Path) -> Option<Installer> {
 }
 
 #[cfg(windows)]
-fn windows_installer(resources: &std::path::Path, enable_if_needed: bool, wsl_missing: bool) -> Option<Installer> {
+fn windows_installer(resources: &std::path::Path, enable_if_needed: bool, missing_features: bool) -> Option<Installer> {
     use std::{os::windows::process::CommandExt, process::Command};
     use windows_sys::Win32::System::Threading::CREATE_NO_WINDOW;
     use base64::{Engine as _, engine::general_purpose::STANDARD};
@@ -230,7 +235,7 @@ fn windows_installer(resources: &std::path::Path, enable_if_needed: bool, wsl_mi
     if distro != "astrion-sandbox" {
         install.arg("-InstallDir").arg(std::env::home_dir()?.join(".astrion").join(format!("wsl-sandbox-{distro}")));
     }
-    let enable = if wsl_missing {
+    let enable = if missing_features {
         if !enable_if_needed { return None; }
         let mut command = Command::new(powershell);
         let enable = "Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux,VirtualMachinePlatform -NoRestart -All -ErrorAction Stop";

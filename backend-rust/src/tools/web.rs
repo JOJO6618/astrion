@@ -2,7 +2,11 @@
 mod extract;
 mod search;
 
-use std::{collections::{HashMap, HashSet}, path::Path, time::Duration};
+use std::{
+    collections::{HashMap, HashSet},
+    path::Path,
+    time::Duration,
+};
 
 use reqwest::{Client, RequestBuilder, Url};
 use ring::digest::{SHA1_FOR_LEGACY_USE_ONLY, digest};
@@ -12,6 +16,7 @@ use crate::web_assets::personalization::web_service_preferences;
 
 pub(crate) const SEARCH: &str = "web_search";
 pub(crate) const EXTRACT: &str = "extract_webpage";
+pub(crate) const SAVE: &str = "save_webpage";
 const MAX_RESPONSE_BYTES: usize = 3 * 1024 * 1024;
 
 pub(crate) fn supports(name: &str) -> bool {
@@ -21,18 +26,82 @@ pub(crate) fn supports(name: &str) -> bool {
 pub(crate) fn definitions() -> Vec<Value> {
     let text = |description: &str| json!({"type":"string","description":description});
     vec![
-        definition(SEARCH, "搜索外部信息；结果含来源 ID，引用使用【cite:src_xxx】。", json!({
-            "query":text("查询内容"),"max_results":{"type":"integer"},
-            "topic":{"type":"string","enum":["general","news","finance"]},
-            "time_range":text("day/week/month/year"),"days":{"type":"integer"},
-            "start_date":text("YYYY-MM-DD"),"end_date":text("YYYY-MM-DD"),"country":text("国家"),
-            "include_domains":{"type":"array","items":{"type":"string"}},
-        }), "query"),
-        definition(EXTRACT, "提取网页正文，保留来源引用；正文超过 80000 字符时拒绝。", json!({
-            "url":text("要提取的 HTTP 或 HTTPS 网页地址"),
-            "extract_depth":{"type":"string","enum":["basic","advanced"]},
-        }), "url"),
+        definition(
+            SEARCH,
+            "搜索外部信息；结果含来源 ID，引用使用【cite:src_xxx】。",
+            json!({
+                "query":text("查询内容"),"max_results":{"type":"integer"},
+                "topic":{"type":"string","enum":["general","news","finance"]},
+                "time_range":text("day/week/month/year"),"days":{"type":"integer"},
+                "start_date":text("YYYY-MM-DD"),"end_date":text("YYYY-MM-DD"),"country":text("国家"),
+                "include_domains":{"type":"array","items":{"type":"string"}},
+            }),
+            "query",
+        ),
+        definition(
+            EXTRACT,
+            "提取网页正文，保留来源引用；正文超过 80000 字符时拒绝。",
+            json!({
+                "url":text("要提取的 HTTP 或 HTTPS 网页地址"),
+                "extract_depth":{"type":"string","enum":["basic","advanced"]},
+            }),
+            "url",
+        ),
     ]
+}
+
+pub(crate) fn save_definition() -> Value {
+    let mut spec = definition(
+        SAVE,
+        "提取网页正文并保存为工作区文本文件。",
+        json!({
+            "url":{"type":"string"},"target_path":{"type":"string"}
+        }),
+        "url",
+    );
+    spec["function"]["parameters"]["required"] = json!(["url", "target_path"]);
+    spec
+}
+
+pub(crate) struct Save {
+    pub(crate) arguments: Value,
+    url: String,
+    target: String,
+    method: Value,
+    characters: usize,
+    bytes: usize,
+}
+
+impl Save {
+    pub(crate) fn result(self, write: Value) -> Value {
+        if write["success"] != true {
+            return write;
+        }
+        json!({"success":true,"url":self.url,"path":write["path"].as_str().unwrap_or(&self.target),
+            "char_count":self.characters,"byte_size":self.bytes,"extract_method":self.method,"message":"网页已保存。"})
+    }
+}
+
+pub(crate) async fn prepare_save(data: &Path, args: &Value) -> Result<Save, Value> {
+    let target = text(args, "target_path").ok_or_else(|| failure("缺少网页的目标路径。"))?;
+    let url = text(args, "url").ok_or_else(|| failure("缺少网页地址。"))?;
+    let extracted = execute(data, EXTRACT, args).await;
+    if extracted["success"] != true {
+        return Err(extracted);
+    }
+    let content = extracted["content"]
+        .as_str()
+        .ok_or_else(|| failure("网页正文为空。"))?;
+    let arguments =
+        json!({"file_path":target,"content":content,"source_url":url,"intent":args["intent"]});
+    Ok(Save {
+        arguments,
+        url: url.into(),
+        target: target.into(),
+        method: extracted["method"].clone(),
+        characters: content.chars().count(),
+        bytes: content.len(),
+    })
 }
 
 fn definition(name: &str, description: &str, mut properties: Value, required: &str) -> Value {
@@ -56,7 +125,10 @@ pub(crate) async fn execute(data: &Path, name: &str, arguments: &Value) -> Value
 }
 
 fn text<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
-    value[key].as_str().map(str::trim).filter(|value| !value.is_empty())
+    value[key]
+        .as_str()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
 }
 
 fn failure(message: &str) -> Value {
@@ -73,15 +145,18 @@ fn credential(prefs: &Value, provider: &str) -> Option<String> {
         "searxng" => ("searxng_base_url", "AGENT_SEARXNG_BASE_URL"),
         _ => return None,
     };
-    text(prefs, key).map(str::to_owned)
+    text(prefs, key)
+        .map(str::to_owned)
         .or_else(|| std::env::var(env).ok().map(|value| value.trim().to_owned()))
         .filter(|value| !value.is_empty() && value != "your-tavily-api-key")
 }
 
-fn http_url(raw: &str) -> Result<Url, String> {
+pub(super) fn http_url(raw: &str) -> Result<Url, String> {
     let mut url = Url::parse(raw).map_err(|_| "请输入有效的 HTTP 或 HTTPS 地址")?;
-    if !matches!(url.scheme(), "http" | "https") || !url.has_host()
-        || !url.username().is_empty() || url.password().is_some()
+    if !matches!(url.scheme(), "http" | "https")
+        || !url.has_host()
+        || !url.username().is_empty()
+        || url.password().is_some()
     {
         return Err("请输入有效的 HTTP 或 HTTPS 地址".into());
     }
@@ -89,9 +164,12 @@ fn http_url(raw: &str) -> Result<Url, String> {
     Ok(url)
 }
 
-fn client() -> Result<Client, String> {
-    Client::builder().timeout(Duration::from_secs(45)).user_agent("Astrion/1.0")
-        .redirect(reqwest::redirect::Policy::none()).build()
+pub(super) fn client() -> Result<Client, String> {
+    Client::builder()
+        .timeout(Duration::from_secs(45))
+        .user_agent("Astrion/1.0")
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
         .map_err(|_| "无法初始化网页服务".into())
 }
 
@@ -114,46 +192,82 @@ async fn response_body(mut response: reqwest::Response) -> Result<Vec<u8>, Strin
     Ok(bytes)
 }
 
-async fn response_json(request: RequestBuilder) -> Result<Value, String> {
+pub(super) async fn response_json(request: RequestBuilder) -> Result<Value, String> {
     serde_json::from_slice(&response(request).await?).map_err(|_| "网页服务返回无效 JSON".into())
 }
 
 fn citation(url: &Url, title: &str, snippet: &str, time: &str, tool: &str) -> Value {
-    let mut normalized = format!("{}{}", url.origin().ascii_serialization(), url.path().trim_end_matches('/'));
+    let mut normalized = format!(
+        "{}{}",
+        url.origin().ascii_serialization(),
+        url.path().trim_end_matches('/')
+    );
     if let Some(query) = url.query().filter(|query| !query.is_empty()) {
         normalized.push('?');
         normalized.push_str(query);
     }
     // Keep citation IDs compatible with archived Python conversations.
     let hash = digest(&SHA1_FOR_LEGACY_USE_ONLY, normalized.as_bytes());
-    let id: String = hash.as_ref()[..5].iter().map(|byte| format!("{byte:02x}")).collect();
-    let title = if title.is_empty() { url.as_str() } else { title };
-    let domain = url.host_str().map(|host| host.strip_prefix("www.").unwrap_or(host));
+    let id: String = hash.as_ref()[..5]
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    let title = if title.is_empty() {
+        url.as_str()
+    } else {
+        title
+    };
+    let domain = url
+        .host_str()
+        .map(|host| host.strip_prefix("www.").unwrap_or(host));
     let mut value = json!({"id":format!("src_{id}"),"type":"url_citation","url":url.as_str(),
         "title":title,"domain":domain,"snippet":snippet.chars().take(300).collect::<String>(),"source_tool":tool});
-    if !time.is_empty() { value["published_date"] = json!(time); }
+    if !time.is_empty() {
+        value["published_date"] = json!(time);
+    }
     value
 }
 
 fn matches_domain(host: &str, domain: &str) -> bool {
-    host == domain || host.strip_suffix(domain).is_some_and(|prefix| prefix.ends_with('.'))
+    host == domain
+        || host
+            .strip_suffix(domain)
+            .is_some_and(|prefix| prefix.ends_with('.'))
 }
 
 /// Resolve only citations that were returned by an actual web tool call.
 pub(crate) fn annotate(message: &mut Value, history: &[Value]) {
-    let Some(text) = message["content"].as_str().filter(|text| text.contains("【cite:")) else { return; };
-    let call_ids: HashSet<_> = history.iter().filter(|row| row["role"] == "assistant")
+    let Some(text) = message["content"]
+        .as_str()
+        .filter(|text| text.contains("【cite:"))
+    else {
+        return;
+    };
+    let call_ids: HashSet<_> = history
+        .iter()
+        .filter(|row| row["role"] == "assistant")
         .flat_map(|row| row["tool_calls"].as_array().into_iter().flatten())
         .filter(|call| call["function"]["name"].as_str().is_some_and(supports))
-        .filter_map(|call| call["id"].as_str()).collect();
+        .filter_map(|call| call["id"].as_str())
+        .collect();
     let mut registry = HashMap::new();
-    for result in history.iter().filter(|row| row["role"] == "tool"
-        && row["tool_call_id"].as_str().is_some_and(|id| call_ids.contains(id)))
-    {
-        let Some(value) = result["content"].as_str().and_then(|text| serde_json::from_str::<Value>(text).ok()) else { continue; };
+    for result in history.iter().filter(|row| {
+        row["role"] == "tool"
+            && row["tool_call_id"]
+                .as_str()
+                .is_some_and(|id| call_ids.contains(id))
+    }) {
+        let Some(value) = result["content"]
+            .as_str()
+            .and_then(|text| serde_json::from_str::<Value>(text).ok())
+        else {
+            continue;
+        };
         for citation in value["citations"].as_array().into_iter().flatten() {
             if let Some(id) = citation["id"].as_str() {
-                registry.entry(id.to_owned()).or_insert_with(|| citation.clone());
+                registry
+                    .entry(id.to_owned())
+                    .or_insert_with(|| citation.clone());
             }
         }
     }
@@ -162,15 +276,23 @@ pub(crate) fn annotate(message: &mut Value, history: &[Value]) {
     let mut clean = String::new();
     let mut remaining = text;
     while let Some((before, marker)) = remaining.split_once("【cite:") {
-        let Some((refs, after)) = marker.split_once('】') else { break; };
+        let Some((refs, after)) = marker.split_once('】') else {
+            break;
+        };
         clean.push_str(before);
-        let valid: Vec<_> = refs.split([',','，']).map(str::trim).filter(|id| {
-            let Some(citation) = registry.get(*id) else { return false; };
-            if seen.insert(*id) {
-                citations.push(citation);
-            }
-            true
-        }).collect();
+        let valid: Vec<_> = refs
+            .split([',', '，'])
+            .map(str::trim)
+            .filter(|id| {
+                let Some(citation) = registry.get(*id) else {
+                    return false;
+                };
+                if seen.insert(*id) {
+                    citations.push(citation);
+                }
+                true
+            })
+            .collect();
         if !valid.is_empty() {
             clean.push_str("【cite:");
             clean.push_str(&valid.join(","));

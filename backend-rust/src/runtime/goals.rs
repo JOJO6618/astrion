@@ -199,6 +199,8 @@ impl Runtime {
         let goals = self.goals.clone();
         let goal_reviewer = self.goal_reviewer.clone();
         let sub_agents = self.sub_agents.as_ref().map(Arc::downgrade);
+        let personalization = self.personalization.clone();
+        let schedules = self.schedules.clone();
         move || {
             let result = (|| -> Result<(), RuntimeError> {
                 let Some(owner) = store.upgrade() else { return Ok(()) };
@@ -212,6 +214,8 @@ impl Runtime {
                         store, tools: tools.clone(), billing: billing.clone(), workflow: workflow.clone(),
                         goals: dispatch_goals.clone(), goal_reviewer: goal_reviewer.clone(),
                         sub_agents: sub_agents.as_ref().and_then(std::sync::Weak::upgrade),
+                        personalization: personalization.clone(),
+                        schedules: schedules.clone(),
                     };
                     match runtime.recover_goal(&workspace_id, &project_path, ticket, model.clone(), approval.clone()) {
                         Ok(()) => Dispatch::Started,

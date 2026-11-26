@@ -6,8 +6,11 @@ import http from 'node:http';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
+if (process.platform !== 'win32') throw new Error('Run the packaged smoke on Windows.');
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const executable = process.env.ASTRION_SMOKE_EXE || path.join(root, 'output/windows-electron/build/win-unpacked/astrion-desktop.exe');
+const executable = await fs.realpath(process.env.ASTRION_SMOKE_EXE || path.join(root, 'output/windows-electron/build/win-unpacked/astrion-desktop.exe'));
+const resources = path.join(path.dirname(executable), 'resources');
+const expectedBackend = await fs.realpath(path.join(resources, 'runtime/rust/astrion-headless.exe'));
 const output = path.join(root, `output/windows-electron/packaged-smoke-${Date.now()}`);
 await fs.mkdir(path.join(output, 'workspace'), { recursive: true });
 await fs.mkdir(path.join(output, 'data/config'), { recursive: true });
@@ -30,6 +33,7 @@ const fixture = http.createServer((_req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/html' });
   res.end('<title>Astrion packaged synthetic page</title><h1 id="fixture">Local browser fixture</h1><script>window.fixtureMarker="retained"</script>');
 });
+fixture.on('connect', (_request, socket) => socket.destroy());
 await new Promise(resolve => fixture.listen(0, '127.0.0.1', resolve));
 const fixtureURL = `http://127.0.0.1:${fixture.address().port}/fixture`;
 await fs.writeFile(path.join(output, 'data/config/custom_models.json'), JSON.stringify({ models: [{
@@ -38,20 +42,47 @@ await fs.writeFile(path.join(output, 'data/config/custom_models.json'), JSON.str
   reasoning_capability: 'fast,thinking', context_window: 100000, max_output_tokens: 2048, multimodal: ['image']
 }] }));
 const gatewayFile = path.join(output, 'gateway.json');
-const env = { ...process.env, ASTRION_ELECTRON_USER_DATA: path.join(output, 'profile'),
+const runtimeData = path.join(output, 'data/host/data');
+const inherited = Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^(ASTRION_|AGENT_|WEB_|DATA_DIR$|LOGS_DIR$|DEPLOY_CONFIG_DIR$|HOST_WORKSPACES_FILE$)/i.test(key)));
+const env = { ...inherited, ASTRION_ELECTRON_USER_DATA: path.join(output, 'profile'),
   ASTRION_DESKTOP_DATA_ROOT: path.join(output, 'data'), ASTRION_DESKTOP_SETTINGS_FILE: path.join(output, 'rundata-settings.json'),
   ASTRION_QUICK_SETTINGS_FILE: path.join(output, 'quick-settings.json'), ASTRION_QUICK_DISCOVERY_FILE: gatewayFile,
-  ASTRION_DESKTOP_INITIAL_WORKSPACE: path.join(output, 'workspace'), PYTHONUTF8: '1' };
+  ASTRION_DESKTOP_INITIAL_WORKSPACE: path.join(output, 'workspace'), DATA_DIR: runtimeData,
+  DEPLOY_CONFIG_DIR: path.join(output, 'data/config'), LOGS_DIR: path.join(output, 'data/host/logs'),
+  HOST_WORKSPACES_FILE: path.join(output, 'data/config/host_workspaces.json'), PYTHONUTF8: '1' };
 delete env.ELECTRON_RUN_AS_NODE;
 let child, browser, gateway, main;
 const logs = [];
 try {
-  child = spawn(executable, [`--remote-debugging-port=${debugPort}`, '--remote-debugging-address=127.0.0.1'], { env, windowsHide: false, stdio: ['ignore', 'pipe', 'pipe'] });
+  child = spawn(executable, [`--remote-debugging-port=${debugPort}`, '--remote-debugging-address=127.0.0.1',
+    `--proxy-server=http://127.0.0.1:${fixture.address().port}`], { env, windowsHide: false, stdio: ['ignore', 'pipe', 'pipe'] });
   child.stdout.on('data', b => logs.push(b.toString())); child.stderr.on('data', b => logs.push(b.toString()));
   child.on('error', e => errors.push(e.message));
   gateway = await until(async () => JSON.parse(await fs.readFile(gatewayFile, 'utf8')));
   check('packaged backend becomes ready using isolated bundled runtime', gateway.port > 0 && gateway.pid === child.pid, { port: gateway.port, shellPid: child.pid });
-  check('guardian is unpacked beside app.asar', !!(await fs.stat(path.join(path.dirname(executable), 'resources/app.asar.unpacked/src/windows/backend-guardian.py'))));
+  const origin = `http://127.0.0.1:${gateway.port}`;
+  const backend = await until(async () => {
+    const response = await fetch(origin + '/api/host-mode-enabled', { signal: AbortSignal.timeout(1500) });
+    return response.ok && response.json();
+  });
+  check('default backend identifies itself as Rust', backend.backend === 'rust' && Number.isSafeInteger(backend.pid) && backend.pid > 0, backend);
+  const powershell = path.join(env.SystemRoot, 'System32/WindowsPowerShell/v1.0/powershell.exe');
+  const ancestryQuery = `$r=Get-CimInstance Win32_Process -Filter 'ProcessId=${backend.pid}';` +
+    "$g=Get-CimInstance Win32_Process -Filter ('ProcessId=' + $r.ParentProcessId);" +
+    '@{backend=$r.ExecutablePath; guardian=$g.ExecutablePath; shell=$g.ParentProcessId} | ConvertTo-Json -Compress';
+  const ancestry = spawnSync(powershell, ['-NoProfile', '-NonInteractive', '-Command', ancestryQuery], {
+    timeout: 15000, windowsHide: true, encoding: 'utf8', env,
+  });
+  check('Windows reports the running backend and guardian paths', ancestry.status === 0 && !!ancestry.stdout.trim(), { status: ancestry.status });
+  const identity = JSON.parse(ancestry.stdout);
+  const samePath = (candidate, expected) => typeof candidate === 'string' && path.resolve(candidate).toLowerCase() === path.resolve(expected).toLowerCase();
+  check('Rust runs from the package under the native guardian', samePath(identity.backend, expectedBackend) &&
+    samePath(identity.guardian, path.join(resources, 'astrion-windows-helper.exe')) && identity.shell === child.pid, identity);
+  const token = (await fs.readFile(path.join(runtimeData, 'host_api_token'), 'utf8')).trim();
+  const sessions = await fetch(origin + '/api/runtime/sessions', { headers: {
+    authorization: `Bearer ${token}`, 'x-astrion-workspace-id': 'electron-smoke',
+  }, signal: AbortSignal.timeout(3000) });
+  check('bundled Rust answers an authenticated Gateway request offline', sessions.ok && (await sessions.json()).success === true);
   // 先探测 /json/version，确认调试端点就绪后再连接；从启动瞬间反复 connectOverCDP
   // 会在 Chromium 尚未监听时留下失败状态，之后的重试同样超时（0.10.3 后每次冒烟都卡在此处）。
   browser = await until(async () => {
@@ -147,7 +178,7 @@ try {
   await chrome.locator('.wc-close').click({ noWaitAfter: true }).catch(() => {});
   await until(() => child.exitCode !== null, 20000);
   check('closing the app exits its shell', child.exitCode === 0, { code: child.exitCode });
-  await until(async () => { try { await fetch(`http://127.0.0.1:${gateway.port}/api/health`); return false; } catch { return true; } }, 15000);
+  await until(async () => { try { await fetch(`http://127.0.0.1:${gateway.port}/api/host-mode-enabled`, { signal: AbortSignal.timeout(1000) }); return false; } catch { return true; } }, 15000);
   check('closing packaged app releases its backend port', true);
 } catch (error) {
   checks.push({ name: 'exception', ok: false, detail: error.stack });
@@ -169,7 +200,7 @@ try {
   await new Promise(resolve => fixture.close(resolve));
   await fs.writeFile(path.join(output, 'app.log'), logs.join(''));
   const hash = async file => createHash('sha256').update(await fs.readFile(file)).digest('hex');
-  const artifacts = { executable_sha256: await hash(executable), asar_sha256: await hash(path.join(path.dirname(executable), 'resources/app.asar')) };
+  const artifacts = { executable_sha256: await hash(executable), asar_sha256: await hash(path.join(resources, 'app.asar')), backend_sha256: await hash(expectedBackend) };
   const result = { success: checks.length > 0 && checks.every(row => row.ok), executable, output, artifacts, checks, rendererErrors: errors };
   await fs.writeFile(path.join(output, 'results.json'), JSON.stringify(result, null, 2));
   await fs.writeFile(path.join(root, 'output/windows-electron/packaged-smoke-latest.json'), JSON.stringify(result, null, 2));

@@ -6,8 +6,10 @@ use std::{
     time::{Duration, Instant},
 };
 
-use serde_json::Value;
+use serde_json::{Value, json};
 use uuid::Uuid;
+
+use super::{ModelConfig, Runtime};
 
 use crate::usage::{
     Actor, Ledger, PriceIdentity, PriceRefresh, PriceSnapshot, RequestTiming, SpeedSample, Tokens,
@@ -62,6 +64,7 @@ impl Billing {
             responses: lookup.responses,
             began_at: Instant::now(),
             first_output: None,
+            goal_run: None,
         }
     }
 }
@@ -77,7 +80,7 @@ pub(super) struct ModelPrice<'a> {
 pub(super) struct BillingScope {
     conversation_id: String,
     baseline: Tokens,
-    review: Option<(String, String)>,
+    actor: Option<(String, String, &'static str)>,
 }
 
 impl BillingScope {
@@ -102,7 +105,7 @@ impl BillingScope {
         Self {
             conversation_id,
             baseline,
-            review: None,
+            actor: None,
         }
     }
 
@@ -114,16 +117,50 @@ impl BillingScope {
         Self {
             conversation_id,
             baseline: Tokens::default(),
-            review: Some((format!("review_agent:{name}"), name.to_owned())),
+            actor: Some((
+                format!("review_agent:{name}"),
+                name.to_owned(),
+                "review_agent",
+            )),
+        }
+    }
+
+    pub(super) fn thinking_summary(conversation_id: String) -> Self {
+        Self {
+            conversation_id,
+            baseline: Tokens::default(),
+            actor: Some(("thinking_summary".into(), String::new(), "thinking_summary")),
+        }
+    }
+
+    fn sub_agent(conversation_id: String, id: &str, name: &str, previous: &Value) -> Self {
+        let usage = &previous["token_usage"];
+        let input = usage["prompt"].as_u64().unwrap_or_default();
+        let output = usage["completion"].as_u64().unwrap_or_default();
+        Self {
+            conversation_id,
+            actor: Some((id.to_owned(), name.to_owned(), "sub_agent")),
+            baseline: Tokens {
+                input_tokens: input,
+                output_tokens: output,
+                cached_input_tokens: usage["cached_input"].as_u64().unwrap_or_default(),
+                total_tokens: usage["total"]
+                    .as_u64()
+                    .unwrap_or_else(|| input.saturating_add(output)),
+                current_context_tokens: previous["current_context_tokens"]
+                    .as_u64()
+                    .unwrap_or_default(),
+            },
         }
     }
 
     fn actor(&self) -> Actor<'_> {
-        if let Some((id, name)) = &self.review {
-            return Actor::new(id, name, "review_agent");
-        }
-        let mut actor = Actor::new("main", "", "main");
-        actor.historical_unpriced = self.baseline.input_tokens > 0;
+        let mut actor = self.actor.as_ref().map_or_else(
+            || Actor::new("main", "", "main"),
+            |(id, name, kind)| Actor::new(id, name, kind),
+        );
+        actor.historical_unpriced = self.baseline.input_tokens > 0
+            || (actor.kind == "sub_agent" && self.baseline.total_tokens > 0);
         actor.baseline = self.baseline;
         actor
     }
@@ -131,7 +168,7 @@ impl BillingScope {
 
 /// Done once for each completed upstream response. Dropping a failed or
 /// cancelled attempt has no side effects. Calling this again keeps the same ID.
-pub(super) struct RequestBilling {
+pub(crate) struct RequestBilling {
     request_id: String,
     ledger: Ledger,
     scope: BillingScope,
@@ -139,6 +176,7 @@ pub(super) struct RequestBilling {
     responses: bool,
     began_at: Instant,
     first_output: Option<Instant>,
+    goal_run: Option<String>,
 }
 
 impl RequestBilling {
@@ -146,7 +184,7 @@ impl RequestBilling {
         &self.request_id
     }
 
-    pub(super) fn observe_text(&mut self, delta: &str) {
+    pub(crate) fn observe_text(&mut self, delta: &str) {
         if !delta.is_empty() {
             self.first_output.get_or_insert_with(Instant::now);
         }
@@ -159,6 +197,16 @@ impl RequestBilling {
         usage: Option<&Value>,
         responses_duration_ms: Option<u64>,
     ) -> io::Result<bool> {
+        self.settle_with_actor(usage, responses_duration_ms)
+            .await
+            .map(|actor| actor.is_some())
+    }
+
+    async fn settle_with_actor(
+        &self,
+        usage: Option<&Value>,
+        responses_duration_ms: Option<u64>,
+    ) -> io::Result<Option<Value>> {
         let entry = calculate_cost(usage, self.price.clone());
         let speed_sample = self
             .responses
@@ -176,7 +224,7 @@ impl RequestBilling {
         let scope = self.scope.clone();
         let request_id = self.request_id.clone();
         tokio::task::spawn_blocking(move || {
-            ledger.record_request(
+            ledger.record_request_with_actor(
                 &scope.conversation_id,
                 &request_id,
                 &scope.actor(),
@@ -186,6 +234,119 @@ impl RequestBilling {
         })
         .await
         .map_err(io::Error::other)?
+    }
+}
+
+impl Runtime {
+    pub(crate) async fn begin_child_billing(
+        &self,
+        parent: &str,
+        child: &str,
+        name: &str,
+        stats: &Value,
+        model: &ModelConfig,
+    ) -> RequestBilling {
+        let responses = reqwest::Url::parse(&model.endpoint).is_ok_and(|url| {
+            url.path().trim_end_matches('/').rsplit('/').next() == Some("responses")
+        });
+        let scope = BillingScope::sub_agent(parent.to_owned(), child, name, stats);
+        let mut request = self
+            .billing
+            .begin(
+                scope,
+                ModelPrice {
+                    model_key: model.key(),
+                    model_id: model.model_id(),
+                    identity: model.price_identity(),
+                    responses,
+                },
+            )
+            .await;
+        let goals = self.goals.clone();
+        let parent = parent.to_owned();
+        request.goal_run = tokio::task::spawn_blocking(move || {
+            let progress = goals.progress(&parent).ok()?;
+            matches!(
+                progress["status"].as_str(),
+                Some("running" | "reviewing" | "retrying")
+            )
+            .then(|| progress["run_id"].as_str().map(str::to_owned))
+            .flatten()
+        })
+        .await
+        .ok()
+        .flatten();
+        request
+    }
+
+    pub(crate) async fn settle_child_billing(
+        &self,
+        billing: &RequestBilling,
+        usage: Option<&Value>,
+        responses_duration_ms: Option<u64>,
+    ) -> Result<Option<Value>, String> {
+        let actor = billing
+            .settle_with_actor(usage, responses_duration_ms)
+            .await
+            .map_err(|error| format!("无法记录子智能体费用：{error}"))?;
+        if actor.is_some()
+            && let Some(run) = &billing.goal_run
+            && let Some(usage) = usage.and_then(crate::usage::normalize_usage)
+        {
+            let goals = self.goals.clone();
+            let (parent, run, request_id) = (
+                billing.scope.conversation_id.clone(),
+                run.clone(),
+                billing.request_id.clone(),
+            );
+            tokio::task::spawn_blocking(move || {
+                goals.record_conversation_usage(&parent, &run, &request_id, usage.total_tokens)
+            })
+            .await
+            .map_err(|error| error.to_string())?
+            .map_err(|error| error.message)?;
+        }
+        Ok(actor)
+    }
+
+    pub(crate) async fn recover_child_billing(
+        &self,
+        parent: &str,
+        child: &str,
+        stats: &mut Value,
+    ) -> io::Result<()> {
+        let ledger = self.billing.ledger.clone();
+        let (parent, child) = (parent.to_owned(), child.to_owned());
+        let actor = tokio::task::spawn_blocking(move || ledger.actor_statistics(&parent, &child))
+            .await
+            .map_err(io::Error::other)??;
+        let Some(actor) = actor.filter(|actor| actor["kind"] == "sub_agent") else {
+            return Ok(());
+        };
+        if !stats.is_object() {
+            *stats = json!({});
+        }
+        if let Some(total) = actor["total_tokens"]
+            .as_u64()
+            .filter(|total| *total > stats["token_usage"]["total"].as_u64().unwrap_or_default())
+        {
+            stats["token_usage"] = json!({"prompt":actor["input_tokens"],"completion":actor["output_tokens"],
+                "cached_input":actor["cached_input_tokens"],"total":total});
+            if let Some(context) = actor["current_context_tokens"].as_u64() {
+                stats["current_context_tokens"] = json!(context);
+            }
+        }
+        if let Some(requests) = actor["requests"].as_u64() {
+            let calls = stats["api_calls"].as_u64().unwrap_or_default();
+            let recovered = stats["cost_ledger_requests"].as_u64().map_or_else(
+                || calls.max(requests),
+                |tracked| calls.saturating_add(requests.saturating_sub(tracked)),
+            );
+            stats["api_calls"] = json!(recovered);
+            stats["cost_ledger_requests"] = json!(requests);
+        }
+        stats["cost_usd"] = actor["cost_usd"].clone();
+        Ok(())
     }
 }
 
@@ -219,3 +380,7 @@ fn milliseconds(duration: Duration) -> u64 {
 #[cfg(test)]
 #[path = "../../../test/2026-11-24_Rust后端/usage_runtime_billing.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../../../test/2026-11-27_Rust子智能体费用/billing.rs"]
+mod child_tests;

@@ -1,4 +1,5 @@
 mod lines;
+pub(super) mod agent_tools;
 
 use super::{Runtime, RuntimeError, verify_workspace_binding};
 use crate::{

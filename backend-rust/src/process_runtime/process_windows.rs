@@ -20,10 +20,10 @@ use windows_sys::Win32::{
 
 const POLL: Duration = Duration::from_millis(15);
 
-pub(super) fn spawn(command: Command, timeout: Option<Duration>, shared: Arc<Shared>) -> io::Result<()> {
+pub(super) fn spawn(command: Command, timeout: Option<Duration>, shared: Arc<Shared>, input: bool) -> io::Result<()> {
     let (ready, wait) = std::sync::mpsc::sync_channel(0);
     std::thread::Builder::new().name("astrion-host-process".into()).spawn(move || {
-        let (mut child, job) = match start(command, timeout.is_none()) {
+        let (mut child, job) = match start(command, input) {
             Ok(result) => result,
             Err(error) => { let _ = ready.send(Err(error)); return; }
         };

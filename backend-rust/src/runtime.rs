@@ -1,8 +1,11 @@
 mod agent;
+mod admission_recovery;
 mod approval;
+pub(crate) mod automatic_title;
 mod billing;
 mod chat;
 mod chat_handoff;
+mod child_processes;
 pub mod conversation_duplicate;
 mod conversation_lifecycle;
 pub use conversation_lifecycle::ConversationSelection;
@@ -15,9 +18,13 @@ mod git_review;
 mod goals;
 pub mod guidance;
 pub mod host_policy;
+mod host_modes;
 mod host_policy_setup;
 mod navigation;
 mod mcp;
+mod native_browser;
+mod native_browser_files;
+pub use native_browser::DesktopBrowser;
 pub mod process_resources;
 mod interactions;
 mod scheduling;
@@ -27,9 +34,14 @@ pub mod preview;
 mod preview_tracking;
 pub(crate) mod store;
 mod task_list;
+pub(crate) mod thinking;
+pub(crate) mod thinking_auxiliary;
 mod tool_loading;
+mod knowledge_tools;
+mod custom_tools;
+mod schedule_tools;
 pub mod transfer;
-mod todos;
+pub(crate) mod todos;
 mod tool_categories;
 mod sub_agent_execution;
 mod system_prompt;
@@ -82,6 +94,8 @@ pub struct Runtime {
     goals: Goals,
     goal_reviewer: Option<GoalReviewer>,
     sub_agents: Option<Arc<crate::sub_agents::SubAgents>>,
+    personalization: Option<crate::web_assets::personalization::Personalization>,
+    schedules: Arc<std::sync::OnceLock<crate::schedules::ScheduleLink>>,
 }
 
 type ToolFuture<'a> = Pin<Box<dyn Future<Output = Result<Value, String>> + Send + 'a>>;
@@ -124,6 +138,7 @@ struct AdmittedTask {
     saved_context_tokens: Option<u64>,
     fast: bool,
     completion: Arc<TaskCompletion>,
+    title_input: Option<(String, String)>,
 }
 
 /// A terminal result becomes observable after its supervisor gives up the store.
@@ -229,6 +244,12 @@ impl ModelConfig {
     pub(crate) fn model_id(&self) -> &str { &self.model }
     pub(crate) fn price_identity(&self) -> &PriceIdentity { &self.price_identity }
     pub(crate) fn supports_images(&self) -> bool { matches!(self.prompt_multimodal, "image" | "image,video") }
+    pub(crate) fn supports_videos(&self) -> bool { matches!(self.prompt_multimodal, "video" | "image,video") }
+
+    fn uses_responses(&self) -> bool {
+        self.subscription.is_some() || reqwest::Url::parse(&self.endpoint)
+            .is_ok_and(|url| url.path().trim_end_matches('/').rsplit('/').next() == Some("responses"))
+    }
 
     pub fn with_session(mut self, session_id: &str, fast: bool) -> Self {
         if let Some(subscription) = &mut self.subscription {
@@ -252,7 +273,16 @@ impl ModelConfig {
         messages: &[Value],
         tools: &[Value],
         budget: &mut model::RoundBudget,
-        on_text: impl FnMut(&str),
+        mut on_text: impl FnMut(&str),
+    ) -> Result<Completion, String> {
+        self.complete_with_updates(messages, tools, budget, |delta| {
+            if let model::StreamDelta::Text(text) = delta { on_text(text); }
+        }).await
+    }
+
+    pub(crate) async fn complete_with_updates(
+        &self, messages: &[Value], tools: &[Value], budget: &mut model::RoundBudget,
+        on_delta: impl FnMut(model::StreamDelta<'_>),
     ) -> Result<Completion, String> {
         let options = self.context_window.map(|window| {
             let mut options = self.options.clone();
@@ -268,10 +298,10 @@ impl ModelConfig {
                 session_id: &request.session_id, fast: request.fast,
                 max_output_tokens: options.max_output_tokens, model_info: &request.selected.model_info,
             };
-            return model::codex::complete(&transport, &self.model, messages, tools, &params, on_text).await;
+            return model::codex::complete_with_updates(&transport, &self.model, messages, tools, &params, on_delta).await;
         }
-        model::complete_with_options(
-            &self.endpoint, self.api_key.as_deref(), &self.model, messages, tools, options, on_text,
+        model::complete_with_updates(
+            &self.endpoint, self.api_key.as_deref(), &self.model, messages, tools, options, on_delta,
         ).await
     }
 
@@ -339,7 +369,22 @@ impl Runtime {
         let store = Store::open(data_dir.as_ref())?;
         let billing = billing::Billing::new(&store.data_dir);
         let goals = Goals::new(&store.data_dir);
-        Ok(Self { store: Arc::new(Mutex::new(store)), tools, billing, workflow: None, goals, goal_reviewer: None, sub_agents: None })
+        Ok(Self { store: Arc::new(Mutex::new(store)), tools, billing, workflow: None, goals, goal_reviewer: None, sub_agents: None, personalization: None, schedules: Arc::default() })
+    }
+
+    pub fn set_schedule_service(&self, service: &crate::schedules::ScheduleService) {
+        let _ = self.schedules.set(service.link());
+    }
+
+    pub fn with_personalization(mut self, settings: crate::web_assets::personalization::Personalization) -> Self {
+        self.personalization = Some(settings);
+        self
+    }
+
+    fn can_edit_settings(&self, task_id: &str) -> Result<bool,String> {
+        let store = self.store().map_err(|error|error.message)?;
+        let (_, settings) = approval::task_scope(&store, task_id)?;
+        Ok(settings.process_modes().is_some_and(|(permission,_)| permission != crate::approval::PermissionMode::ReadOnly))
     }
 
     pub fn with_pricing(mut self, config_dir: impl AsRef<Path>) -> Self {
@@ -574,6 +619,9 @@ impl Runtime {
             goals::verify_goal_identity(store, workspace_id, &conversation_id)?;
         }
         let mut document = document.into_raw();
+        if !create && matches!(origin, Origin::User) {
+            admission_recovery::recover_idle_agent(store, &mut document)?;
+        }
         if let Some(title) = admission.title {
             document["title"] = json!(title);
             document["metadata"]["title"] = json!(title);
@@ -675,6 +723,10 @@ impl Runtime {
             }
             let prior_count = document.raw()["messages"].as_array().unwrap().len();
             let document = append_document(document, durable, created_at, None, Some(&model.key))?;
+            let title_input = (prior_count == 0 && matches!(origin, Origin::User)
+                && !message.trim().is_empty())
+                .then(|| automatic_title::eligible(document.raw())).flatten()
+                .map(|title| (title.to_owned(), message.to_owned()));
             task.version_message_id = document.raw()["messages"].as_array()
                 .and_then(|rows| rows.len().checked_sub(submitted_count).and_then(|index| rows.get(index)))
                 .and_then(|message| message["message_id"].as_str()).map(str::to_owned);
@@ -694,25 +746,29 @@ impl Runtime {
                 task.goal_run = Some(assignment.run.clone());
             }
             task.checkpoint_events();
-            prepared = Some((billing_scope, saved_context_tokens, messages));
+            prepared = Some((billing_scope, saved_context_tokens, messages, title_input));
             Ok(())
         }).map(|assignment| {
             if let Some(assignment) = assignment {
                 task.emit("goal_progress", assignment.progress);
             }
         })?;
-        let (billing_scope, saved_context_tokens, messages) = prepared.expect("admission persisted the task");
+        let (billing_scope, saved_context_tokens, messages, title_input) = prepared.expect("admission persisted the task");
         store.register_task(task);
         Ok(AdmittedTask {
             handle, cancel, workspace_id: workspace_id.into(), conversation_id,
             task_id, created_at, billing_scope, messages, tools, saved_context_tokens, fast, completion,
+            title_input,
         })
     }
 
     fn spawn_admitted(&self, admitted: AdmittedTask, model: ModelConfig) -> Value {
         let AdmittedTask { handle, cancel, workspace_id, conversation_id, task_id, created_at,
-            billing_scope, messages, tools, saved_context_tokens, fast, completion } = admitted;
-        let model = model.with_session(&conversation_id, fast);
+            billing_scope, messages, tools, saved_context_tokens, fast, completion, title_input } = admitted;
+        let model = self.with_conversation_session(model, &workspace_id, &conversation_id, fast);
+        if let Some((title, first_message)) = title_input {
+            self.spawn_automatic_title(&workspace_id, &conversation_id, &title, &first_message);
+        }
         let runtime = self.clone();
         let worker_runtime = self.clone();
         let worker_id = task_id.clone();
@@ -748,12 +804,18 @@ impl Runtime {
         from: u64,
     ) -> Result<Value, RuntimeError> {
         let store = self.store()?;
-        Ok(store
+        let task = store
             .tasks
             .get(task_id)
             .filter(|task| task.workspace_id == workspace_id)
-            .ok_or_else(RuntimeError::task_not_found)?
-            .poll(from))
+            .ok_or_else(RuntimeError::task_not_found)?;
+        let mut result = task.poll(from);
+        if workspace_id.is_empty() {
+            result["data"]["title_pending"] = json!(store.pending_titles.contains(
+                &(String::new(), task.conversation_id.clone()),
+            ));
+        }
+        Ok(result)
     }
 
     pub fn stop_task_admission(&self) -> Result<(), RuntimeError> {
@@ -876,6 +938,32 @@ impl Runtime {
     fn task_has_approval_scope(&self, id: &str) -> Result<bool, String> {
         let mut store = self.store().map_err(|error| error.message)?;
         Ok(writable_task(&mut store, id)?.approval.is_some())
+    }
+
+    fn skill_roots(&self, task_id: &str, source: &str) -> Result<(PathBuf,PathBuf),String> {
+        let mut store = self.store().map_err(|error|error.message)?;
+        let task = writable_task(&mut store,task_id)?;
+        let execution = task.execution_root.clone();
+        let workspace = task.workspace_id.clone();
+        let root = store.workspaces.get(&workspace).ok_or("Missing skill workspace")?.clone();
+        let authorized = host_policy::native_path_root(&store,task_id,source,true)?;
+        let source_root = authorized.or(execution).unwrap_or_else(||root.clone());
+        Ok((root,source_root))
+    }
+
+    fn media_roots(&self, task_id: &str, path: &str, aliases: &Value) -> Result<(PathBuf, PathBuf), String> {
+        let mut store = self.store().map_err(|error| error.message)?;
+        let task = writable_task(&mut store, task_id)?;
+        let execution = task.execution_root.clone();
+        let workspace = task.workspace_id.clone();
+        let root = store.workspaces.get(&workspace).ok_or("Missing media workspace")?.clone();
+        let execution = execution.unwrap_or_else(|| root.clone());
+        if aliases.get(path).is_none() {
+            if let Some(external) = host_policy::native_path_root(&store, task_id, path, false)? {
+                return Ok((external.clone(), external));
+            }
+        }
+        Ok((root, execution))
     }
 
     fn web_request_context(&self, task_id: &str) -> Result<Option<PathBuf>, String> {
@@ -1020,11 +1108,9 @@ fn new_document_with_id(
         },
         "token_statistics":{}
     });
-    if let Some(state) = crate::web_assets::personalization::deferred_snapshot(&store.data_dir)
-        .map_err(RuntimeError::storage)?
-    {
-        raw["metadata"]["tool_loading"] = state;
-    }
+    let tool_preferences = crate::web_assets::personalization::runtime_creation_tools(&store.data_dir)
+        .map_err(RuntimeError::storage)?;
+    raw["metadata"].as_object_mut().expect("new conversation metadata").extend(tool_preferences);
     if let Some(overrides) = store.draft_categories.get(workspace_id) {
         raw["metadata"]["runtime_tool_category_overrides"] = overrides.clone();
     }

@@ -133,7 +133,7 @@ fn reject_data(knowledge: &Knowledge, dir: &Dir) -> io::Result<()> {
     Ok(())
 }
 
-fn valid_id(id: &str) -> bool {
+pub(crate) fn valid_id(id: &str) -> bool {
     let mut bytes = id.bytes();
     bytes
         .next()

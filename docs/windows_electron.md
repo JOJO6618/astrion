@@ -14,7 +14,7 @@ Windows Electron 当前线上正式版为 **0.10.3**（2026-11-15 发布，安�
 
 ## 构建
 
-必须使用 Windows 原生 Node、Python 与 Rust MSVC 工具链。不要在 WSL/Linux 中执行 Windows `.exe`。
+使用 Windows x64 原生 Node 与 Rust MSVC 工具链。Chrome 导入需要 `desktop/src-tauri/runtime/python/python.exe` 和随解释器安装的 `cryptography`。
 
 ```cmd
 set "ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/"
@@ -22,13 +22,13 @@ npm ci --prefix desktop-electron --no-audit --no-fund
 node desktop-electron\scripts\build_windows.mjs
 ```
 
-构建先生成共享前端，再构建 Windows native helper、调用 `desktop/scripts/prepare_backend.py` staging 后端，最后运行 electron-builder。已有本次前端/helper 产物时可用 `--skip-frontend --skip-native`；仅目录包加 `--dir`。所有构建固定 `--publish never`。
+构建先生成共享前端与 Windows native helper，再用 `x86_64-pc-windows-msvc` 构建 Rust 后端，并将 `astrion-headless.exe`、Web 静态资源及 WSL2 安装脚本打入 `resources/runtime/rust`。`resources/runtime/python` 的解释器供私有 Chrome 导入 worker 使用。Host 服务启动由包内 Rust sidecar 和 Windows Job guardian 负责。已有本次前端与 helper 时可用 `--skip-frontend --skip-native`，已有本次 Rust 二进制或 Web 静态目录时可指定 `ASTRION_RUST_BACKEND_BIN` 或 `ASTRION_RUST_STATIC_ROOT`。仅目录包加 `--dir`，构建固定 `--publish never`。
 
 - Windows 版本及说明：`desktop-electron/windows-release.json`，由 builder 的 `extraMetadata.version` 注入。
 - macOS 版本：`desktop-electron/package.json`，独立维护。
 - Windows 配置：`desktop-electron/electron-builder.win.cjs`。
 - 输出：`output/windows-electron/build/win-unpacked/astrion-desktop.exe` 与 `Astrion-<version>-windows-x64-setup.exe`。
-- 构建回执：`output/windows-electron/build-receipt.json`；构建成功不代表原生交互验证成功。
+- 构建回执 `output/windows-electron/build-receipt.json` 记录 shell 与 Rust 后端的路径和 SHA-256。包内验收另有回执。
 
 Windows 普通用户可能无法解压 winCodeSign 归档中的 macOS 符号链接。`test/2026-11-13_WindowsElectron/prepare_sign_cache.py` 可从已下载归档仅准备 Windows rcedit 工具，排除不用的 Darwin 目录；不关闭签名配置、不修改系统权限。
 
@@ -126,7 +126,7 @@ desktop-electron\node_modules\electron\dist\electron.exe test\2026-11-13_Windows
 node test\2026-11-13_WindowsElectron\packaged_smoke.mjs
 ```
 
-包内 smoke 自行设置独立 `ASTRION_ELECTRON_USER_DATA`、`ASTRION_DESKTOP_DATA_ROOT`、`ASTRION_DESKTOP_SETTINGS_FILE`、`ASTRION_QUICK_SETTINGS_FILE`、`ASTRION_QUICK_DISCOVERY_FILE` 和合成工作区。CDP 调试端口只在该次测试启动中启用，不写入产品启动参数。
+包内 smoke 使用独立 Electron profile、运行数据和合成工作区，并让 Chromium 的外部请求经过仅当次测试使用的本地代理。测试读取正常入口的 Rust PID，核验实际可执行文件位于目录包内、父进程为随包 guardian、后者由当前 Electron 启动，同时验证带 Bearer 的本地 Gateway 请求和关闭后的端口回收。完整操作和实际后端 SHA-256 记录于 `output/windows-electron/packaged-smoke-latest.json`。CDP 调试端口仅用于本次烟测。
 
 独立安装配置 `test/2026-11-13_WindowsElectron/installer-test.cjs` 使用不同 appId、产品名、exe、安装目录、快捷方式与 localhost 更新源；不访问生产旧 Tauri 登记。
 

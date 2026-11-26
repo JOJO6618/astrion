@@ -2,7 +2,7 @@ use std::{
     collections::HashSet,
     fs::{File, OpenOptions},
     path::Path,
-    sync::{Arc, Mutex, TryLockError},
+    sync::{Arc, Mutex, TryLockError, Weak},
 };
 
 use jiff::Timestamp;
@@ -21,9 +21,53 @@ use super::{
 #[derive(Clone)]
 pub struct ScheduleService(Arc<Service>);
 
+#[derive(Clone)]
+pub(crate) struct ScheduleLink(Weak<Service>);
+
+impl ScheduleLink {
+    pub(crate) fn get(&self) -> Option<ScheduleService> { self.0.upgrade().map(ScheduleService) }
+}
+
+pub(crate) struct AgentScheduleScope {
+    pub workspace: String,
+    pub conversation: String,
+    pub permission: crate::approval::PermissionMode,
+    pub execution: crate::approval::ExecutionMode,
+    pub network: String,
+}
+
+impl AgentScheduleScope {
+    fn authorize(&self, settings: &Value) -> Result<()> {
+        use crate::approval::{ExecutionMode, PermissionMode};
+        let permission = match self.permission {
+            PermissionMode::ReadOnly => 0,
+            PermissionMode::Approval => 1,
+            PermissionMode::AutoApproval => 2,
+            PermissionMode::Unrestricted => 3,
+        };
+        let target_permission = match settings["permission_mode"].as_str() {
+            Some("readonly") => 0, Some("approval") => 1, Some("auto_approval") => 2, Some("unrestricted") => 3,
+            _ => return Err(ScheduleError::forbidden("无法确认计划的权限档位")),
+        };
+        let network = |value| match value { "none"=>0, "restricted"=>1, "full"=>2, _=>3 };
+        if target_permission > permission {
+            return Err(ScheduleError::forbidden("计划权限高于当前对话"));
+        }
+        if settings["execution_mode"] == "direct" && self.execution != ExecutionMode::Direct {
+            return Err(ScheduleError::forbidden("当前沙箱对话不能创建或启动完全访问计划"));
+        }
+        if network(settings["network_permission"].as_str().unwrap_or_default()) > network(&self.network) {
+            return Err(ScheduleError::forbidden("计划网络权限高于当前对话"));
+        }
+        Ok(())
+    }
+}
+
+
 struct Service {
     store: Store,
     adapter: Arc<dyn ScheduleAdapter>,
+    mutations: Mutex<()>,
 }
 
 /// Holds the same lease as the Python scheduler for as long as the caller can tick.
@@ -47,7 +91,26 @@ impl ScheduleService {
         Ok(Self(Arc::new(Service {
             store: Store::open(data_root.as_ref())?,
             adapter,
+            mutations: Mutex::new(()),
         })))
+    }
+
+    pub(crate) fn link(&self) -> ScheduleLink { ScheduleLink(Arc::downgrade(&self.0)) }
+
+    pub(crate) fn submit_agent(&self, scope: &AgentScheduleScope, path: &str, bytes: &[u8], overwrite: bool)
+        -> Result<Value> {
+        let text = std::str::from_utf8(bytes).map_err(|_|ScheduleError::invalid("计划文件必须为 UTF-8。"))?;
+        let value = yaml::parse(text)?;
+        let principal = HostPrincipal::new(Some(scope.workspace.clone()));
+        let source = json!({"kind":"agent","conversation_id":scope.conversation,"file_path":path});
+        self.submit_scoped_at(&principal,&value,&json!(scope.workspace),overwrite,Timestamp::now(),Some((scope,&source)))
+    }
+
+    pub(crate) fn manage_agent(&self, scope: &AgentScheduleScope, args: &Value) -> Result<Value> {
+        let id = schema::identifier(&args["schedule_id"],"schedule_id")?;
+        let action = args["action"].as_str().ok_or_else(||ScheduleError::invalid("缺少计划操作"))?;
+        self.manage_scoped_at(id,action,args["revision"].as_i64(),args["run_id"].as_str(),args["request_id"].as_str(),
+            Timestamp::now(),Some(scope))
     }
 
     /// Only the process replacing the previous runtime should acquire the lease and reconcile runs.
@@ -83,14 +146,21 @@ impl ScheduleService {
         self.submit_at(host, value, workspace, overwrite, Timestamp::now())
     }
 
-    fn submit_at(
+    fn submit_at(&self, host: &HostPrincipal, value: &Value, workspace: &Value, overwrite: bool, now: Timestamp)
+        -> Result<Value> {
+        self.submit_scoped_at(host,value,workspace,overwrite,now,None)
+    }
+
+    fn submit_scoped_at(
         &self,
         host: &HostPrincipal,
         value: &Value,
         workspace: &Value,
         overwrite: bool,
         now: Timestamp,
+        agent: Option<(&AgentScheduleScope,&Value)>,
     ) -> Result<Value> {
+        let _mutations = self.0.mutations.lock().map_err(ScheduleError::storage)?;
         let value = schema::input(value)?;
         let previous = if overwrite && !value["id"].is_null() {
             Some(
@@ -122,6 +192,10 @@ impl ScheduleService {
             }
         }
         let snapshot = self.0.adapter.validate(&definition, &principal)?;
+        if let Some((scope,_)) = agent {
+            scope.authorize(&self.0.adapter.agent_settings(&definition,&principal)?)?;
+        }
+
         principal["host_workspace_id"] = definition["target"]["workspace_id"].clone();
         if let Some(fields) = principal.as_object_mut() {
             fields.remove("configuration_snapshot");
@@ -135,10 +209,12 @@ impl ScheduleService {
         let next = (definition["enabled"] == true)
             .then(|| rule.next(now))
             .flatten();
+        let page = json!({"kind":"page"});
+        let source = agent.map_or(&page, |(_,source)| source);
         let plan = self.0.store.put(
             definition,
             &principal,
-            &json!({"kind":"page"}),
+            source,
             overwrite,
             next,
             now,
@@ -221,7 +297,12 @@ impl ScheduleService {
         self.manage_at(id, action, revision, run_id, request_id, Timestamp::now())
     }
 
-    fn manage_at(
+    fn manage_at(&self, id: &str, action: &str, revision: Option<i64>, run_id: Option<&str>,
+        request_id: Option<&str>, now: Timestamp) -> Result<Value> {
+        self.manage_scoped_at(id,action,revision,run_id,request_id,now,None)
+    }
+
+    fn manage_scoped_at(
         &self,
         id: &str,
         action: &str,
@@ -229,8 +310,18 @@ impl ScheduleService {
         run_id: Option<&str>,
         request_id: Option<&str>,
         now: Timestamp,
+        agent: Option<&AgentScheduleScope>,
     ) -> Result<Value> {
+        let _mutations = self.0.mutations.lock().map_err(ScheduleError::storage)?;
         let mut plan = self.0.store.get(id, false)?;
+        if let Some(scope) = agent {
+            if revision.is_some_and(|revision| revision != plan.revision) {
+                return Err(ScheduleError::conflict("计划版本已更新"));
+            }
+            if matches!(action,"enable"|"run") {
+                scope.authorize(&self.0.adapter.agent_settings(&plan.definition,&plan.principal)?)?;
+            }
+        }
         match action {
             "enable" => {
                 if revision.is_some_and(|revision| revision != plan.revision) {

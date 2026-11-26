@@ -11,6 +11,12 @@ const summary = 'Saved fixture summary: the user asked to process the isolated n
 const original = 'Initial fixture turn: read the isolated note repeatedly.';
 async function startMock() {
   const requests = [];
+  let gate;
+  function pauseNext(){
+    const started=Promise.withResolvers(), release=Promise.withResolvers();
+    gate={started,release};
+    return {arrived:started.promise,resume:()=>release.resolve()};
+  }
   const server = createServer(async (req, res) => {
     const bytes = [];
     for await (const b of req) bytes.push(b);
@@ -18,9 +24,15 @@ async function startMock() {
     const messages = body.messages;
     const count = messages.filter(m => m.role === 'tool').length;
     const last = messages.at(-1);
-    const summarizing = !body.tools?.length;
+    const summarizing = last.role === 'user' && last.content?.includes?.('对用户最新输入的响应进度');
     requests.push({ body, at: Date.now(), summarizing });
-    const tool = !summarizing && last.content !== 'after compression' && count < 10;
+    if(gate){
+      const current=gate;
+      gate=null;
+      current.started.resolve();
+      await current.release.promise;
+    }
+    const tool = !summarizing && messages.some(m=>m.content===original) && last.content !== 'after compression' && count < 10;
     const delta = tool ? { tool_calls: [{ index:0,id:'call_fixture_'+count,type:'function',function:{name:'read_file',arguments:JSON.stringify({path:'note.txt', type:'read'})}}]} :
       {content:summarizing?summary:last.content==='after compression'?'Resumed the summary.':'Completed ten file reads.'};
     res.writeHead(200,{'content-type':'text/event-stream'});
@@ -30,13 +42,13 @@ async function startMock() {
     res.end('data: [DONE]\n\n');
   });
   const port=await listenOnLoopback(server);
-  return {endpoint:'http://127.0.0.1:'+port+'/v1/chat/completions',requests,close:()=>closeServer(server)};
+  return {endpoint:'http://127.0.0.1:'+port+'/v1/chat/completions',requests,pauseNext,close:()=>closeServer(server)};
 }
 
 test('a long Agent tool run completes, compresses in place, and continues from its summary', {timeout:90000}, async t=>{
   const options={model,startMock,workspaceIds:['default'],web:true,async prepare({workspace,dataDir}){
     await writeFile(join(workspace,'note.txt'),'isolated file contents');
-    await writeFile(join(dataDir,'personalization.json'),JSON.stringify({default_work_mode:'execute',default_permission_mode:'approval'}));
+    await writeFile(join(dataDir,'personalization.json'),JSON.stringify({default_work_mode:'execute',default_permission_mode:'approval',auto_generate_title:false}));
   }};
   const app=process.env.ASTRION_RUNTIME_TEST_APP;
   const f=app?await startAppRuntimeFixture(t,app,options):await startGatewayFixture(t,options);
@@ -63,6 +75,8 @@ test('a long Agent tool run completes, compresses in place, and continues from i
   await poll.until('compression',row=>row.status==='succeeded');
   const event=poll.events.find(e=>e.type==='compression_finished');
   assert.equal(event.data.guide_inserted,true);
+  const summaryRequest=mock.requests.find(entry=>entry.summarizing);
+  assert.deepEqual(summaryRequest.body.tools,mock.requests[10].body.tools);
   assert.ok((await readFile(join(f.workspace,event.data.compact_file),'utf8')).includes(original));
   const status=await (await fetch(base+prefix+'/compression_status',{headers})).json();
   assert.equal(status.data.compression_count,1);
@@ -72,5 +86,26 @@ test('a long Agent tool run completes, compresses in place, and continues from i
   const last=mock.requests.at(-1).body.messages;
   assert.ok(last.some(m=>m.content?.includes?.(summary)));
   assert.ok(!last.some(m=>m.content===original || m.role==='tool'));
-  t.diagnostic('10 actual read_file calls, '+mock.requests.length+' model SSE requests, one compact file and one resumed task');
+  const gate=mock.pauseNext();
+  const queued=await createTask(gateway,task.conversationId,'Queue compression before the final answer.');
+  await gate.arrived;
+  const queuedReply=await fetch(base+prefix+'/compress',{method:'POST',headers,body:'{}'});
+  assert.equal(queuedReply.status,202);
+  assert.equal((await queuedReply.json()).data.queued,true);
+  gate.resume();
+  await queued.until('queued summary and resumed reply',row=>row.status==='succeeded');
+  assert.equal(queued.events.filter(e=>e.type==='compression_finished').length,1);
+  assert.match(mock.requests.at(-1).body.messages.at(-1).content,/当前运行时状态/);
+  assert.equal(mock.requests.at(-1).summarizing,false);
+  const countBefore=mock.requests.length;
+  const cancelGate=mock.pauseNext();
+  const started=await (await fetch(base+prefix+'/compress',{method:'POST',headers,body:'{}'})).json();
+  await cancelGate.arrived;
+  assert.equal((await fetch(base+prefix+'/compression_cancel',{method:'POST',headers,body:'{}'})).status,200);
+  cancelGate.resume();
+  await trackTask(gateway,started.data.task_id,task.conversationId).until('canceled manual compression',row=>row.status==='stopped');
+  const canceled=await(await fetch(base+prefix+'/compression_status',{headers})).json();
+  assert.equal(canceled.data.compression_count,2);
+  assert.equal(canceled.data.compression_in_progress,false);
+  t.diagnostic('10 real file reads, manual and queued summaries, resumed model request and canceled summary; '+countBefore+' SSE requests before cancellation.');
 });

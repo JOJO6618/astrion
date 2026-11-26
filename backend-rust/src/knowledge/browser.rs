@@ -3,7 +3,7 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
     io::{self, ErrorKind},
-    path::Path,
+    path::{Path, PathBuf},
     sync::Arc,
 };
 
@@ -177,6 +177,7 @@ impl BrowserPreferences {
         let backend = Arc::new(RuntimeQueries {
             runtime,
             data: data.try_clone()?,
+            data_path: data_dir.canonicalize()?,
         });
         Ok(Self(Arc::new(Preferences {
             data,
@@ -465,9 +466,28 @@ fn conversation(raw: &str) -> Option<String> {
 struct RuntimeQueries {
     runtime: Runtime,
     data: Dir,
+    data_path: PathBuf,
 }
 
 impl BrowserRuntime for RuntimeQueries {
+    fn supported(&self) -> bool {
+        self.runtime.desktop_browser_supported()
+    }
+
+    fn change_mode(
+        &self,
+        workspace: &str,
+        conversation: &str,
+        enabled: bool,
+    ) -> Result<Option<BrowserPending>, BrowserError> {
+        self.runtime
+            .change_browser_tools(workspace, conversation, enabled)
+    }
+
+    fn release_pages(&self, workspace: &str, conversation: &str) -> Result<(), BrowserError> {
+        self.runtime.release_browser_tools(workspace, conversation)
+    }
+
     fn mode(&self, workspace: &str, conversation: &str) -> Result<BrowserMode, BrowserError> {
         let metadata = self
             .runtime
@@ -520,7 +540,15 @@ impl BrowserRuntime for RuntimeQueries {
                         .entry((*kind, workspace.as_str()))
                         .or_insert_with(|| self.conversation_dir(*kind, workspace));
                     match dir {
-                        Ok(Some(dir)) => conversation_exists(dir, id),
+                        Ok(Some(dir)) => {
+                            let path = if *kind == BrowserKind::Agent {
+                                self.data_path.join("conversations").join(workspace)
+                            } else {
+                                self.data_path.join("chat/conversations")
+                            };
+                            database_conversation(dir, &path, id)
+                                .unwrap_or_else(|| conversation_exists(dir, id))
+                        }
                         Ok(None) => Some(false),
                         Err(_) => None,
                     }
@@ -581,10 +609,41 @@ impl RuntimeQueries {
     }
 }
 
+fn database_conversation(dir: &Dir, root: &Path, id: &str) -> Option<Option<bool>> {
+    let metadata = dir
+        .symlink_metadata(crate::conversation_db::FILENAME)
+        .ok()?;
+    if !metadata.is_file() {
+        return Some(None);
+    }
+    let Ok(database) = crate::conversation_db::Database::open(root) else {
+        return Some(None);
+    };
+    match (database.contains(id), database.imported(id)) {
+        (Ok(true), _) => Some(Some(true)),
+        (Ok(false), Ok(true)) => Some(Some(false)),
+        (Ok(false), Ok(false)) => None,
+        _ => Some(None),
+    }
+}
+
 fn conversation_exists(dir: &Dir, id: &str) -> Option<bool> {
     match dir.symlink_metadata(format!("{id}.json")) {
         Ok(metadata) if metadata.is_file() => Some(true),
         Err(error) if error.kind() == ErrorKind::NotFound => Some(false),
         _ => None,
     }
+}
+
+pub(crate) fn authorized_sites(data: &Path) -> io::Result<Vec<String>> {
+    let data = open_canonical_dir(&data.canonicalize()?)?;
+    Ok(sites::list(&data)?
+        .into_iter()
+        .filter_map(|row| row["site"].as_str().map(str::to_owned))
+        .collect())
+}
+
+pub(crate) fn remember_site(data: &Path, site: &str) -> io::Result<()> {
+    let data = open_canonical_dir(&data.canonicalize()?)?;
+    sites::grant(&data, site)
 }

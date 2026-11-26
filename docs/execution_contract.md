@@ -74,6 +74,10 @@ Rust Host 的 `POST /api/upload` 将通过管理员策略、文件类型、大�
 
 插件调用位置通过后端入口收敛，启用、管理员和目录规则仍由原有编排判定。MCP 是外置服务，继续使用自己的 cwd、连接与权限语义；接入公共执行层不等于 MCP 获得了原生目录沙箱保护。独立资源工厂不自动创建 MCP 服务。
 
+Rust Host 从管理员安装的自定义工具目录读取 `definition.json`、`execution.py` 和可选 `return.json`。Agent 执行沿用当前对话的权限、工作区根、网络档位、审批与进程超时。插件由独立 Python 3 子进程在选定执行环境解译。Rust 用标准输入传递 JSON，旧模板中的参数以值绑定，返回格式沿用 `output`、`stderr`、`return_code` 及可选结果模板。只读和计划模式禁止执行插件。
+
+Rust 壳和后端不内嵌 Python。macOS 默认按顺序探测 /opt/homebrew、/usr/local 与系统 Python 3；Linux 使用系统安装的 Python 3，沙箱沿用管理员安装的执行助手；Windows 沙箱使用专用 WSL 发行版的 `/usr/bin/python3`，完全访问使用 Windows 的 Python。宿主解释器可配置 `ASTRION_CUSTOM_PYTHON` 绝对路径；WSL 由沙箱发行版提供解释器。缺失时工具返回明确错误。
+
 ## 正式 Remote 上线前的剩余边界
 
 以下是审计确认的剩余工作，不是已经支持的能力。尚无生产远端后端，因此不得只注入一个远端对象就宣称完整工作区可用：

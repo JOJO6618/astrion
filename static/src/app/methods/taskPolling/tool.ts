@@ -288,6 +288,18 @@ export const toolMethods = {
     if (data.result !== undefined) {
       targetAction.tool.result = data.result;
 
+      if (
+        targetAction.tool.name === 'trigger_easter_egg' &&
+        data.status === 'completed' &&
+        data.result?.success === true &&
+        Date.now() - Number(data.result.effect_created_at) * 1000 < 8000 &&
+        Number(data.result.effect_created_at) * 1000 <= Date.now() + 1000 &&
+        document.visibilityState === 'visible' &&
+        !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      ) {
+        void this.handleEasterEggPayload(data.result);
+      }
+
       // 处理个性化设置工具 - 刷新个人空间数据
       if (targetAction.tool && targetAction.tool.name === 'manage_personalization') {
         let result = data.result;

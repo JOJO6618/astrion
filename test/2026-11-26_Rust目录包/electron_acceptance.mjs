@@ -3,6 +3,7 @@ import { execFileSync, spawn } from 'node:child_process';
 import { open, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
+import { DatabaseSync } from 'node:sqlite';
 import { join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
@@ -269,6 +270,22 @@ try {
   const legacySeed = join(repo, 'test/2026-11-24_Rust后端/cli_python_fixture.py');
   const seed = execFileSync('python3.11', ['-B', legacySeed, 'seed', data, workspace], { encoding: 'utf8' });
   const { id, path: source } = JSON.parse(seed.trim().split('\n').at(-1));
+  const dataDir = join(data, 'host/data');
+  const childId = 'sub_gui_history';
+  const childDir = join(dataDir, 'sub_agent_tasks', childId);
+  const child = {task_id: childId, conversation_id: id, workspace_root: workspace, working_dir: workspace, name: 'archived', status: 'terminated'};
+  const childHistory = [{role: 'system', content: 'fixture child system'}, {role: 'user', content: 'child original', future: [3]}];
+  const legacyFiles = new Map([
+    [join(dataDir, 'sub_agent_runtime.json'), {version: 1, tasks: {[childId]: child}, states: {}}],
+    [join(childDir, 'conversation.json'), {task_id: childId, messages: childHistory, unknown: {round: 7}}]
+  ]);
+  await mkdir(childDir, {recursive: true});
+  for (const [folder, kind] of [['approval_agent','approval'], ['goal_review_agent','goal_review'], ['workflow_review_agent','workflow_review']]) {
+    const logs = join(data,'host/logs',folder);
+    await mkdir(logs,{recursive:true});
+    legacyFiles.set(join(logs, kind + '_1700000000000.json'), {messages: [{role:'user',content:kind}],trace:[],final_result:{decision:'approved'},opaque:[1,null]});
+  }
+  for (const [file, value] of legacyFiles) await writeFile(file,JSON.stringify(value));
   const saved = JSON.parse(await readFile(source, 'utf8'));
   saved.metadata.model_key = model;
   saved.metadata.run_mode = 'fast';
@@ -359,7 +376,21 @@ try {
     return true;
   })()`));
   assert.equal(await readFile(source, 'utf8'), original);
-  console.info('Explicit migration, unchanged source and refreshed history verified.');
+  for (const [file,value] of legacyFiles) assert.equal(await readFile(file,'utf8'), JSON.stringify(value));
+  const children = new DatabaseSync(join(dataDir,'sub_agents.sqlite3'), {readOnly:true});
+  try {
+    const stored = children.prepare('SELECT seq,body FROM child_message WHERE task_id=? ORDER BY seq').all(childId);
+    assert.deepEqual(stored.map(row=>JSON.parse(row.body)),childHistory);
+    const header=children.prepare('SELECT context FROM child_task WHERE id=?').get(childId);
+    assert.deepEqual(JSON.parse(header.context).unknown, {round:7});
+  } finally { children.close(); }
+  const reviews = new DatabaseSync(join(dataDir,'review_history.sqlite3'), {readOnly:true});
+  try {
+    assert.deepEqual(reviews.prepare('SELECT kind FROM reviews ORDER BY kind').all().map(row=>row.kind),
+      ['auto_approval','goal_review','workflow_review']);
+    for (const row of reviews.prepare('SELECT body FROM review_events').all()) assert.deepEqual(JSON.parse(row.body).transcript.opaque,[1,null]);
+  } finally { reviews.close(); }
+  console.info('Explicit Agent, child and three reviewer migrations, unchanged sources and refreshed history verified.');
 
   await send(runtime, conversationPath, first);
   await waitFor('read_file execution and first assistant answer', async () => {

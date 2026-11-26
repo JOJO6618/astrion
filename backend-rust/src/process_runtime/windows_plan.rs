@@ -29,7 +29,15 @@ pub(super) fn wsl_path(raw: &str) -> io::Result<String> {
 
 pub(super) fn sandbox_args(
     distro: &str, workspace: &str, cwd: &str, access: SandboxAccess, script: &str,
-    reads: &[String], writes: &[String],
+    reads: &[String], writes: &[String], fixed_write_root: Option<&str>,
+) -> Vec<String> {
+    let argv = ["/bin/bash","--noprofile","--norc","-c",script];
+    sandbox_argv(distro,workspace,cwd,access,&argv,reads,writes,fixed_write_root)
+}
+
+pub(super) fn sandbox_argv(
+    distro: &str, workspace: &str, cwd: &str, access: SandboxAccess, argv: &[&str],
+    reads: &[String], writes: &[String], fixed_write_root: Option<&str>,
 ) -> Vec<String> {
     let mut args = ["-d", distro, "-e", "/usr/bin/bwrap", "--die-with-parent", "--new-session", "--unshare-all"]
         .map(str::to_owned).to_vec();
@@ -40,18 +48,22 @@ pub(super) fn sandbox_args(
     for path in reads {
         args.extend(["--ro-bind", path, path].map(str::to_owned));
     }
-    args.extend([if access.write { "--bind" } else { "--ro-bind" }, workspace, workspace].map(str::to_owned));
+    let workspace_writable = access.write && fixed_write_root.is_none_or(|root| root == workspace);
+    args.extend([if workspace_writable { "--bind" } else { "--ro-bind" }, workspace, workspace].map(str::to_owned));
     if access.write {
-        for path in writes {
-            args.extend(["--bind", path, path].map(str::to_owned));
+        if let Some(root) = fixed_write_root {
+            if root != workspace { args.extend(["--bind", root, root].map(str::to_owned)); }
+        } else {
+            for path in writes { args.extend(["--bind", path, path].map(str::to_owned)); }
         }
     }
     args.extend([
         "--chdir", cwd, "--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp", "--tmpfs", "/var/tmp",
         "--dir", "/root", "--clearenv", "--setenv", "PATH", "/usr/bin:/bin:/usr/sbin:/sbin",
         "--setenv", "HOME", "/root", "--remount-ro", "/", "--cap-drop", "ALL",
-        "--", "/bin/bash", "--noprofile", "--norc", "-c", script,
+        "--",
     ].map(str::to_owned));
+    args.extend(argv.iter().map(|arg|(*arg).to_owned()));
     args
 }
 

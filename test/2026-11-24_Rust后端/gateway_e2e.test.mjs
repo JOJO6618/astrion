@@ -179,7 +179,7 @@ test('GatewayClient resolves the preferred and explicit models through the provi
         base_url: `${mock.baseUrl}/${provider}/v1`, api_key: key, models: [{ id: model }],
       }]));
       await writeFile(join(dataDir, 'providers.json'), JSON.stringify({ version: 2, providers }));
-      await writeFile(join(dataDir, 'personalization.json'), JSON.stringify({ default_model: modelKey(preferred) }));
+      await writeFile(join(dataDir, 'personalization.json'), JSON.stringify({ default_model: modelKey(preferred), auto_generate_title: false }));
     },
   });
 

@@ -165,7 +165,9 @@ impl ApprovalStore {
             ));
         }
         if remember_site && decision == Decision::Approved {
-            if item.request.approval_type != ApprovalType::BrowserAction {
+            if item.request.approval_type != ApprovalType::BrowserAction
+                || matches!(item.request.tool_name.as_str(), "browser_evaluate" | "browser_fill_saved_login")
+            {
                 return Err(ApprovalError::Invalid(
                     "Only a browser site approval may be remembered",
                 ));

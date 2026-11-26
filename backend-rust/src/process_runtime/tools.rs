@@ -36,6 +36,24 @@ pub(crate) fn schemas() -> [Value; 5] {
     ]
 }
 
+pub(crate) fn child_schemas() -> Vec<Value> {
+    schemas().into_iter().filter_map(|mut schema| {
+        match schema["function"]["name"].as_str()? {
+            SLEEP => return None,
+            COMMAND => {
+                let function = &mut schema["function"];
+                function["description"] = json!("Run a foreground command in this agent's fixed execution scope. The timeout limit is 120 seconds.");
+                let properties = function["parameters"]["properties"].as_object_mut().expect("command properties");
+                for field in ["run_in_background", "request_full_access", "full_access_reason"] {
+                    properties.shift_remove(field);
+                }
+            }
+            _ => (),
+        }
+        Some(schema)
+    }).collect()
+}
+
 fn schema(name: &str, description: &str, mut properties: Value, required: &[&str]) -> Value {
     properties["intent"] = json!({"type":"string","description":"Purpose of the tool call"});
     json!({"type":"function","function":{"name":name,"description":description,"parameters":{

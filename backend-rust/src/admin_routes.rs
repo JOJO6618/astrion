@@ -33,6 +33,12 @@ use policy::Policy;
 use secondary::Secondary;
 use tools::ToolRegistry;
 
+pub(crate) fn runtime_custom_tools(data: &std::path::Path) -> io::Result<Vec<Value>> {
+    ToolRegistry::for_host(data)?
+        .model_tools()
+}
+
+
 type Result<T> = std::result::Result<T, AdminError>;
 type Payload = std::result::Result<Json<Value>, JsonRejection>;
 

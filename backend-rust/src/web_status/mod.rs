@@ -9,6 +9,7 @@ mod gui_files;
 mod downloads;
 mod file_response;
 mod settings;
+pub(crate) use settings::{apply_pending_host_modes, recover_pending_host_modes};
 
 pub use chatgpt_fast_mode::chatgpt_fast_mode_router;
 pub use attachments::attachment_router;
@@ -321,7 +322,8 @@ async fn status(
             "thinking_status": if prefs.run_mode == "thinking" { "思考模式" } else { "快速模式" },
             "model_key": prefs.model_key(&catalog), "reasoning_effort": prefs.reasoning_effort,
             "pending_runtime_modes": pending_modes(meta),
-            "execution_mode_enabled": false, "network_permission_enabled": false,
+            "execution_mode_enabled": app.runtime.host_direct_execution_available(),
+            "network_permission_enabled": app.runtime.host_network_permissions_available(),
             "focused_files": {}, "focused_files_count": 0,
             "terminals": terminals,
             "memory": {"main": memory_count(&app.data_dir, "memory.md"), "task": memory_count(&app.data_dir, "task_memory.md")},
@@ -337,12 +339,11 @@ async fn status(
         });
         modes.write_fields(&mut status);
         status["execution_mode"] = json!({"mode": modes.execution_mode, "default_mode": "sandbox"});
-        if current.is_some() {
+        if let Some(id) = current.as_deref() {
             for key in ["title", "created_at", "updated_at"] {
                 status["conversation"][key] = document[key].clone();
             }
-            let running = active.as_ref().is_some_and(|run| Some(run.conversation_id.as_str()) == current.as_deref());
-            status["conversation"]["compression"] = bootstrap::compression(meta, current.as_deref().unwrap_or_default(), running);
+            status["conversation"]["compression"] = app.runtime.web_compression_projection(&app.workspace_id, id, meta)?;
         }
         Ok(status)
     }).await
@@ -394,11 +395,12 @@ async fn conversation_metadata(
     app.check_workspace(&headers, &scope, &Value::Null)?;
     let id = conversation_id(&id)?;
     snapshot(move || {
-        let document = read_document(&app, &id)?;
+        let (document, title_pending) = app.runtime.web_title_status(&app.workspace_id, &id)?;
         Ok(success(json!({
             "id": id, "workspace_id": app.workspace_id,
             "title": document["title"].as_str().unwrap_or_default(),
             "title_locked": truthy(&document["metadata"]["title_locked"]),
+            "title_pending": title_pending,
         })))
     })
     .await

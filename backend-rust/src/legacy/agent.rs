@@ -75,7 +75,7 @@ pub(super) fn state_blockers_in_context(document: &Value, restored_summary: bool
     reasons
 }
 
-fn verified_transfer(document: &Value) -> bool {
+pub(super) fn verified_transfer(document: &Value) -> bool {
     use crate::conversation_transfer::document::{text, verify_import};
     let transfer = &document["metadata"]["conversation_transfer"];
     let (Some(origin), Some(hash), Some(operation)) = (
@@ -137,13 +137,14 @@ pub(super) fn model_history(document: &Value) -> Result<Vec<Value>, String> {
         .as_str()
         .filter(|prompt| !prompt.trim().is_empty())
         .ok_or("A saved complete frozen system prompt is required to continue this Agent")?;
-    project_history(messages, Some(prompt), false)
+    project_history(messages, Some(prompt), false, false)
 }
 
 pub(super) fn project_history(
     messages: &[Value],
     prompt: Option<&str>,
     chat: bool,
+    account_media: bool,
 ) -> Result<Vec<Value>, String> {
     let mut history = Vec::with_capacity(messages.len() + usize::from(prompt.is_some()));
     if let Some(prompt) = prompt {
@@ -152,7 +153,7 @@ pub(super) fn project_history(
     let mut seen_calls = HashSet::new();
     let mut pending_calls = HashSet::new();
     for (index, message) in messages.iter().enumerate() {
-        if chat && contains_media(message) {
+        if chat && !account_media && contains_media(message) {
             return Err(format!(
                 "Message {}: Media references require resolution in the original Chat account",
                 index + 1
@@ -229,6 +230,11 @@ fn project_message<'a>(
             // Python provider keys cannot identify the configured Rust connection.
             // Only a stored Rust fingerprint can make a reasoning block eligible for replay.
             let metadata = &message["metadata"];
+            if metadata["_responses_connection"].is_null()
+                && let Some(thinking) = message["reasoning_content"].as_str()
+            {
+                projected["reasoning_content"] = json!(thinking);
+            }
             if let Some(connection) =
                 metadata["_responses_connection"]
                     .as_str()
@@ -253,6 +259,11 @@ fn project_message<'a>(
                 return Err("tool result has no matching current call");
             }
             projected["tool_call_id"] = id.into();
+            if !chat && let Some(refs) = message.get("media_refs").or_else(|| message["metadata"].get("media_refs"))
+                .filter(|refs| refs.is_array())
+            {
+                projected["media_refs"] = refs.clone();
+            }
         }
         "system" if !chat => {}
         "user" => {}

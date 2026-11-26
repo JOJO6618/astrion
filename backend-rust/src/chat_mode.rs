@@ -100,10 +100,11 @@ impl ChatMode {
         let data_dir = data_dir.as_ref();
         std::fs::create_dir_all(data_dir.join("chat").join("conversations"))
             .map_err(|error| ChatError::storage(format!("Chat storage is unavailable: {error}")))?;
+        let data_dir = data_dir.canonicalize()?;
         Ok(Self {
             runtime,
             root: data_dir.join("chat"),
-            preferences_dir: data_dir.to_path_buf(),
+            preferences_dir: data_dir,
             resources: resources.as_ref().to_path_buf(),
             model,
             catalog: None,

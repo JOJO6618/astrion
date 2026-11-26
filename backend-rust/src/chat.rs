@@ -26,6 +26,13 @@ pub struct Completion {
     pub responses_duration_ms: Option<u64>,
 }
 
+pub(crate) enum StreamDelta<'a> {
+    Text(&'a str),
+    Thinking(&'a str),
+    NativeSummary(&'a str),
+    Usage(&'a Value),
+}
+
 /// Provider-supplied configuration read by the trusted server.
 #[derive(Clone, Default)]
 pub struct RequestOptions {
@@ -80,6 +87,15 @@ pub(crate) async fn complete_with_options(
     options: &RequestOptions,
     mut on_text: impl FnMut(&str),
 ) -> Result<Completion, String> {
+    complete_with_updates(endpoint, api_key, model, messages, tools, options, |delta| {
+        if let StreamDelta::Text(text) = delta { on_text(text); }
+    }).await
+}
+
+pub(crate) async fn complete_with_updates(
+    endpoint: &str, api_key: Option<&str>, model: &str, messages: &[Value], tools: &[Value],
+    options: &RequestOptions, mut on_delta: impl FnMut(StreamDelta<'_>),
+) -> Result<Completion, String> {
     let mut body = json!({"model": model, "messages": messages, "stream": true});
     for message in body["messages"]
         .as_array_mut()
@@ -115,7 +131,7 @@ pub(crate) async fn complete_with_options(
         }
         let value = serde_json::from_str(data)
             .map_err(|error| format!("invalid Chat Completions SSE chunk: {error}"))?;
-        assistant.push_value(value, &mut on_text)?;
+        assistant.push_value(value, &mut on_delta)?;
         Ok(false)
     };
     let mut stream = response.bytes_stream();

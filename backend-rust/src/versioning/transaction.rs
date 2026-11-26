@@ -69,6 +69,8 @@ pub(super) struct Journal {
     execution_root: Option<PathBuf>,
     before: Option<Vec<u8>>,
     after: Vec<u8>,
+    #[serde(default)]
+    versioning_only: bool,
     changes: Vec<Change>,
     created_workspace_dirs: Vec<String>,
 }
@@ -111,10 +113,21 @@ impl<'a> Transaction<'a> {
                 execution_root: execution_root.map(Path::to_owned),
                 before: previous.map(fingerprint).transpose().map_err(storage)?,
                 after: fingerprint(next.raw()).map_err(storage)?,
+                versioning_only: false,
                 changes: Vec::new(),
                 created_workspace_dirs: Vec::new(),
             },
         })
+    }
+
+    pub fn for_versioning(
+        marker: &'a Dir, records: &'a Dir, workspace_id: &str, id: &str, before: &Value, after: &Value,
+    ) -> Result<Self, RuntimeError> {
+        Ok(Self { marker, records, workspace: None, journal: Journal {
+            workspace_id: workspace_id.into(), source_id: id.into(), target_id: id.into(), execution_root: None,
+            before: Some(fingerprint(before).map_err(storage)?), after: fingerprint(after).map_err(storage)?,
+            versioning_only: true, changes: Vec::new(), created_workspace_dirs: Vec::new(),
+        } })
     }
 
     pub fn change(&mut self, scope: Scope, path: &str, after: Option<FileState>) -> io::Result<()> {
@@ -157,6 +170,23 @@ impl<'a> Transaction<'a> {
     }
 
     pub fn commit(self, store: &Store, document: LegacyDocument) -> Result<(), RuntimeError> {
+        self.commit_with(store, |journal| store.persist(&journal.workspace_id, document, journal.before.is_none()))
+    }
+
+    pub fn commit_versioning(self, store: &Store, config: Value) -> Result<(), RuntimeError> {
+        self.commit_with(store, |journal| {
+            store.update_agent_metadata(&journal.workspace_id, &journal.target_id, |metadata| {
+                let current = fingerprint(&metadata["versioning"]).map_err(storage)?;
+                if journal.before.as_ref() != Some(&current) {
+                    return Err(RuntimeError::new(409, "The conversation version setting changed during checkpointing"));
+                }
+                metadata["versioning"] = config;
+                Ok(())
+            })?
+        })
+    }
+
+    fn commit_with(self, store: &Store, publish: impl FnOnce(&Journal) -> Result<(), RuntimeError>) -> Result<(), RuntimeError> {
         self.record_intent()?;
         let written = self
             .install(true)
@@ -168,14 +198,7 @@ impl<'a> Transaction<'a> {
                 }
                 Ok(())
             })
-            .map_err(storage)
-            .and_then(|()| {
-                store.persist(
-                    &self.journal.workspace_id,
-                    document,
-                    self.journal.before.is_none(),
-                )
-            });
+            .map_err(storage).and_then(|()| publish(&self.journal));
         match written {
             Ok(()) => self.clear(),
             Err(error) => {
@@ -221,8 +244,14 @@ impl<'a> Transaction<'a> {
     }
 
     fn recover(&self, store: &Store) -> Result<(), RuntimeError> {
-        let current = match store.read(&self.journal.workspace_id, &self.journal.target_id) {
-            Ok(document) => Some(fingerprint(document.raw()).map_err(storage)?),
+        let value = if self.journal.versioning_only {
+            store.header(&self.journal.workspace_id, &self.journal.target_id)
+                .map(|(header, _)| header["metadata"]["versioning"].clone())
+        } else {
+            store.read(&self.journal.workspace_id, &self.journal.target_id).map(LegacyDocument::into_raw)
+        };
+        let current = match value {
+            Ok(value) => Some(fingerprint(&value).map_err(storage)?),
             Err(error) if error.status == 404 => None,
             Err(error) => return Err(error),
         };

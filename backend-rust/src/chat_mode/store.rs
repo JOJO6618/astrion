@@ -72,6 +72,35 @@ impl ChatPaths {
         Ok(ChatError::not_found("Chat conversation unavailable"))
     }
 
+    pub(super) fn read_header(&self, id: &str) -> Result<(Value, usize), ChatError> {
+        if !valid_conversation_id(id) {
+            return Err(ChatError::bad_request("Invalid Chat conversation ID"));
+        }
+        let db = self.database()?;
+        let (header, count) = db.header(id).map_err(ChatError::storage)?
+            .ok_or_else(|| self.missing(&db, id).unwrap_or_else(|error| error))?;
+        validate_document_shape(&header, id)?;
+        Ok((header, count))
+    }
+
+    pub(super) fn update_header<T>(
+        &self, id: &str, update: impl FnOnce(&mut Value, usize) -> Result<T, ChatError>,
+    ) -> Result<T, ChatError> {
+        let (mut header, count) = self.read_header(id)?;
+        let result = update(&mut header, count)?;
+        self.commit_delta(id, count, &header, crate::conversation_db::chat_delta::Messages::Unchanged)?;
+        Ok(result)
+    }
+
+    pub(super) fn commit_delta(
+        &self, id: &str, before_count: usize, document: &Value,
+        messages: crate::conversation_db::chat_delta::Messages<'_>,
+    ) -> Result<(), ChatError> {
+        validate_document_shape(document, id)?;
+        self.database()?.commit_chat_delta(id, before_count, document, &index_row(document), messages)
+            .map_err(ChatError::storage)
+    }
+
     pub(super) fn read_raw(&self, id: &str) -> Result<Value, ChatError> {
         if !valid_conversation_id(id) {
             return Err(ChatError::bad_request("Invalid Chat conversation ID"));
@@ -186,19 +215,19 @@ impl ChatPaths {
         let database = self.database()?;
         let mut rows = database.rows().map_err(ChatError::storage)?;
         let directory = open_canonical_dir(&self.conversations())?;
-        let index = read_index(&directory)?;
+        let known = database.known_ids().map_err(ChatError::storage)?;
+        let mut legacy_index = None;
         for entry in directory.entries()? {
             let entry = entry?;
             let name = entry.file_name();
             let Some(id) = legacy_id(&name) else {
                 continue;
             };
-            if !entry.file_type()?.is_file()
-                || database.contains(id).map_err(ChatError::storage)?
-                || database.imported(id).map_err(ChatError::storage)?
-            {
-                continue;
-            }
+            if known.contains(id) || !entry.file_type()?.is_file() {continue;}
+            let index = match &legacy_index {
+                Some(index) => index,
+                None => legacy_index.insert(read_index(&directory)?),
+            };
             rows.push(json!({
                 "id": id,
                 "title": index[id]["title"].as_str().unwrap_or(id),
@@ -273,10 +302,14 @@ impl ChatPaths {
     }
 
     pub(super) fn set_title(&self, id: &str, title: &str) -> Result<(), ChatError> {
-        let mut raw = self.read_raw(id)?;
-        raw["title"] = json!(title);
-        raw["metadata"]["title"] = json!(title);
-        self.write_raw(id, raw, false)
+        if !valid_conversation_id(id) {
+            return Err(ChatError::bad_request("Invalid Chat conversation ID"));
+        }
+        let mut db = self.database()?;
+        if db.save_title(id, title, None).map_err(ChatError::storage)? {
+            return Ok(());
+        }
+        Err(self.missing(&db, id)?)
     }
 
     pub(super) fn next_conversation_id(&self, timestamp: f64) -> Result<String, ChatError> {
@@ -373,7 +406,7 @@ impl ChatPaths {
 }
 
 pub(super) fn public_document(document: LegacyDocument) -> Result<Value, ChatError> {
-    let messages = document.public_chat_path(None)?;
+    let messages = document.public_messages();
     let mut raw = document.into_raw();
     raw["messages"] = json!(messages);
     super::handoff::public_document(&mut raw);
@@ -381,6 +414,12 @@ pub(super) fn public_document(document: LegacyDocument) -> Result<Value, ChatErr
 }
 
 pub(super) fn validate_document(raw: &Value, id: &str) -> Result<(), ChatError> {
+    validate_document_shape(raw, id)?;
+    LegacyDocument::from_value(raw.clone()).map_err(ChatError::from)?;
+    Ok(())
+}
+
+fn validate_document_shape(raw: &Value, id: &str) -> Result<(), ChatError> {
     if !raw.is_object() {
         return Err(ChatError::bad_request(
             "Expected a Chat conversation JSON object",
@@ -402,8 +441,6 @@ pub(super) fn validate_document(raw: &Value, id: &str) -> Result<(), ChatError> 
     if !raw["messages"].is_array() {
         return Err(ChatError::bad_request("Chat messages must be an array"));
     }
-    // Full tree validation happens when LegacyDocument is constructed.
-    LegacyDocument::from_value(raw.clone()).map_err(ChatError::from)?;
     Ok(())
 }
 

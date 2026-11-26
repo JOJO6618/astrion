@@ -70,6 +70,8 @@ fn source(root: &Dir) -> io::Result<Option<Value>> {
     Ok(value)
 }
 
+use crate::conversation_db::migration::Issue;
+
 fn imported(db: Option<&Connection>, task: &str) -> io::Result<bool> {
     db.map(|db| {
         db.query_row(
@@ -83,87 +85,131 @@ fn imported(db: Option<&Connection>, task: &str) -> io::Result<bool> {
     .map(|found| found.unwrap_or(false))
 }
 
-pub(crate) fn legacy_pending(data: &Path) -> Result<usize, String> {
-    pending(data).map_err(|error| error.to_string())
+#[derive(Default)]
+pub(crate) struct ChildMigration {
+    plan: Option<Plan>,
 }
 
-fn pending(data: &Path) -> io::Result<usize> {
-    let Some(root) = child_root(data)? else {
-        return Ok(0);
-    };
-    let Some(source) = source(&root)? else {
-        return Ok(0);
-    };
-    let registry = Registry::new(data.to_owned());
-    let db = registry.connect(false)?;
-    let mut count = 0;
-    for (id, record) in source["tasks"].as_object().into_iter().flatten() {
-        if checked_parent(id, record).is_some() && !imported(db.as_ref(), id)? {
-            count += 1;
-        }
-    }
-    Ok(count)
+struct Plan {
+    root: Dir,
+    source: Value,
+    groups: BTreeMap<String,Vec<String>>,
 }
 
-pub(crate) fn migrate_legacy(data: &Path) -> Result<usize, String> {
-    migrate(data).map_err(|error| error.to_string())
-}
+pub(crate) fn discover_legacy(data: &Path) -> (ChildMigration,Vec<Issue>) {
+    let (root, source) = match child_root(data).and_then(|root| {
+        let Some(root) = root else { return Ok(None); };
+        Ok(source(&root)?.map(|source|(root,source)))
+    }) {
+        Ok(Some(source)) => source,
+        Ok(None) => return Default::default(),
+        Err(error) => return (ChildMigration::default(),vec![Issue::new(1,"子智能体注册表",error)]),
+    };
 
-fn migrate(data: &Path) -> io::Result<usize> {
-    let Some(root) = child_root(data)? else {
-        return Ok(0);
-    };
-    let Some(source) = source(&root)? else {
-        return Ok(0);
-    };
-    let registry = Registry::new(data.to_owned());
-    let database = registry.connect(false)?;
-    let mut groups = BTreeMap::<String, Vec<_>>::new();
-    for (id, record) in source["tasks"].as_object().into_iter().flatten() {
-        if let Some(parent) = checked_parent(id, record)
-            && !imported(database.as_ref(), id)?
-        {
-            groups.entry(parent).or_default().push((id, record));
-        }
-    }
-    if groups.is_empty() {
-        return Ok(0);
-    }
-    let task_root = optional_directory(&root, "sub_agent_tasks")?;
-    let states = source["states"].as_object();
-    let mut total = 0;
-    let mut failures = Vec::new();
-    for (parent, records) in groups {
-        let result = (|| {
-            let mut children = Vec::new();
-            for (id, record) in records {
-                let directory = task_root
-                    .as_ref()
-                    .map(|root| optional_directory(root, id))
-                    .transpose()?
-                    .flatten();
-                children.push(ChildSource::load(id, record, directory.as_ref())?);
+    let mut groups = BTreeMap::<String,Vec<String>>::new();
+    let mut blocked = std::collections::BTreeSet::new();
+    let mut issues = Vec::new();
+    for (id,record) in source["tasks"].as_object().into_iter().flatten() {
+        let fields = ["workspace_root","working_dir","execution_root","status"];
+        let parent = checked_parent(id,record).filter(|_| fields.iter().all(|key|
+            record.get(key).is_none_or(|value|value.is_null() || value.is_string())
+        ));
+        if let Some(parent) = parent {
+            groups.entry(parent).or_default().push(id.clone());
+        } else {
+            if let Some(parent) = record["conversation_id"].as_str().and_then(normalize_conversation) {
+                blocked.insert(parent);
             }
-            let state = states.and_then(|states| {
-                states.get(&parent).or_else(|| {
-                    states.iter().find_map(|(id, value)| {
-                        (normalize_conversation(id).as_deref() == Some(parent.as_str()))
-                            .then_some(value)
-                    })
-                })
-            });
-            import_parent(&registry, &parent, children, state)
-        })();
-        match result {
-            Ok(count) => total += count,
-            Err(error) => failures.push(format!("{parent}: {error}")),
+            issues.push(Issue::new(1,&format!("子智能体 {id:?}"),"旧任务身份或字段无效"));
         }
     }
-    if failures.is_empty() {
-        Ok(total)
-    } else {
-        Err(io::Error::other(failures.join("\n")))
+    if groups.is_empty() { return (ChildMigration::default(), issues); }
+    let pending = groups.values().map(Vec::len).sum::<usize>();
+    let database = match Registry::new(data.to_owned()).connect(false) {
+        Ok(database) => database,
+        Err(error) => {
+            issues.push(Issue::new(pending,"子智能体数据库",error));
+            return (ChildMigration::default(),issues);
+        }
+    };
+    let mut available = BTreeMap::new();
+    for (parent,records) in groups {
+        let mut unimported = Vec::new();
+        for id in records {
+            match imported(database.as_ref(),&id) {
+                Ok(false) => unimported.push(id),
+                Ok(true) => (),
+                Err(error) => issues.push(Issue::new(1,&format!("子智能体 {id}"),error)),
+            }
+        }
+        if unimported.is_empty() { continue; }
+        if blocked.contains(&parent) {
+            issues.push(Issue::new(unimported.len(),&format!("子智能体父对话 {parent}"),"先修复此对话中的无效子任务"));
+        } else {
+            available.insert(parent,unimported);
+        }
     }
+    let plan = (!available.is_empty()).then_some(Plan { root, source, groups:available });
+    (ChildMigration { plan }, issues)
+}
+
+impl ChildMigration {
+    pub(crate) fn count(&self) -> usize {
+        self.plan.as_ref().map_or(0, |plan|plan.groups.values().map(Vec::len).sum())
+    }
+
+    /// A parent group commits together. The caller receives each independently committed count.
+    pub(crate) fn import(self, data: &Path, mut report: impl FnMut(Result<(usize,usize),Issue>)) {
+        let count = self.count();
+        let Some(Plan { root, source, groups }) = self.plan else { return; };
+        let task_root = match optional_directory(&root, "sub_agent_tasks") {
+            Ok(root) => root,
+            Err(error) => {
+                report(Err(Issue::new(count,"子智能体任务目录",error)));
+                return;
+            }
+        };
+        let states = source["states"].as_object();
+        let registry = Registry::new(data.to_owned());
+        for (parent, records) in groups {
+            let count = records.len();
+            let result = (|| {
+                let mut children = Vec::with_capacity(count);
+                for id in &records {
+                    let directory = task_root.as_ref().map(|root|optional_directory(root,id))
+                        .transpose()?.flatten();
+                    children.push(ChildSource::load(id,&source["tasks"][id],directory.as_ref())?);
+                }
+                let state = states.and_then(|states| states.get(&parent).or_else(|| {
+                    states.iter().find_map(|(id,value)| {
+                        (normalize_conversation(id).as_deref() == Some(parent.as_str())).then_some(value)
+                    })
+                }));
+                import_parent(&registry,&parent,children,state)
+            })();
+            report(result.map(|inserted|(count,inserted))
+                .map_err(|error|Issue::new(count,&format!("子智能体父对话 {parent}"),error)));
+        }
+    }
+}
+
+#[cfg(test)]
+pub(crate) fn legacy_pending(data: &Path) -> Result<usize,String> {
+    let (scan,issues) = discover_legacy(data);
+    if issues.is_empty() { Ok(scan.count()) }
+    else { Err(issues.into_iter().map(|issue|issue.message).collect::<Vec<_>>().join("\n")) }
+}
+
+#[cfg(test)]
+pub(crate) fn migrate_legacy(data: &Path) -> Result<usize,String> {
+    let (scan,mut issues) = discover_legacy(data);
+    let mut count = 0;
+    scan.import(data,|result|match result {
+        Ok((_,inserted)) => count += inserted,
+        Err(issue) => issues.push(issue),
+    });
+    if issues.is_empty() { Ok(count) }
+    else { Err(issues.into_iter().map(|issue|issue.message).collect::<Vec<_>>().join("\n")) }
 }
 
 fn optional_directory(root: &Dir, path: &str) -> io::Result<Option<Dir>> {
@@ -236,8 +282,8 @@ fn import_parent(
             continue;
         }
         let added = tx.execute(
-            "INSERT OR IGNORE INTO child_task (id,parent_id,record,context,stats,output) VALUES(?,?,?,?,?,?)",
-            params![child.id, parent, child.record.to_string(), child.context.map(|value| value.to_string()),
+            "INSERT OR IGNORE INTO child_task (id,parent_id,record,stats,output) VALUES(?,?,?,?,?)",
+            params![child.id, parent, child.record.to_string(),
                 child.stats.map(|value| value.to_string()), child.output.map(|value| value.to_string())],
         ).map_err(sql)?;
         if added != 1 {
@@ -245,6 +291,9 @@ fn import_parent(
                 ErrorKind::AlreadyExists,
                 format!("Child task ID {} already exists", child.id),
             ));
+        }
+        if let Some(context) = child.context.as_ref() {
+            super::context_rows::write(&tx,child.id,context,0,false)?;
         }
         if let Some(file) = child.activity {
             import_activity(&tx, child.id, file)?;

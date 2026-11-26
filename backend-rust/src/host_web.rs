@@ -163,7 +163,7 @@ pub fn routes(
         .merge(astrion_headless::runtime::process_resources::monitor_router(runtime.clone()))
         .merge(astrion_headless::mcp::router(data.to_owned(), registry.clone()))
         .merge(astrion_headless::knowledge::migration::router(data.to_owned(), registry))
-        .merge(astrion_headless::conversation_db::migration::router(data.to_owned()))
+        .merge(astrion_headless::conversation_db::migration::router(data.to_owned(),paths.logs.clone()))
         .merge(transfer)
         .merge(transfer_routes)
         .merge(native.system_router())

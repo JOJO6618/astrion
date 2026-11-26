@@ -75,7 +75,7 @@ def fixture_resources(binary: Path, static_root: Path, with_python: bool, root: 
     resources = root / "Contents/Resources"
     rust = resources / "runtime/rust"
     rust.mkdir(parents=True)
-    (rust / "astrion-headless").symlink_to(binary)
+    (rust / "astrion-headless").symlink_to(binary.resolve(strict=True))
     (rust / "static").symlink_to(static_root)
     (rust / "config").mkdir()
     (rust / "config/providers_catalog.json").symlink_to(REPO / "config/providers_catalog.json")
@@ -153,7 +153,18 @@ def logic_only(binary: Path) -> int:
             resources=str(py_resources), exp_root=str(exp_root),
             data_root=str(tmp_path / "data-root"), workspace=str(tmp_path / "ws"),
         ))
-        checks["带 Python 运行时默认仍是 python"] = py_result["default"].get("backend") == "python"
+        checks["带独立 Python 工作进程仍默认 Rust"] = py_result["default"].get("backend") == "rust"
+        checks["独立 Python 工作进程不提供 Flask 后端"] = "error" in py_result["explicit_python"]
+        old_resources = tmp_path / "legacy/Contents/Resources"
+        legacy_backend = old_resources / "runtime/backend/server"
+        legacy_backend.mkdir(parents=True)
+        (legacy_backend / "app.py").touch()
+        legacy_result = node(LOGIC.format(
+            module=str(REPO / "desktop-electron/src/rust-backend.js"),
+            resources=str(old_resources), exp_root=str(exp_root),
+            data_root=str(tmp_path / "data-root"), workspace=str(tmp_path / "ws"),
+        ))
+        checks["旧包默认 Python"] = legacy_result["default"].get("backend") == "python"
         print(json.dumps({"checks": checks, "default": default, "launch": result.get("launch")}, ensure_ascii=False, indent=2))
         return 0 if all(checks.values()) else 1
 

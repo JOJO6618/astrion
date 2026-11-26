@@ -4,6 +4,9 @@ main 分支的 macOS 与 Windows 共用 Electron 浏览器，Windows 迁移已�
 
 **2026-11-13 Windows 迁移边界**：新壳复用以下 Electron 宿主、叠层/输入转发、AI 与独立窗口实现；Windows 独立窗口用 Window Controls Overlay，支持 `popout: true`。Windows 元数据/密码库根为 `<desktopDataRoot>/electron/browser/`，Chromium 网站资料放 sessionData；旧 `<desktopDataRoot>/browser/` 不动。不自动迁移旧 WebView2 或 Chrome 浏览器资料；迁移测试包 0.10.3 按用户要求接入 Chrome 手动导入，见下方 Electron 适配说明。后文标明 Windows WebView2、原生裁剪等章节仍为旧壳记录，不能当作 Electron 版已迁移旧资料的证据。
 
+
+1.0 的 Rust Host 后端复用 Electron 的同一浏览器控制器和工具 schema。macOS 使用关闭即弃的一次性 fd 3 管道，Windows Rust 守护方式使用标准输入控制管道的首行。浏览器凭据不进入环境变量。工具只在带可信控制通道的桌面 Agent 中装配。普通 Web、独立 CLI headless、Chat 和子智能体无内置浏览器工具。
+
 ## 结构和职责
 
 - `desktop-electron/src/browser/index.js`：管理器、可信身份连接、IPC、布局与生命周期。
@@ -173,7 +176,7 @@ macOS Electron 回归覆盖启动配色、三主题切换、普通网页画布�
 ### 执行底层与通道
 
 - 执行底层已定（用户在「整套接入 Playwright／每标签单独 CDP」中选后者）：每个标签用 `webContents.debugger`（CDP）单独控制，注入 Playwright 无障碍快照脚本（Apache-2.0）到隔离环境生成 `[ref=eN]` 快照，输入用 CDP `Input.*` 真实事件；不开放远程调试端口、不向模型透传原始 CDP、不使用 `connectOverCDP` 控制整个应用（2026-11-07 实验已证明其可触达可信主界面）。
-- 后端 → `bridge.js` 控制桥 → Electron 浏览器管理器。浏览器端点必须校验桌面壳启动后端时经环境变量下发的随机 token（现有更新类端点不变）。每次调用带调用 ID，停止时中断等待／稳定检测；已送达 Chromium 的输入不可撤销。
+- 后端 → `bridge.js` 控制桥 → Electron 浏览器管理器。浏览器端点必须校验桌面壳启动后端时经私有管道下发的随机 token（现有更新类端点不变）。每次调用带调用 ID，停止时中断等待／稳定检测；已送达 Chromium 的输入不可撤销。
 - 审批与执行之间页面可能跳转：执行时携带批准时的站点，Electron 发输入前核对，不一致则拒绝并提示重新操作。
 - 网页 `alert`／`confirm`／`prompt`／`beforeunload` 显示为浏览器原生对话框；模型经 CDP 事件感知，用 `browser_handle_dialog` 回答（CDP 关闭原生对话框）。
 

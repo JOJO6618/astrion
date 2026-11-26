@@ -21,7 +21,13 @@ function errorToast(host, error) {
 export async function startDesktopView(host) {
   const tabs = useConversationTabsStore();
   if (!tabs.enabled || controllers.has(host)) return;
-  const control = { disposed: false, retryTimer: 0, shown: false, unsubscribe: null, stopRelocationWatch: null };
+  const control = {
+    disposed: false,
+    retryTimer: 0,
+    shown: false,
+    unsubscribe: null,
+    stopRelocationWatch: null
+  };
   controllers.set(host, control);
   // 重新可见：被暂停的辅助刷新各补一次（任务事件轮询从未停止，只是降频）。
   control.unsubscribe = onViewVisibilityChange((visible) => {
@@ -53,9 +59,13 @@ export async function startDesktopView(host) {
     () => tabs.viewTab,
     (next, previous) => {
       if (
-        tabs.attached && next?.kind === 'conv' && previous?.kind === 'conv' &&
-        next.key === previous.key && next.conversationId === previous.conversationId &&
-        next.workspaceId !== previous.workspaceId && !tabs.renderers[next.key]
+        tabs.attached &&
+        next?.kind === 'conv' &&
+        previous?.kind === 'conv' &&
+        next.key === previous.key &&
+        next.conversationId === previous.conversationId &&
+        next.workspaceId !== previous.workspaceId &&
+        !tabs.renderers[next.key]
       ) {
         window.clearTimeout(control.retryTimer);
         tabs.localRendererId = navigationId();

@@ -260,8 +260,18 @@ FunctionEnd
   ; builds without extraResources are not rejected.
   ${If} $AstrionMissing == ""
   ${AndIf} ${FileExists} "$INSTDIR\resources\runtime"
-  ${AndIfNot} ${FileExists} "$INSTDIR\resources\runtime\python\python.exe"
-    StrCpy $AstrionMissing "resources\runtime\python\python.exe"
+  ${AndIfNot} ${FileExists} "$INSTDIR\resources\runtime\rust\astrion-headless.exe"
+    StrCpy $AstrionMissing "resources\runtime\rust\astrion-headless.exe"
+  ${EndIf}
+  ${If} $AstrionMissing == ""
+  ${AndIf} ${FileExists} "$INSTDIR\resources\runtime"
+  ${AndIfNot} ${FileExists} "$INSTDIR\resources\runtime\python\astrion-backend.exe"
+    StrCpy $AstrionMissing "resources\runtime\python\astrion-backend.exe"
+  ${EndIf}
+  ${If} $AstrionMissing == ""
+  ${AndIf} ${FileExists} "$INSTDIR\resources\runtime"
+  ${AndIfNot} ${FileExists} "$INSTDIR\resources\astrion-windows-helper.exe"
+    StrCpy $AstrionMissing "resources\astrion-windows-helper.exe"
   ${EndIf}
 !macroend
 

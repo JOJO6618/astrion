@@ -48,7 +48,7 @@ const expectedModels = [
     context_window: 65_536, max_output: 4096, supports_reasoning_effort: true },
   { ...baseModel, key: 'custom-fast', name: 'custom-fast' },
   { ...baseModel, key: 'openai-codex/fixture-luna', name: 'Fixture Luna', description: 'Subscription fixture',
-    provider_type: 'provider', provider_id: 'openai-codex', provider_name: 'OpenAI（ChatGPT 订阅）',
+    provider_type: 'provider', provider_id: 'openai-codex', provider_name: 'OpenAI（ChatGPT 订阅）-779335',
     api_protocol: 'responses', supports_thinking: true, fast_only: false, thinking_only: true,
     multimodal: 'image', context_window: 272_000, supports_reasoning_effort: true,
     supported_reasoning_levels: [{ effort: 'low', description: 'Fast' }], default_reasoning_level: 'low' },

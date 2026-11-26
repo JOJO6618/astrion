@@ -1,5 +1,6 @@
 // Run with a current astrion-headless binary and the CLI's installed development dependencies.
 import assert from 'node:assert/strict';
+import { seedDocument } from '../2026-11-27_Rust对话格式迁移/fixture.mjs';
 import { mkdir, readFile, readdir, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -20,9 +21,7 @@ function jsonl(rows) {
 async function conversation(dataDir, workspaceId, id, versioning, kind = 'agent') {
   const directory = join(dataDir, 'conversations', workspaceId);
   await mkdir(directory, { recursive: true });
-  await writeFile(join(directory, `${id}.json`), JSON.stringify({
-    id, title: 'Python fixture', messages: [], metadata: { conversation_kind: kind, versioning },
-  }));
+  seedDocument(directory,{id,title:'Python fixture',messages:[],metadata:{conversation_kind:kind,versioning}});
 }
 
 async function prepare({ dataDir, workspace }) {

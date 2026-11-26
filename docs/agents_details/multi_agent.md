@@ -42,7 +42,7 @@
 
 - Python Host 的状态在 `<工作区 data_dir>/sub_agent_runtime.json`（version=1），子上下文与活动在 `<工作区 data_dir>/sub_agent_tasks/<task_id>/`。
 - Rust Host 在 `<DATA_DIR>/sub_agents.sqlite3` 保存按任务 ID 隔离的记录、上下文、统计、结果、活动，以及按主对话 ID 归属的协作队列。建档、接受引导、结束任务时同步提交上下文与注册表。活动分页保留旧日志的字节边界，完整事件追加后才对查询可见。
-- Rust 的旧目录和 v1 注册表仅由迁移作业读取。迁移按主对话提交，保留原文件，通过已导入标记避免重复导入或覆盖当前记录。原先的工作区、任务 ID、上下文以及终结状态继续约束恢复。
+- Rust 的旧目录和 v1 注册表仅由迁移作业读取。迁移按主对话提交，保留原文件，通过已导入标记避免重复导入或覆盖当前记录。每条子消息单独存入 `child_message`，新工具结果与上下文头在同一事务中提交。达到压缩阈值后保留最近八条及完整工具配对，刷新冻结提示词中的项目记忆段，重新开始计算上下文 token。原工作区、任务 ID 和终结状态继续约束恢复。
 - 默认工作目录：`<项目>/.astrion/sub_agent_work/agent_N[_suffix]/`；也可复用已有项目内目录。
 - pending_master_messages、pending_work及work_paused持久化。恢复仅消费新格式，不读取旧 sub_agents.json；terminated 永不复活。
 - 激活恢复走 `server/context/resources.py`，按明确对话合并，构造 manager 不自动发模型请求；恢复 idle 后等待新消息，已接收且未暂停的待处理消息可以继续消费。切换对话不清理其他对话的运行实例。

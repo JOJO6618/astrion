@@ -396,6 +396,10 @@ impl ScheduleAdapter for RuntimeScheduleAdapter {
             })
     }
 
+    fn agent_settings(&self, definition: &Value, principal: &Value) -> Result<Value> {
+        self.resolve(definition, principal).map(|(_,settings,_,_)| settings)
+    }
+
     fn check_dispatch(&self, definition: &Value, principal: &Value) -> Result<()> {
         match self.resolve(definition, principal) {
             Err(error) if defer_error(&error) => Err(error),

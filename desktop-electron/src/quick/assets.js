@@ -6,9 +6,9 @@ import { quickDocument } from './entry-styles.js';
 
 // A stable origin preserves drafts/session selection across app restarts. This
 // serves only renderer assets; all authenticated requests remain behind IPC.
-export async function startQuickAssets() {
+export async function startQuickAssets(staticRoot) {
   const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
-  const root = app.isPackaged ? path.join(process.resourcesPath, 'runtime/backend/static') : path.join(repo, 'static');
+  const root = staticRoot || (app.isPackaged ? path.join(process.resourcesPath, 'runtime/backend/static') : path.join(repo, 'static'));
   const mime = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf' };
   protocol.handle('astrion-quick', async (request) => {
     try {

@@ -191,6 +191,7 @@ fn save_media(
     files: &Payloads,
     date: &str,
 ) -> Result<(), RuntimeError> {
+    let _index = crate::legacy::media::index_lock().map_err(RuntimeError::storage)?;
     let mut links = Map::new();
     for message in raw["messages"]
         .as_array()

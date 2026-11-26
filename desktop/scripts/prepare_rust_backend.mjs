@@ -42,7 +42,7 @@ function copyPublicTree(from, to) {
 
 export function stageRustResources(destination) {
   fs.mkdirSync(destination);
-  for (const name of ['workflows', 'agentskills']) {
+  for (const name of ['workflows', 'agentskills', 'prompts']) {
     copyPublicTree(path.join(repoRoot, name), path.join(destination, name));
   }
   fs.mkdirSync(path.join(destination, 'config'));

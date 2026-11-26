@@ -156,7 +156,7 @@ def python_routes(snapshot: dict) -> dict[RouteKey, list[str]]:
 
 def rust_status(declarations: list, mode: str) -> str:
     kinds = {route.kind for route in declarations if mode in route.modes}
-    for kind in ('declared', 'via_get', 'wildcard'):
+    for kind in ('declared', 'via_get', 'via_options', 'wildcard'):
         if kind in kinds:
             return kind
     if any(not route.modes for route in declarations):
@@ -176,7 +176,7 @@ def summary(full: dict, headless: dict, rust: dict, *, api_only: bool = False) -
               for mode in RUST_MODES.values()}
     explicit = {mode: {key for key, value in values.items() if value == 'declared'}
                 for mode, values in status.items()}
-    mounted = {mode: {key for key, value in values.items() if value in {'declared', 'via_get'}}
+    mounted = {mode: {key for key, value in values.items() if value in {'declared', 'via_get', 'via_options'}}
                for mode, values in status.items()}
     source_explicit = {key for key, items in source.items() if any(item.kind == 'declared' for item in items)}
     all_keys = python['full'] | python['headless'] | set(source)
@@ -248,7 +248,7 @@ def print_summary(totals: dict, api: dict) -> None:
             print(f"  {profile}: {item['effective']} effective method/path pairs, {item['primary']} primary, "
                   f"{item['primary_rust_declared']} declared in Rust, {item['primary_missing']} missing")
         for mode, rust in counts['rust_modes'].items():
-            print(f"  Rust {mode}: {rust['declared']} mounted declarations, {rust['effective']} with HEAD via GET, "
+            print(f"  Rust {mode}: {rust['declared']} mounted declarations, {rust['effective']} including automatic HEAD and OPTIONS, "
                   f"{rust['wildcards']} ANY routes")
         print(f"  Rust source: {counts['rust_source_explicit']} explicit, "
               f"{counts['rust_source_unconfirmed_explicit']} with no confirmed mount")

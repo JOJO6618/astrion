@@ -10,13 +10,14 @@ import { startAppRuntimeFixture } from './app_runtime_fixture.mjs';
 
 const model = 'isolated-runtime-model';
 const alias = 'mcp__fixture__echo';
+const childProcesses = process.env.ASTRION_RUNTIME_TEST_CHILD_PROCESSES === '1';
 const question = (id, text) => tool(id, 'ask_user', { question: text, options: [{ id: 'yes', label: 'Yes' }] });
 
 function tool(id, name, args) {
   return { id, type: 'function', function: { name, arguments: JSON.stringify(args) } };
 }
 
-function complete(response, reply) {
+function complete(response, reply, usage) {
   response.writeHead(200, { 'content-type': 'text/event-stream' });
   const send = (delta, finish_reason) => response.write(`data: ${JSON.stringify({
     id: 'fixture-completion', model, object: 'chat.completion.chunk',
@@ -30,6 +31,7 @@ function complete(response, reply) {
     send({ content: reply }, null);
     send({}, 'stop');
   }
+  if (usage) response.write(`data: ${JSON.stringify({id: 'fixture-completion', model, choices: [], usage})}\n\n`);
   response.end('data: [DONE]\n\n');
 }
 
@@ -37,6 +39,7 @@ async function startMock() {
   const mcpCalls = [];
   const requests = [];
   const mockErrors = [];
+  const replies = new Map();
   const server = createServer(async (request, response) => {
     try {
       if (request.method === 'DELETE') {
@@ -116,10 +119,45 @@ async function startMock() {
           case 'child_mcp':
             assert.equal(JSON.parse(latest.content).structured_content.echo, 'child echo');
             assert(!latest.content.includes('Zml4dHVyZS1pbWFnZQ=='), 'text-only child model must not receive image bytes');
+            if (childProcesses) {
+              const command = body.tools.find((item) => item.function.name === 'run_command');
+              assert(command, 'child command schema must be present');
+              for (const field of ['run_in_background', 'request_full_access', 'full_access_reason', 'working_dir']) {
+                assert(!Object.hasOwn(command.function.parameters.properties, field), field);
+              }
+              complete(response, [tool('child_command', 'run_command', { timeout: 5,
+                command: 'test -f ../../../notes.txt && printf child-owned > child-owned.txt && '
+                  + 'if (printf forbidden > ../../../notes.txt); then exit 12; else printf narrow-write-verified; fi',
+              })]);
+              return;
+            }
             complete(response, 'child MCP received');
+            return;
+          case 'child_command':
+            assert.equal(JSON.parse(latest.content).success, true, latest.content);
+            assert.match(JSON.parse(latest.content).output, /narrow-write-verified/);
+            complete(response, [tool('child_terminal', 'terminal_session', { action: 'open', session_name: 'fixture-shared' })]);
+            return;
+          case 'child_terminal':
+            assert.equal(JSON.parse(latest.content).success, true, latest.content);
+            complete(response, [tool('child_input', 'terminal_input', { session_name: 'fixture-shared', command: 'printf isolated-child-terminal-output', output_wait: 3 })]);
+            return;
+          case 'child_input':
+            assert.equal(JSON.parse(latest.content).success, true, latest.content);
+            assert.match(JSON.parse(latest.content).output, /isolated-child-terminal-output/);
+            complete(response, [tool('child_after_compression','read_file',{path:'child-owned.txt'})], {prompt_tokens:10100,completion_tokens:1,total_tokens:10101});
+            return;
+          case 'child_after_compression':
+            assert.match(latest.content,/child-owned/);
+            assert(messages.some(message => message.role === 'system' && message.content.includes('压缩摘要')), 'next child model request must include the durable summary');
+            complete(response, 'child MCP received with isolated commands and terminal');
             return;
           case 'create_child':
             assert.equal(JSON.parse(latest.content).success, true, latest.content);
+            if (childProcesses) {
+              assert.equal(messages.at(-2).tool_call_id, 'parent_terminal');
+              assert.equal(JSON.parse(messages.at(-2).content).success, true, messages.at(-2).content);
+            }
             complete(response, 'child created');
             return;
         }
@@ -160,6 +198,14 @@ async function startMock() {
         complete(response, [tool('full_command', 'run_command', {
           command: 'printf isolated-direct-test', timeout: 5, request_full_access: true, full_access_reason: 'Isolated runtime test',
         })]);
+      } else if (task === 'hold final reply for mode' || task === 'hold final reply for compression') {
+        await new Promise(resolve => {
+          const timer = setTimeout(resolve, 12_000);
+          response.once('close', () => { clearTimeout(timer); resolve(); });
+          replies.set(task, () => { clearTimeout(timer); resolve(); });
+        });
+        replies.delete(task);
+        if (!response.destroyed) complete(response, 'final reply with no tools');
       } else if (typeof task === 'string' && task.includes('\n\nchild task fixture\n\n')) {
         assert(names.has(alias));
         assert(names.has('ask_master'));
@@ -167,10 +213,13 @@ async function startMock() {
         complete(response, [tool('child_mcp', alias, { text: 'child echo', intent: 'test' })]);
       } else if (task === 'create fixture child') {
         assert(names.has('create_sub_agent'));
-        complete(response, [tool('create_child', 'create_sub_agent', {
+        const calls = [];
+        if (childProcesses) calls.push(tool('parent_terminal', 'terminal_session', { action: 'open', session_name: 'fixture-shared' }));
+        calls.push(tool('create_child', 'create_sub_agent', {
           name: 'fixture-child', summary: 'Call an isolated local MCP server',
           task: 'child task fixture', intelligence: 'same', access_level: 'working_dir_write',
-        })]);
+        }));
+        complete(response, calls);
       } else {
         throw new Error(`Unexpected model message ${JSON.stringify(latest)}`);
       }
@@ -182,7 +231,7 @@ async function startMock() {
   });
   const port = await listenOnLoopback(server);
   return { endpoint: `http://127.0.0.1:${port}/v1/chat/completions`, mcpUrl: `http://127.0.0.1:${port}/mcp`,
-    requests, mcpCalls, mockErrors, close: () => closeServer(server) };
+    requests, mcpCalls, mockErrors, replies, close: () => closeServer(server) };
 }
 
 test('authenticated Rust tasks batch questions, approve a plan, and run main and child MCP', { timeout: 80_000 }, async (t) => {
@@ -193,7 +242,9 @@ test('authenticated Rust tasks batch questions, approve a plan, and run main and
       await mkdir(plan, { recursive: true });
       await writeFile(join(plan, 'test.md'), '# Isolated approved plan\n');
       await writeFile(join(workspace, 'notes.txt'), 'isolated monitor fixture\n');
-      await writeFile(join(dataDir, 'personalization.json'), JSON.stringify({ default_work_mode: 'plan', default_permission_mode: 'approval' }));
+      await writeFile(join(dataDir, 'personalization.json'), JSON.stringify({
+        default_work_mode: 'plan', default_permission_mode: 'approval', auto_generate_title: false,
+      }));
       await writeFile(join(dataDir, 'mcp_servers.json'), JSON.stringify({
         servers: [{ id: 'fixture', transport: 'streamable_http', url: mock.mcpUrl, enabled: true,
           tools_cache_updated_at: 'generated fixture', tools_cache: [{ name: 'echo',
@@ -284,6 +335,7 @@ test('authenticated Rust tasks batch questions, approve a plan, and run main and
   const snapshot = await request(monitorPath, { headers: { cookie } });
   assert.equal(snapshot.status, 200);
   assert.match((await snapshot.json()).snapshot.content, /isolated monitor fixture/);
+  if (childProcesses) await api('/api/personalization', {method:'POST', body:{sub_agent_compress_threshold_tokens:10000}});
   const child = await createTask(gateway, null, 'create fixture child');
   await done(child);
   await waitFor('child completion notice', async () => {
@@ -296,10 +348,61 @@ test('authenticated Rust tasks batch questions, approve a plan, and run main and
   }, 12_000);
   assert.deepEqual(mock.mockErrors, []);
   assert.deepEqual(mock.mcpCalls, ['main echo', 'child echo']);
+  if (childProcesses) {
+    assert.equal(await readFile(join(fixture.workspace, '.astrion', 'sub_agent_work', 'agent_1', 'child-owned.txt'), 'utf8'), 'child-owned');
+    assert.equal(await readFile(join(fixture.workspace, 'notes.txt'), 'utf8'), 'isolated monitor fixture\n');
+    const output = await request(`/api/terminals/fixture-shared/output?conversation_id=${child.conversationId}`,
+      { headers: { cookie, 'x-astrion-workspace-id': 'default' } });
+    assert.equal(output.status, 200);
+    assert(!JSON.stringify(await output.json()).includes('isolated-child-terminal-output'));
+  }
 
   const testPolicies = process.env.ASTRION_RUNTIME_TEST_HOST_POLICY === '1';
+  if (app) {
+    const views = await Promise.all([fixture.openView('/settings/workspace'), fixture.openView('/settings/workspace')]);
+    const [first, stale] = views;
+    const store = "document.querySelector('#app')?.__vue_app__?.config.globalProperties.$pinia._s.get('personalization')";
+    try {
+      await Promise.all(views.map(view => waitFor('settings window to load the saved default', () =>
+        view.evaluate(`${store}?.loaded && ${store}.form.default_work_mode === 'plan'`))));
+      await first.evaluate(`(async () => {
+        const settings = ${store};
+        settings.setDefaultWorkMode('execute');
+        const saved = await settings.flushAutoSave();
+        return saved?.ok === true;
+      })()`).then(saved => assert.equal(saved, true));
+      assert.equal(await stale.evaluate(`${store}.form.default_work_mode`), 'plan');
+      const writes = await stale.evaluate(`(async () => {
+        const settings = ${store};
+        const postBodies = [];
+        const fetchOriginal = window.fetch;
+        window.fetch = (url, options) => {
+          if (url === '/api/personalization' && options?.method === 'POST') {
+            postBodies.push(JSON.parse(options.body));
+          }
+          return fetchOriginal(url, options);
+        };
+        try {
+          settings.setDefaultPermissionMode('approval');
+          settings.setVersioningBackupMode('full');
+          const saved = await settings.flushAutoSave();
+          return saved?.ok ? postBodies : null;
+        } finally {
+          window.fetch = fetchOriginal;
+        }
+      })()`);
+      assert.deepEqual(writes, [{ default_permission_mode: 'approval', versioning_backup_mode: 'full' }]);
+      const saved = (await api('/api/personalization')).data;
+      assert.equal(saved.default_work_mode, 'execute');
+      assert.equal(saved.default_permission_mode, 'approval');
+      assert.equal(saved.versioning_backup_mode, 'full');
+    } finally {
+      await Promise.allSettled(views.map(view => view.close()));
+    }
+  }
   if ((app || testPolicies) && process.platform === 'darwin') {
-    await api('/api/personalization', { method: 'POST', body: { default_work_mode: 'execute', default_permission_mode: 'approval' } });
+    assert.equal((await api('/api/personalization', { method: 'POST',
+      body: { default_work_mode: 'execute', default_permission_mode: 'approval', versioning_backup_mode: 'shallow' } })).data.default_work_mode, 'execute');
     const command = await createTask(gateway, null, 'request command approval');
     await command.until('sandbox write approval', (poll) => poll.events.some((event) => event.type === 'tool_approval_required'));
     const dest = join(fixture.workspace, 'approved-command.txt');
@@ -326,10 +429,18 @@ test('authenticated Rust tasks batch questions, approve a plan, and run main and
       }
       await browser(`/api/tool-approvals/${pending[0].approval_id}/decision`, { decision: 'approved' });
     };
+    if (testPolicies) {
+      const pending = await browser('/api/network-permission', { mode: 'none', conversation_id: command.conversationId });
+      assert.equal(pending.pending_mode, 'none');
+    }
     await approve(command, 'sandbox_write');
     await done(command);
     assert.equal(await readFile(dest, 'utf8'), 'bundled-approved');
+    assert.equal((await api('/api/personalization')).data.default_work_mode, 'execute');
     if (testPolicies) {
+      const current = await browser(`/api/network-permission?conversation_id=${command.conversationId}`);
+      assert.equal(current.mode, 'none');
+      assert.equal(current.pending_mode, null);
       const isolatedExternal = join(fixture.workspace, '..', 'policy-external');
       await mkdir(isolatedExternal);
       const outside = join(isolatedExternal, 'authorized.txt');
@@ -344,9 +455,11 @@ test('authenticated Rust tasks batch questions, approve a plan, and run main and
       assert.deepEqual((await api('/api/path-authorization', { workspace: 'another-workspace' })).workspace_writable_paths, []);
       await api('/api/path-authorization', { method: 'POST',
         body: { writable_paths: ['/'], readable_extra_paths: [] }, expected: 400 });
-      await done(await createTask(gateway, null, `read authorized external ${outside}`));
+      const authorizedRead = await createTask(gateway, null, `read authorized external ${outside}`);
+      await done(authorizedRead);
+      assert.equal((await bootstrap(authorizedRead.conversationId)).meta.work_mode, 'execute');
       const writePath = join(isolatedExternal, 'written.txt');
-      const write = await createTask(gateway, null, `write authorized external ${writePath}`);
+      const write = await createTask(gateway, authorizedRead.conversationId, `write authorized external ${writePath}`);
       await write.until('authorized write approval', (poll) => poll.events.some((event) => event.type === 'tool_approval_required'));
       await approve(write, 'sandbox_write', 'write_file');
       await done(write);
@@ -373,6 +486,31 @@ test('authenticated Rust tasks batch questions, approve a plan, and run main and
       await approve(onceTask, 'full_access');
       await done(onceTask);
       assert.equal((await browser(`/api/execution-mode?conversation_id=${conversation}`)).state.mode, 'sandbox');
+
+      const noTool = await createTask(gateway, null, 'hold final reply for mode');
+      const releaseFinal = await waitFor('held final response', () => mock.replies.get('hold final reply for mode'));
+      const permission = await browser('/api/permission-mode', { mode: 'readonly', conversation_id: noTool.conversationId });
+      assert.equal(permission.pending_mode, 'readonly');
+      releaseFinal();
+      await done(noTool);
+      const finishedPermission = await browser(`/api/permission-mode?conversation_id=${noTool.conversationId}`);
+      assert.equal(finishedPermission.mode, 'readonly');
+      assert.equal(finishedPermission.pending_mode, null);
+
+      const compress = await createTask(gateway, null, 'hold final reply for compression');
+      await waitFor('held compression response', () => mock.replies.has('hold final reply for compression'));
+      const base = `/api/conversations/${compress.conversationId}`;
+      await browser(`${base}/compress`, {}, 202);
+      const payload = await bootstrap(compress.conversationId);
+      assert.equal(payload.compression.stage, 'waiting_for_tools');
+      assert.equal(payload.display.state.compression.job_id, compress.taskId);
+      const status = await browser(`/api/status?conversation_id=${compress.conversationId}`);
+      assert.equal(status.execution_mode_enabled, true);
+      assert.equal(status.network_permission_enabled, true);
+      assert.deepEqual(status.conversation.compression, payload.compression);
+      await api(`/api/tasks/${compress.taskId}/cancel`, { method: 'POST', body: {} });
+      await compress.until('compression fixture stopped', (poll) => poll.status === 'stopped');
+      assert.equal((await bootstrap(compress.conversationId)).compression.in_progress, false);
     }
     assert.deepEqual(mock.mockErrors, []);
   }

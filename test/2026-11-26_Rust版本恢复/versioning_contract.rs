@@ -234,7 +234,8 @@ async fn toggle_and_finished_agent_checkpoint_use_python_layout_and_respect_acti
     let baseline: Value =
         serde_json::from_slice(&fs::read(f.record_dir().join("snapshots/0.json")).unwrap())
             .unwrap();
-    assert_eq!(baseline["messages"], json!([]));
+    assert!(baseline.get("messages").is_none());
+    assert_eq!(baseline["rust_message_revision"]["count"], 0);
     assert_eq!(baseline["run_status"], "initial");
     let created = crate::runtime::now();
     let task_id = f.hold(ID, "edit tracked files", created);
@@ -299,6 +300,74 @@ async fn toggle_and_finished_agent_checkpoint_use_python_layout_and_respect_acti
     let listed = request(&f, "GET", ID, "/checkpoints", Value::Null, StatusCode::OK).await;
     assert_eq!(listed["data"]["items"], json!([]));
     assert!(f.record_dir().join("snapshots/1.json").is_file());
+}
+
+#[tokio::test]
+async fn automatic_checkpoints_do_not_copy_history_and_forks_keep_revisions_after_source_deletion() {
+    let f = Fixture::new();
+    let prefix = json!({"role":"assistant","content":"stored fixture transcript ".repeat(16_384),
+        "message_id":"retained-prefix","future_message_field":{"value":17}});
+    f.insert(ID, Value::Null, vec![prefix.clone()]);
+    {
+        let store = f.runtime.store().unwrap();
+        store.update_agent_metadata(WORKSPACE, ID, |metadata| metadata["future_header_field"] = json!({"saved":true})).unwrap();
+    }
+    request(&f, "POST", ID, "", json!({"enabled":true}), StatusCode::OK).await;
+    for text in ["turn-one", "turn-two"] {
+        let created = crate::runtime::now();
+        let task = f.hold(ID, text, created);
+        let mut store = f.runtime.store().unwrap();
+        store.append_messages(WORKSPACE, ID, vec![message(text)], created, None, None).unwrap();
+        store.finish(&task, Ok(vec![json!({"role":"assistant","content":format!("reply for {text}")})])).unwrap();
+    }
+    for sequence in 0..=2 {
+        let state = fs::read(f.record_dir().join(format!("snapshots/{sequence}.json"))).unwrap();
+        assert!(state.len() < 8_192, "checkpoint {sequence} copied transcript bytes");
+        let state: Value = serde_json::from_slice(&state).unwrap();
+        assert!(state.get("messages").is_none());
+        assert_eq!(state["rust_message_revision"]["count"], 1 + sequence * 2);
+    }
+    let first = f.document(ID)["messages"].as_array().unwrap()[..3].to_vec();
+    let mut rewritten = f.document(ID);
+    rewritten["messages"] = json!([{"role":"system","content":"compacted replacement"}]);
+    rewritten["metadata"]["future_header_field"] = json!({"saved":false});
+    f.runtime.store().unwrap().persist(WORKSPACE, LegacyDocument::from_value(rewritten).unwrap(), false).unwrap();
+
+    let result = request(&f, "POST", ID, "/restore", json!({"seq":1,"mode":"copy"}), StatusCode::OK).await;
+    let fork = result["data"]["conversation_id"].as_str().unwrap();
+    let copied = f.document(fork);
+    assert_eq!(copied["messages"], json!(first));
+    assert_eq!(copied["metadata"]["future_header_field"], json!({"saved":true}));
+
+    f.runtime.store().unwrap().delete_conversation(WORKSPACE, ID).unwrap();
+    request(&f, "POST", fork, "/restore", json!({"seq":0}), StatusCode::OK).await;
+    assert_eq!(f.document(fork)["messages"], json!([prefix]));
+}
+
+#[test]
+fn interrupted_checkpoint_recovers_files_at_the_metadata_commit_boundary() {
+    for committed in [false, true] {
+        let f = Fixture::new();
+        f.insert(ID, json!({"enabled":true,"last_input_seq":0}), vec![message("persistent transcript")]);
+        fs::create_dir_all(f.record_dir()).unwrap();
+        let record = open_data_directory(&f.record_dir()).unwrap();
+        let records = open_data_directory(&f.data.join("save")).unwrap();
+        let before = f.document(ID)["metadata"]["versioning"].clone();
+        let after = json!({"enabled":true,"last_input_seq":1});
+        let mut tx = Transaction::for_versioning(&record, &records, WORKSPACE, ID, &before, &after).unwrap();
+        tx.put(&format!("{ID}/meta.json"), br#"{"new":true}"#.to_vec()).unwrap();
+        tx.interrupt_after(1).unwrap();
+        {
+            let store = f.runtime.store().unwrap();
+            if committed { store.update_agent_metadata(WORKSPACE, ID, |metadata| metadata["versioning"] = after.clone()).unwrap(); }
+            integration::recover_pending(&store, WORKSPACE, ID).unwrap();
+            assert!(transaction::pending(&record).unwrap().is_none());
+        }
+        assert_eq!(f.record_dir().join("meta.json").is_file(), committed);
+        let document = f.document(ID);
+        assert_eq!(document["metadata"]["versioning"], if committed { after } else { before });
+        assert_eq!(document["messages"], json!([message("persistent transcript")]));
+    }
 }
 
 #[tokio::test]

@@ -13,11 +13,22 @@ use super::ChatError;
 use crate::legacy::media::BlobStore;
 
 pub(super) fn resolve_refs(root: &Path, values: &Value) -> Result<Vec<Value>, ChatError> {
+    resolve_typed_refs(root, values, None)
+}
+
+pub(super) fn resolve_typed_refs(
+    root: &Path,
+    values: &Value,
+    kind: Option<&str>,
+) -> Result<Vec<Value>, ChatError> {
     let Some(values) = values.as_array() else {
         return Err(ChatError::bad_request("Invalid media list"));
     };
     if values.len() > 20 {
         return Err(ChatError::bad_request("Invalid media list"));
+    }
+    if values.is_empty() {
+        return Ok(Vec::new());
     }
     let store = BlobStore::open(root);
     let mut resolved = Vec::with_capacity(values.len());
@@ -34,6 +45,9 @@ pub(super) fn resolve_refs(root: &Path, values: &Value) -> Result<Vec<Value>, Ch
             .ok_or_else(|| ChatError::not_found("Chat media unavailable"))?;
         if !matches!(entry["kind"].as_str(), Some("image" | "video")) {
             return Err(ChatError::not_found("Chat media unavailable"));
+        }
+        if kind.is_some_and(|kind| entry["kind"] != kind) {
+            return Err(ChatError::bad_request("Wrong Chat media kind"));
         }
         let mime_type = entry["mime_type"]
             .as_str()

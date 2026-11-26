@@ -11,7 +11,7 @@ pub(super) fn build(
     snapshot: WebConversationSnapshot,
 ) -> Value {
     let WebConversationSnapshot {
-        mut document, activity, goal_progress, pending_user_questions,
+        mut document, activity, goal_progress, compression, pending_user_questions,
         pending_plan_approvals, pending_tool_approvals, has_running_background_commands, has_running_multi_agent,
     } = snapshot;
     let activity = activity.as_ref();
@@ -66,7 +66,8 @@ pub(super) fn build(
             "state": { "streaming": live.streaming, "api_request_pending": live.pending,
                 "goal_progress": goal_progress, "goal_running": goal_running, "summary_tool_batch_id": null, "summary_tool_batch_sequence": 0,
                 "pending_tool_approvals": pending_tool_approvals, "resolved_tool_approval_ids": [], "pending_user_questions": pending_user_questions,
-                "pending_plan_approvals": pending_plan_approvals, "approval_review_records": [], "compression": null } },
+                "pending_plan_approvals": pending_plan_approvals, "approval_review_records": [],
+                "compression": if compression["in_progress"] == true { &compression } else { &Value::Null } } },
         "running": {
             "is_main_running": running,
             "main_task_id": task.as_ref().and_then(|task| task["task_id"].as_str()),
@@ -80,22 +81,10 @@ pub(super) fn build(
         "context_baseline_tokens": positive_integer(&metadata["context_baseline_tokens"]).unwrap_or(0),
         "compress_limit_tokens": limit, "compress_limit_source": limit_source,
         "runtime_queue": queue_snapshot(&metadata["runtime_message_queue"], !running),
-        "compression": compression(&metadata, id, running),
+        "compression": compression,
         "edited_files": edited_files(&metadata["edited_files"], root.as_deref()),
         "preview_targets": project_preview_targets(&metadata["preview_targets"], &|path| existing_file(root.as_deref(), path)),
         "preview_base": null, "preview_token": null,
-    })
-}
-
-pub(super) fn compression(metadata: &Value, id: &str, running: bool) -> Value {
-    let in_progress = running && metadata["compression_in_progress"] == true;
-    json!({
-        "conversation_id": id, "in_progress": in_progress,
-        "mode": in_progress.then(|| metadata["compression_mode"].as_str()).flatten(),
-        "stage": in_progress.then(|| metadata["compression_stage"].as_str()).flatten(),
-        "error": metadata["compression_error"].as_str(),
-        "count": positive_integer(&metadata["compression_count"]).unwrap_or(0),
-        "job_id": in_progress.then(|| metadata["compression_job_id"].as_str()).flatten(),
     })
 }
 
@@ -130,20 +119,24 @@ fn live_display(activity: &Value) -> LiveDisplay {
         return output;
     };
     let stream = &activity["stream"];
-    let Some(start_idx) = stream["start_idx"].as_u64() else {
+    let thinking = &activity["thinking_stream"];
+    let Some(start_idx) = thinking["start_idx"].as_u64().or_else(|| stream["start_idx"].as_u64()) else {
         return output;
     };
-    let timestamp = stream["timestamp"].as_f64();
+    let timestamp = thinking["timestamp"].as_f64().or_else(|| stream["timestamp"].as_f64());
     let text = stream["content"].as_str().unwrap_or_default();
-    let streaming = stream["streaming"] == true;
+    let streaming_text = stream["streaming"] == true;
+    let streaming_thinking = thinking["streaming"] == true;
+    let actions = crate::runtime::thinking::display_actions(activity);
     output.messages.push(json!({
         "id": format!("{task_id}:{start_idx}:assistant"), "role": "assistant",
         "taskId": task_id, "timestamp": timestamp,
-        "actions": [{"id": format!("{task_id}:{start_idx}:text"), "type": "text", "content": text,
-            "timestamp": timestamp, "streaming": streaming }],
-        "streamingThinking": "", "streamingText": if streaming { text } else { "" },
-        "currentStreamingType": if streaming { Some("text") } else { None },
-        "activeThinkingId": null, "awaitingFirstContent": false, "generatingLabel": "",
+        "actions": actions,
+        "streamingThinking": if streaming_thinking { thinking["content"].as_str().unwrap_or_default() } else { "" },
+        "streamingText": if streaming_text { text } else { "" },
+        "currentStreamingType": if streaming_text { Some("text") } else if streaming_thinking { Some("thinking") } else { None },
+        "activeThinkingId": if streaming_thinking { actions.first().and_then(|action| action["id"].as_str()) } else { None },
+        "awaitingFirstContent": false, "generatingLabel": "",
         "streamAttemptStart": 0, "streamAttemptBatchId": "",
     }));
     output

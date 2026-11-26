@@ -105,6 +105,9 @@ class LocalServices(BaseHTTPRequestHandler):
         if 'blocked' not in results:
             return [call(STATUS,'blocked',{})]
         assert results['blocked']['tool_not_loaded'] is True
+        if 'invalid-load' not in results:
+            return [call('load_tools','invalid-load',{'tool_names':[STATUS,7]})]
+        assert results['invalid-load']['success'] is False, results
         if 'load' not in results:
             return [call('load_tools','load',{'tool_names':[STATUS]})]
         loaded = results['load']
@@ -173,7 +176,7 @@ def run():
             'webpage_direct_extract_enabled':True,'webpage_direct_extract_domains':['127.0.0.1'],
         }))
         (data/'personalization.json').write_text(json.dumps({
-            'tool_loading_enabled':True,'tool_loading_deferred':[STATUS],
+            'tool_loading_enabled':True,'tool_loading_deferred':[STATUS],'auto_generate_title':False,
         }))
         thread = threading.Thread(target=service.serve_forever, daemon=True)
         thread.start()

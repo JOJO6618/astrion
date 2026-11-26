@@ -16,10 +16,12 @@ const props = defineProps<{ actions: T[]; limited: boolean; expanded: boolean }>
 const content = ref<HTMLElement | null>(null);
 const batchSize = 4;
 const firstIndex = ref(Math.max(0, props.actions.length - batchSize));
-const start = computed(() => props.limited
-  ? Math.min(firstIndex.value, Math.max(0, props.actions.length - batchSize))
-  : 0);
-const visibleActions = computed(() => start.value ? props.actions.slice(start.value) : props.actions);
+const start = computed(() =>
+  props.limited ? Math.min(firstIndex.value, Math.max(0, props.actions.length - batchSize)) : 0
+);
+const visibleActions = computed(() =>
+  start.value ? props.actions.slice(start.value) : props.actions
+);
 
 let wrapper: HTMLElement | null = null;
 let observer: ResizeObserver | undefined;
@@ -31,7 +33,8 @@ let previousTop = 0;
 async function fill(loadOlder = false) {
   const list = content.value;
   const scroller = wrapper;
-  if (updating || !list || !scroller || !props.limited || !props.expanded || !list.offsetWidth) return;
+  if (updating || !list || !scroller || !props.limited || !props.expanded || !list.offsetWidth)
+    return;
   const limit = parseFloat(getComputedStyle(scroller).maxHeight);
   if (!Number.isFinite(limit)) return;
   updating = true;
@@ -73,18 +76,23 @@ onMounted(() => {
   wrapper = content.value!.parentElement;
   if (!wrapper) return;
   wrapper.addEventListener('scroll', onScroll, { passive: true });
-  observer = new ResizeObserver(() => { void fill(); });
+  observer = new ResizeObserver(() => {
+    void fill();
+  });
   observer.observe(wrapper);
   observer.observe(content.value!);
   showLatest();
 });
 
-watch(() => props.limited, async (limited) => {
-  if (!limited) return;
-  firstIndex.value = Math.max(0, props.actions.length - batchSize);
-  await nextTick();
-  showLatest();
-});
+watch(
+  () => props.limited,
+  async (limited) => {
+    if (!limited) return;
+    firstIndex.value = Math.max(0, props.actions.length - batchSize);
+    await nextTick();
+    showLatest();
+  }
+);
 
 onBeforeUnmount(() => {
   wrapper?.removeEventListener('scroll', onScroll);

@@ -175,18 +175,30 @@ async fn list(State(mode): State<ChatMode>, Query(query): Query<Search>) -> Repl
     .await
 }
 
-async fn bootstrap(State(mode): State<ChatMode>, Path(id): Path<String>) -> Reply {
-    run(move || {
-        let document = mode.storage(|paths| {
-            let document = paths.read_document(&id)?;
-            public_document(document)
-        })?;
-        Ok(json!({
-            "success": true,
-            "data": {"document": document, "display": Value::Null},
-        }))
+fn display(task: &Value) -> Value {
+    let actions = crate::runtime::thinking::display_actions(task);
+    let messages = if actions.is_empty() { Vec::new() } else { vec![json!({"actions":actions})] };
+    json!({
+        "messages":messages,
+        "state":{"streaming":task["stream"]["streaming"] == true || task["thinking_stream"]["streaming"] == true,
+            "api_request_pending":task["api_request_pending"] == true,
+            "title_pending":task["title_pending"] == true},
+        "task": task["task_id"].as_str().map(|id| json!({"task_id":id,"status":if task["cancel_requested"] == true { json!("cancel_requested") } else { task["status"].clone() }})),
+        "next_event_idx":task["next_offset"].as_u64().unwrap_or_default(),
     })
-    .await
+}
+
+fn conversation_view(mode: &ChatMode, id: &str) -> Result<Value, ChatError> {
+    mode.runtime.with_chat_display(id, |root, task| {
+        let paths = super::store::ChatPaths::new(root);
+        let mut document = public_document(paths.read_document(id)?)?;
+        crate::runtime::thinking::decorate(&paths.conversations(), id, &mut document);
+        Ok(json!({"document":document,"display":display(&task)}))
+    })
+}
+
+async fn bootstrap(State(mode): State<ChatMode>, Path(id): Path<String>) -> Reply {
+    run(move || Ok(json!({"success":true,"data":conversation_view(&mode,&id)?}))).await
 }
 
 #[derive(Deserialize)]
@@ -204,8 +216,7 @@ async fn presentation(
         let release = body.release == Some(true);
         mode.handoff_presentation(&id, body.presentation_id.as_deref(), release)?;
         if release { return Ok(json!({"success": true})); }
-        let document = mode.storage(|paths| public_document(paths.read_document(&id)?))?;
-        Ok(json!({"success":true,"data":{"document":document,"display":null}}))
+        Ok(json!({"success":true,"data":conversation_view(&mode,&id)?}))
     })
     .await
 }
@@ -347,10 +358,7 @@ async fn title(
         return error(ChatError::bad_request("Invalid Chat title"));
     };
     run(move || {
-        mode.storage(|paths| {
-            paths.read_raw(&id)?;
-            paths.set_title(&id, &title)
-        })?;
+        mode.storage(|paths| paths.set_title(&id, &title))?;
         Ok(json!({"success": true}))
     })
     .await
@@ -450,7 +458,7 @@ async fn poll(
             let document = paths.read_document(&conversation_id)?;
             Ok(json!({
                 "document": public_document(document)?,
-                "display": Value::Null,
+                "display": display(&data),
             }))
         })
         .ok()

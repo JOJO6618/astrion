@@ -21,7 +21,7 @@ ASTRION_HOST_TOKEN_FILE="$HOME/.astrion/rust-headless-dev/host_api_token" \
   bun cli/src/main.tsx
 ```
 
-网关监听 IPv4 回环地址。以上命令使用独立开发目录；`--data-dir` 也支持既有 Astrion `host/data` 布局，Python 与 Rust 进程按同一实例锁依次接管。启动 Web 时增加 `--web --static-root static`，需要已有前端构建产物。Electron 默认启动 Python，显式设置 `ASTRION_DESKTOP_BACKEND=rust` 可选择包含 Rust 可执行文件的目录包。
+网关监听 IPv4 回环地址。示例命令使用独立开发目录，`--data-dir` 也支持既有 Astrion `host/data` 布局。启动 Web 时增加 `--web --static-root static`，需要已有前端构建产物。Electron 默认运行包内的 Rust 后端。每个数据目录只应由一个后端实例持有。
 
 使用已保存的模型目录时，省略 `--endpoint` 和 `--model`。已连接的 ChatGPT 订阅模型按目录中的完整账号/模型 key 选择。启动服务会沿用指定数据目录中的账号凭据与模型缓存。
 
@@ -40,4 +40,4 @@ node --test test/2026-11-24_Rust后端/gateway_e2e.test.mjs test/2026-11-24_Rust
 
 ## 存储范围
 
-会话、索引、草稿和 Chat 消息树沿用 Python 的磁盘布局。任务事件与轮询游标属于当前进程，重启后从已提交的会话历史继续。Agent 在每个完整工具批次后提交助手消息及工具结果。两档合成数据的首次列表耗时与就绪瞬间 RSS 见[启动基准](../test/2026-11-26_Rust启动性能/README.md)。长期运行的内存占用和发行包冷启动仍待实测。
+1.0 使用 SQLite 存储 Agent 与 Chat 历史、列表索引、版本检查点、子智能体上下文和审核记录。启动时可以暂缓旧记录迁移。迁移成功后可在原 ID 下继续对话，旧 JSON 原样保留。Agent 在完整工具批次结束时提交助手消息和工具结果，Chat 追加或编辑时只更新对应的消息行。任务的实时轮询游标属于当前进程。数据位置见[运行态目录](../docs/agents_details/runtime_data_paths.md)，实包验收见[迁移进展](MIGRATION_STATUS.md)。

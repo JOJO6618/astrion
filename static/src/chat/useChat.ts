@@ -34,6 +34,7 @@ export function useChat(onTaskError: (data: Record<string, any>) => void = () =>
   let fatalNotifiedTaskId = '';
   const task = computed(() => display.value?.task);
   const running = computed(() => !!task.value && activeStatuses.has(task.value.status));
+  const titlePending = computed(() => display.value?.state?.title_pending === true);
   const busy = computed(() => running.value || sending.value || loading.value);
   const cid = computed(() => document.value?.id || '');
   const path = computed(() => (document.value ? pathOf(document.value, viewingLeaf.value) : []));
@@ -107,8 +108,11 @@ export function useChat(onTaskError: (data: Record<string, any>) => void = () =>
   function schedule(token: number, initial = false) {
     if (!owns(token)) return;
     window.clearTimeout(pollTimer);
-    if (running.value || (initial && task.value?.status === 'failed'))
+    if (running.value || (initial && task.value?.status === 'failed')) {
       pollTimer = window.setTimeout(() => void poll(token), 250);
+    } else if (titlePending.value) {
+      pollTimer = window.setTimeout(() => void poll(token), 800);
+    }
   }
   async function poll(token: number) {
     const current = task.value;
@@ -133,7 +137,7 @@ export function useChat(onTaskError: (data: Record<string, any>) => void = () =>
           onTaskError({ message: result.error });
           fatalNotifiedTaskId = taskId;
         }
-        void list().catch(report);
+        if (!titlePending.value || activeStatuses.has(current.status)) void list().catch(report);
       }
     } catch (cause) {
       if (owns(token)) report(cause);

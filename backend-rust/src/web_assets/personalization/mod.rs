@@ -1,10 +1,24 @@
 //! Host personalization settings for the browser and authenticated local Gateway.
 
 mod metadata;
+mod skill_archive;
 mod schema;
 mod store;
 
 pub(crate) use metadata::default_admin_tool_categories;
+pub(crate) use skill_archive::{CREATE_SKILL, create_skill_definition};
+pub(crate) const TOOL: &str = "manage_personalization";
+const EDITABLE: [&str; 8] = ["self_identify","user_name","profession","tone","considerations","theme",
+    "communication_style","conversation_continuity"];
+
+pub(crate) fn model_tool() -> Value {
+    json!({"type":"function","function":{"name":TOOL,"description":"读取个人偏好或更新一个允许修改的个人偏好。",
+        "parameters":{"type":"object","properties":{
+            "action":{"type":"string","enum":["read","update"]},"field":{"type":"string","enum":EDITABLE},
+            "value":{"type":"string"},"intent":{"type":"string"}
+        },"required":["action"]}}})
+}
+
 
 use crate::{catalog::CatalogSource, workspace_catalog::RegisteredWorkspace};
 use axum::{
@@ -31,8 +45,16 @@ pub(crate) fn web_service_preferences(data: &Path) -> io::Result<Value> {
     Store::open(data)?.network_settings().map(Value::Object)
 }
 
-pub(crate) fn deferred_snapshot(data: &Path) -> io::Result<Option<Value>> {
-    Store::open(data)?.agent_tool_loading()
+pub(crate) fn runtime_creation_tools(data: &Path) -> io::Result<Object> {
+    Store::open(data)?.agent_creation_tools()
+}
+
+pub(crate) fn title_preferences(data: &Path) -> io::Result<(bool, String)> {
+    Store::open(data)?.title_preferences()
+}
+
+pub(crate) fn external_session_enabled(data: &Path) -> bool {
+    Store::open(data).and_then(|store| store.external_session_enabled()).unwrap_or(false)
 }
 
 fn tool_loading_snapshot(config: &Object) -> Option<Value> {
@@ -113,6 +135,48 @@ impl Personalization {
         Ok(metadata)
     }
 
+    pub(crate) fn apply_model_tool(&self, args: &Value) -> io::Result<Value> {
+        let prefs = &self.preferences;
+        let _lock = prefs.updates.lock().map_err(|_| io::Error::other("personalization settings lock is poisoned"))?;
+        let store = Store::open(prefs.catalog.host_data_dir())?;
+        let config = store.read(&prefs.catalog.load())?;
+        match args["action"].as_str() {
+            Some("read") => {
+                let mut response = config;
+                response.retain(|name, _| name == "enabled" || EDITABLE.contains(&name.as_str()));
+                Ok(json!({"success":true,"data":response}))
+            }
+            Some("update") => {
+                let Some(field) = args["field"].as_str().filter(|field| EDITABLE.contains(field)) else {
+                    return Ok(json!({"success":false,"error":"该个性化字段不允许修改。"}));
+                };
+                let Some(value) = args["value"].as_str() else {
+                    return Ok(json!({"success":false,"error":"个性化值必须是文本。"}));
+                };
+                let valid = match field {
+                    "theme" => matches!(value, "classic" | "light" | "dark"),
+                    "communication_style" => matches!(value, "default" | "human_like" | "auto"),
+                    "conversation_continuity" => matches!(value, "high" | "medium" | "low"),
+                    "considerations" => value.chars().count() <= 2000,
+                    _ => value.chars().count() <= 20,
+                };
+                if !valid {
+                    return Ok(json!({"success":false,"error":"个性化值超出允许范围。"}));
+                }
+                let patch = Object::from_iter([(field.to_owned(), json!(value))]);
+                store.write_ordinary_patch(&patch)?;
+                let mut result = json!({"success":true,"message":"个性化设置已更新。",
+                    "updated_field":field,"old_value":config[field],"updated_value":value});
+                if field == "theme" {
+                    result["theme_changed"] = json!(true);
+                    result["new_theme"] = json!(value);
+                }
+                Ok(result)
+            }
+            _ => Ok(json!({"success":false,"error":"action 必须是 read 或 update。"})),
+        }
+    }
+
     /// Account Chat settings share the Agent personalization document and its
     /// in-process write lock. The snapshot excludes secrets and runs no Agent
     /// schema normalization; PATCH preserves every unknown key in place.
@@ -133,7 +197,7 @@ impl Personalization {
             .lock()
             .map_err(|_| io::Error::other("personalization settings lock is poisoned"))?;
         let store = Store::open(preferences.catalog.host_data_dir())?;
-        Ok(Value::Object(store.write_chat_patch(patch)?))
+        Ok(Value::Object(store.write_ordinary_patch(patch)?))
     }
 
     /// Mount under the protection used for Host cookie+CSRF and local Host Bearer requests.

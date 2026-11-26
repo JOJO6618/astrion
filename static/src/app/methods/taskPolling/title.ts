@@ -54,9 +54,8 @@ export const titleMethods = {
       this.currentConversationId === conversationId &&
       this.generatedTitleRefreshSeq === seq;
 
-    // 标题模型是后台独立请求，慢时可能在主任务完成后几十秒才落盘。
-    // 这里用“总等待窗口”而不是少量固定次数，避免刚好错过最终 title_locked=true 的标题。
-    const deadlineMs = Math.max(15000, Number(options.deadlineMs || 90000));
+    // 后台标题最长等待五分钟。状态为已结束时，立即停止轮询。
+    const deadlineMs = Math.max(15000, Number(options.deadlineMs || 310000));
     const maxAttempts = Math.max(1, Number(options.maxAttempts || 60));
     const delays = Array.isArray(options.delays)
       ? options.delays
@@ -72,11 +71,11 @@ export const titleMethods = {
     const run = async (attempt: number) => {
       if (!owns()) return;
       this.generatedTitleRefreshTimer = null;
-      const updated = await this.fetchGeneratedConversationTitle(
+      const settled = await this.fetchGeneratedConversationTitle(
         conversationId,
         `${reason}:attempt-${attempt}`
       );
-      if (!owns() || updated) return;
+      if (!owns() || settled) return;
       const elapsedMs = Date.now() - startedAt;
       if (attempt >= maxAttempts || elapsedMs >= deadlineMs) {
         debugLog('[TaskPolling] 停止等待生成标题', {
@@ -125,8 +124,7 @@ export const titleMethods = {
       const normalizedTitle = String(data.title || '').trim();
       const titleLocked = Boolean(data.title_locked || data.metadata?.title_locked);
       if (this.isPlaceholderConversationTitle(normalizedTitle) || !titleLocked) {
-        // Unlocked titles are usually first-message fallback titles; keep waiting for the final generated title.
-        return false;
+        return data.title_pending === false;
       }
       this.applyConversationTitleUpdate(normalizedConversationId, normalizedTitle, source);
       return true;

@@ -61,7 +61,7 @@ test('Rust-only staged sidecar primes a session before Electron binds the main w
   const f = await fixture(t);
   const runtime = join(f.resourcesPath, 'runtime/rust');
   stageRustBackend({ binary, staticRoot, destination: runtime });
-  assert.deepEqual((await readdir(runtime)).sort(), ['agentskills', 'astrion-headless', 'config', 'static', 'workflows']);
+  assert.deepEqual((await readdir(runtime)).sort(), ['agentskills', 'astrion-headless', 'config', 'prompts', 'static', 'workflows']);
   for (const artifact of ['config/providers_catalog.json', 'agentskills/docx/SKILL.md', 'workflows/feature-development/WORKFLOW.md', 'static/dist/.vite/entry-styles.json']) {
     assert.ok((await readFile(join(runtime, artifact))).length > 0, artifact);
   }
@@ -235,7 +235,15 @@ test('Desktop probe rejects an unrelated occupant, and isolated directories reje
   assert.throws(() => resolveDesktopBackend({ env, platform: 'darwin' }), /initially empty data directory/);
   assert.deepEqual(await readdir(f.data), ['synthetic-existing-state']);
   assert.deepEqual(await readdir(f.profile), []);
-  assert.equal(resolveDesktopBackend({ env: {}, platform: 'win32' }), null);
+  assert.equal(resolveDesktopBackend({ env: { ASTRION_DESKTOP_BACKEND: 'python' }, platform: 'win32' }), null);
+  for (const platform of ['darwin', 'win32']) {
+    const source = resolveDesktopBackend({
+      env: { ASTRION_RUST_BACKEND_BIN: binary, ASTRION_RUST_STATIC_ROOT: staticRoot, ASTRION_RUST_RESOURCE_ROOT: resources },
+      platform,
+    });
+    assert.equal(source.binary, binary);
+    assert.equal(source.experimental, false);
+  }
   const server = createServer((_req, res) => res.end(JSON.stringify({ backend: 'rust', pid: process.pid + 1 })));
   const port = await listenOnLoopback(server);
   t.after(() => closeServer(server));

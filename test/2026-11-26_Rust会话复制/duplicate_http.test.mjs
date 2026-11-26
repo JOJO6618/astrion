@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { DatabaseSync } from 'node:sqlite';
+import { migrate, readDocument, readSummary } from '../2026-11-27_Rust对话格式迁移/fixture.mjs';
 import { execFileSync } from 'node:child_process';
 import { mkdir, readFile, readdir, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -151,11 +153,11 @@ async function checkCopy(dataDir, workspaceId, response, reference, expectedMode
   assert.equal(response.headers.get('cache-control'), 'no-store');
   const { duplicate_conversation_id: id, load_result: loaded, success } = response.json;
   assert.equal(success, true);
-  const record = JSON.parse(await readFile(join(directory(dataDir, workspaceId), `${id}.json`), 'utf8'));
-  const index = JSON.parse(await readFile(join(directory(dataDir, workspaceId), 'index.json'), 'utf8'));
+  const record=readDocument(directory(dataDir,workspaceId),id);
+  const summary=readSummary(directory(dataDir,workspaceId),id);
   assert.equal(record.id, id);
   assert.deepEqual(normalize(record), normalize(reference.document));
-  assert.deepEqual(normalize(index[id]), normalize(reference.index));
+  assert.deepEqual(normalize(summary), normalize(reference.index));
   assert.deepEqual(loaded, {
     success: true, conversation_id: id, title: record.title, messages_count: record.messages.length,
     run_mode: expectedMode, thinking_mode: expectedMode === 'thinking', model_key: expectedModel,
@@ -165,7 +167,14 @@ async function checkCopy(dataDir, workspaceId, response, reference, expectedMode
 }
 
 async function files(dataDir) {
-  return Promise.all(['default', 'other'].map(id => readdir(directory(dataDir, id))));
+  return Promise.all(['default', 'other'].map(async id => {
+    const folder = directory(dataDir, id);
+    // SQLite may checkpoint and remove its transient sidecars when the last reader closes.
+    const files = (await readdir(folder)).filter(name => !['conversations.sqlite3-wal','conversations.sqlite3-shm'].includes(name));
+    const database = new DatabaseSync(join(folder,'conversations.sqlite3'), { readOnly:true });
+    try { return { files: files.sort(), rows: database.prepare('SELECT id,summary FROM conversations ORDER BY id').all() }; }
+    finally { database.close(); }
+  }));
 }
 
 test('Agent conversation duplication matches Python history and index under the registered workspace', { timeout: 55_000 }, async (t) => {
@@ -181,11 +190,12 @@ test('Agent conversation duplication matches Python history and index under the 
   await duplicate(base, SHARED, { headers: { ...anonymous, ...bearer }, status: 401 });
   const browser = await login(base, anonymous);
   await duplicate(base, SHARED, { headers: { cookie: browser.cookie }, status: 403 });
+  await migrate(base,browser,2);
   const originalFiles = await files(dataDir);
   const rejected = [
-    [OTHER, { status: 404 }], [FOREIGN, { status: 404 }], [CHAT, { status: 404 }],
+    [OTHER, { status: 404 }], [FOREIGN, { status: 404 }], [CHAT, { status: 409 }],
     ['conv_missing', { status: 404 }], ['conv_../hidden', { status: 404 }],
-    [DAMAGED, { status: 503 }],
+    [DAMAGED, { status: 409 }],
     [SHARED, { scope: 'default', headers: { 'x-astrion-workspace-id': 'other' }, status: 400 }],
     [SHARED, { scope: 'default', body: { workspace_id: 'other' }, status: 404 }],
     [SHARED, { body: { workspace_id: 'other' }, headers: { 'x-astrion-workspace-id': 'default' }, status: 404 }],

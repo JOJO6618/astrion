@@ -51,7 +51,7 @@ pub(super) fn freeze(
             .filter(|prefs| prefs.as_object().is_some_and(|fields| !fields.is_empty()))
             .cloned().unwrap_or_else(|| knowledge.prompt_preferences());
         let recent = sections::recent_conversations(store, workspace_id, &conversation_id, &preferences);
-        let input = Inputs { root, created_at: &created_at, knowledge: &knowledge, preferences: &preferences, model, writer, recent };
+        let input = Inputs { root, created_at: &created_at, knowledge: &knowledge, preferences: &preferences, model, writer, recent, browser: store.native_browser.is_some() && writer };
         build(metadata, input)
     })
 }
@@ -111,11 +111,12 @@ struct Inputs<'a> {
     preferences: &'a Value,
     model: &'a ModelConfig,
     writer: bool,
+    browser: bool,
     recent: String,
 }
 
 fn build(metadata: &mut Map<String, Value>, input: Inputs<'_>) -> Result<String, RuntimeError> {
-    let Inputs { root, created_at, knowledge, preferences, model, writer, recent } = input;
+    let Inputs { root, created_at, knowledge, preferences, model, writer, recent, browser } = input;
     let mut parts = vec![STATIC.trim().to_owned()];
     parts.extend(sections::personalization(preferences));
     for (name, enabled) in [("AGENTS.md", "agents_md_auto_inject"), ("CLAUDE.md", "claude_md_auto_inject")] {
@@ -154,7 +155,9 @@ fn build(metadata: &mut Map<String, Value>, input: Inputs<'_>) -> Result<String,
         _ => dynamic!("vision_text"),
     }.trim().into());
     parts.extend(sections::modes(metadata, preferences, writer));
-    parts.push(render(dynamic!("features"), &[("preview_state", "可用"), ("browser_state", "不可用")]));
+    let browser_state = if !browser { "不可用" }
+        else if metadata.get("browser_tools_enabled") == Some(&Value::Bool(true)) { "开启" } else { "关闭" };
+    parts.push(render(dynamic!("features"), &[("preview_state", "可用"), ("browser_state", browser_state)]));
     if !recent.is_empty() {
         parts.push(render(dynamic!("recent_conversations"), &[("recent_conversations", &recent)]));
     }

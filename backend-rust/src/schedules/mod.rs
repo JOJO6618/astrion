@@ -11,6 +11,7 @@ mod yaml;
 pub use routes::router;
 pub use runtime::RuntimeScheduleAdapter;
 pub use scheduler::{ScheduleOwner, ScheduleService};
+pub(crate) use scheduler::{AgentScheduleScope, ScheduleLink};
 
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -122,6 +123,11 @@ pub trait ScheduleAdapter: Send + Sync + 'static {
     /// Resolve settings against trusted state. Return the settings snapshot to persist for new
     /// conversations. On an unchanged overwrite `principal` contains any previous snapshot.
     fn validate(&self, definition: &Value, principal: &Value) -> Result<Option<Value>>;
+
+    fn agent_settings(&self, _definition: &Value, _principal: &Value) -> Result<Value> {
+        Err(ScheduleError::unavailable("无法验证当前计划的执行权限"))
+    }
+
 
     /// Return admission only after the runtime actually accepts the task under its main task gate.
     fn start(&self, request: &ScheduleInvocation) -> std::result::Result<Admission, StartError>;

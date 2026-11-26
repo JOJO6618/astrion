@@ -271,6 +271,37 @@ pub(super) fn workspace_write_request(
 }
 
 impl Runtime {
+    pub(super) async fn approve_host_mutation(
+        &self, task_id: &str, call_id: &str, name: &str, args: &Value, batch: &[Value],
+    ) -> Result<(), Value> {
+        let denied = |reason: &str| tool_failure("approval_authority_denied", reason);
+        let arguments = args.as_object().cloned().ok_or_else(|| denied("工具参数必须是对象。"))?;
+        let preview = ["source_dir","file_path","schedule_id","action","intent"].into_iter()
+            .filter_map(|key| args.get(key).cloned().map(|value| (key.into(),value))).collect();
+        let (request, item) = {
+            let mut store = self.store().map_err(|error| denied(&error.message))?;
+            let (_, settings) = task_scope(&store, task_id).map_err(|error| denied(&error))?;
+            let (permission, execution) = settings.process_modes().ok_or_else(|| denied("当前任务权限无效。"))?;
+            match permission {
+                PermissionMode::ReadOnly => return Err(denied("只读或计划模式不允许该操作。")),
+                PermissionMode::Unrestricted => return Ok(()),
+                PermissionMode::Approval | PermissionMode::AutoApproval => {}
+            }
+            let approval_type = if execution == ExecutionMode::Direct { ApprovalType::DirectExecution }
+                else { ApprovalType::SandboxWrite };
+            let request = ToolRequest { tool_call_id:call_id.into(), tool_name:name.into(), arguments,
+                preview, approval_type, browser_site:None };
+            let item = create_process_approval(&mut store, task_id, &request).map_err(|error| denied(&error))?;
+            (request, item)
+        };
+        let item = self.resolve_tool_approval(item, batch).await.map_err(|error| denied(&error))?;
+        if item.status != Status::Approved {
+            return Err(denied(item.reason.as_deref().unwrap_or("工具调用未获批准。")));
+        }
+        let mut store = self.store().map_err(|error| denied(&error.message))?;
+        claim_process_approval(&mut store, task_id, &request, &item, batch).map_err(|error| denied(&error))
+    }
+
     pub(super) async fn execute_workspace_write(
         &self,
         writer: Arc<WorkspaceFileWriter>,
@@ -349,7 +380,7 @@ impl Runtime {
                         .auto_review_required()
                         .then(|| capture(&store, &item, &batch))
                         .transpose()?;
-                    let current = fingerprint.as_ref().map(ReviewSnapshot::fingerprint);
+                    let current = fingerprint.as_ref().map(|snapshot|snapshot.fingerprint());
                     store
                         .approvals
                         .claim_execution(&item.approval_id, &scope, &request, current)
@@ -614,7 +645,7 @@ pub(super) fn claim_process_approval(
         return Err("任务权限已变化，请重新申请。".into());
     }
     let snapshot = item.requirements.auto_review_required().then(|| capture(store, item, batch)).transpose()?;
-    let fingerprint = snapshot.as_ref().map(ReviewSnapshot::fingerprint);
+    let fingerprint = snapshot.as_ref().map(|snapshot|snapshot.fingerprint());
     let grant = store.approvals.claim_execution(&item.approval_id, &scope, request, fingerprint)
         .map_err(|error| error.to_string())?;
     store.approvals.consume_execution(grant, &scope, request, fingerprint)
@@ -669,25 +700,45 @@ pub(super) fn task_scope(store: &Store, task_id: &str) -> Result<(TaskScope, Tas
     Ok((scope, settings.clone()))
 }
 
-fn capture(store: &Store, item: &Approval, batch: &[Value]) -> Result<ReviewSnapshot, String> {
+pub(super) struct CachedReview {
+    pub(super) task_id:String,
+    approval:String,
+    batch_hash:Vec<u8>,
+    goal:Option<String>,
+    database:crate::conversation_db::Database,
+    revision:i64,
+    snapshot:Arc<ReviewSnapshot>,
+}
+
+fn capture(store: &Store, item: &Approval, batch: &[Value]) -> Result<Arc<ReviewSnapshot>, String> {
     let scope = item.scope();
     let (current, _) = task_scope(store, scope.task_id())?;
     if &current != scope {
         return Err("Approval task scope changed".into());
     }
     let task = &store.tasks[scope.task_id()];
-    let document = store
-        .read(scope.principal().workspace_id(), scope.conversation_id())
-        .map_err(|error| error.message)?;
-    let history = document.raw()["messages"]
-        .as_array()
-        .ok_or("Review history unavailable")?;
-    Ok(ReviewSnapshot::capture(
-        item,
-        &task.start.message,
-        history,
-        batch,
-    ))
+    let batch_hash=ring::digest::digest(&ring::digest::SHA256,&serde_json::to_vec(batch).map_err(|e|e.to_string())?).as_ref().to_vec();
+    let goal=task.goal_progress["goal"].as_str();
+    let mut cache=store.review_snapshot.borrow_mut();
+    if let Some(last)=cache.as_ref() && last.approval==item.approval_id && last.batch_hash==batch_hash
+        && last.goal.as_deref()==goal && last.database.data_version()?==last.revision {
+        return Ok(last.snapshot.clone());
+    }
+    let path=store.conversation_path(scope.principal().workspace_id(),scope.conversation_id()).map_err(|e|e.message)?;
+    let database=crate::conversation_db::Database::open(path.parent().unwrap())?;
+    let revision=database.data_version()?;
+    let document=database.read(scope.conversation_id())?.ok_or("Review history unavailable")?;
+    let rows=document["messages"].as_array().ok_or("Invalid review history")?;
+    let mut pending=batch.to_vec();
+    if let Some(guidance)=document["metadata"]["runtime_message_queue"]["guidance"].as_array() {
+        for item in guidance {
+            let text=item.as_str().or(item["text"].as_str()).unwrap_or_default();
+            pending.push(json!({"role":"user","content":text,"metadata":{"message_source":"guidance","runtime_guidance_original":text}}));
+        }
+    }
+    let snapshot=Arc::new(ReviewSnapshot::capture(item,&task.start.message,rows,&pending,goal));
+    *cache=Some(CachedReview{task_id:scope.task_id().to_owned(),approval:item.approval_id.clone(),batch_hash,goal:goal.map(str::to_owned),database,revision,snapshot:snapshot.clone()});
+    Ok(snapshot)
 }
 
 fn tool_failure(code: &str, reason: &str) -> Value {

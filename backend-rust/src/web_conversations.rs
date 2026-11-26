@@ -101,7 +101,7 @@ fn normalized_id(id: String) -> String {
     if id.starts_with("conv_") { id } else { format!("conv_{id}") }
 }
 
-async fn compress(State(app): State<Arc<Gateway>>, Extension(ws): Extension<RegisteredWorkspace>, Path(id): Path<String>) -> Reply {
+async fn compress(State(app): State<Arc<Gateway>>, Extension(ws): Extension<RegisteredWorkspace>, Extension(principal): Extension<astrion_headless::approval::ApprovalPrincipal>, Path(id): Path<String>) -> Reply {
     run(StatusCode::ACCEPTED, move || {
         let id=normalized_id(id);
         let policy=astrion_headless::web_status::admin_policy(app.catalog.host_data_dir(),&app.catalog.load()).map_err(|e| RuntimeError{status:503,message:e.to_string()})?;
@@ -109,7 +109,8 @@ async fn compress(State(app): State<Arc<Gateway>>, Extension(ws): Extension<Regi
             return Err(RuntimeError{status:403,message:"管理员已禁用对话压缩".into()});
         }
         let model=app.turn_model(&ws,&json!({"conversation_id":id}))?;
-        app.runtime.request_compression(&ws,&id,model)
+        let settings=astrion_headless::runtime::resolve_task_approval_settings(principal,&app.catalog)?;
+        app.runtime.request_compression(&ws,&id,model,settings)
     }).await
 }
 

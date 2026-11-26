@@ -63,6 +63,7 @@ pub(super) fn collect_after_write(paths: &ChatPaths) {
 }
 
 fn collect(paths: &ChatPaths) -> io::Result<()> {
+    let _index = crate::legacy::media::index_lock()?;
     let root = open_canonical_dir(paths.root())?;
     let conversations = root.open_dir_nofollow("conversations")?;
     let Some(store) = optional_dir(&conversations, "media_store")? else {

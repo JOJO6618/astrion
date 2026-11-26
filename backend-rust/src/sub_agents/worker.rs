@@ -1,19 +1,27 @@
-use std::{collections::HashSet, time::Duration};
+use std::{collections::HashSet, path::Path, time::Duration};
 
 use serde_json::{Value, json};
 use tokio::{sync::watch, time::Instant};
 
-use crate::{goals::GoalFailure, model::RoundBudget, runtime::ModelConfig, tools::{read_file, write_file::{EDIT_NAME, WRITE_NAME}}};
+use crate::{
+    conversation_db::Database, goals::GoalFailure,
+    knowledge::{self, Knowledge, KnowledgeAccess}, model::RoundBudget,
+    runtime::{ModelConfig, todos::operations as todos},
+    tools::{media, read_file, web, write_file::{EDIT_NAME, WRITE_NAME}},
+};
 
 use super::{SubAgents, execution::{Parent, Stop, now}, protocol::{self, failed}, registry::Registry, scope::ChildScope};
 
 pub(super) struct Context {
     pub(super) document: Value,
+    pub(super) persisted_messages: usize,
+    pub(super) rewrite_history: bool,
+    pub(super) threshold: u64,
 }
 
 impl Context {
     pub(super) fn new(record: &Value, prompt: &str) -> Self {
-        Self { document: json!({
+        Self { persisted_messages: 0, rewrite_history:false, threshold:250_000, document: json!({
             "agent_id":record["agent_id"],"task_id":record["task_id"],"name":record["name"],"working_dir":record["working_dir"],
             "execution_root":record["execution_root"],"status":"idle","round_id":0,
             "messages":[{"role":"system","content":prompt}],
@@ -28,13 +36,23 @@ impl Context {
             !messages.is_empty() && messages.iter().all(Value::is_object) && messages[0]["role"] == "system"
         });
         if !valid { return Err("原子智能体上下文无效。".into()); }
-        Ok(Self { document })
+        Ok(Self { persisted_messages: document["messages"].as_array().unwrap().len(), rewrite_history:false, threshold:250_000, document })
     }
 
     fn messages(&self) -> &[Value] { self.document["messages"].as_array().expect("validated child context") }
 
     fn append(&mut self, message: Value) {
         self.document["messages"].as_array_mut().expect("validated child context").push(message);
+    }
+
+    pub(super) fn append_worktree(&mut self, directory: &Path, branch: &str, revision: u64, inside: bool) {
+        let reason = if inside { String::new() } else { "父对话选择了原工作区外的工作树。子智能体保持原工作区权限。
+".to_owned() };
+        self.document["execution_root"] = json!(directory);
+        self.append(json!({"role":"user","name":format!("worktree_change_{revision}"),
+            "content":format!("[工作树环境变更]
+{reason}当前执行目录：{}
+父对话分支：{branch}", directory.display())}));
     }
 
     pub(super) fn append_work(&mut self, work: &Value) -> Result<(), String> {
@@ -62,8 +80,10 @@ impl Context {
         self.document["updated_at"] = json!(now());
     }
 
-    fn save(&self, registry: &Registry) -> std::io::Result<()> {
-        registry.save_context(&self.document)
+    pub(super) fn mark_saved(&mut self) { self.persisted_messages = self.messages().len(); self.rewrite_history=false; }
+
+    fn save(&mut self, registry: &Registry) -> std::io::Result<()> {
+        registry.save_context(self)
     }
 
     pub(super) fn final_output(&self, content: &str) -> (Value, Value) {
@@ -109,7 +129,9 @@ impl Context {
     }
 
     fn tool_result(&mut self, id: &str, result: Value) {
-        self.append(json!({"role":"tool","tool_call_id":id,"content":result.to_string()}));
+        let mut message = json!({"role":"tool","tool_call_id":id,"content":result.to_string()});
+        media::annotate(&mut message, &result);
+        self.append(message);
     }
 }
 
@@ -123,6 +145,12 @@ pub(super) async fn supervise(app: SubAgents, parent: Parent, id: String, mut st
     scope: ChildScope, mut context: Context, model: ModelConfig, timeout: Option<Instant>) {
     let worker = Worker { app: &app, parent: &parent, id: &id, scope: &scope, model: &model, timeout };
     let result = worker.run(&mut context, &mut stop).await.unwrap_or_else(End::Failed);
+    if stop.borrow().cancelled() || matches!(result, End::Failed(_)) {
+        let runtime = app.runtime.clone();
+        let parent = parent.clone();
+        let id = id.clone();
+        let _ = tokio::task::spawn_blocking(move || runtime.close_child_processes(&parent.workspace_id, &parent.conversation_id, &id)).await;
+    }
     if let Err(error) = app.finish(&parent, &id, &mut context, result) {
         eprintln!("Child worker {id}: {error}");
         app.fail_worker(&id);
@@ -139,13 +167,49 @@ struct Worker<'a> {
 }
 
 impl Worker<'_> {
+    fn web_enabled(&self) -> Result<bool, String> {
+        let directory = self.app.registry.data_dir().join("conversations").join(&self.parent.workspace_id);
+        let database = Database::open(&directory)?;
+        if !database.contains(&self.parent.conversation_id)? {
+            return Err("无法验证父对话的网络权限。".into());
+        }
+        Ok(database.field(&self.parent.conversation_id, "metadata", "network_permission")?
+            .is_none_or(|value| value != "none"))
+    }
+
+
     async fn run(&self, context: &mut Context, stop: &mut watch::Receiver<Stop>) -> Result<End, String> {
-        let mcp = self.app.mcp_for_child(self.parent, self.id, self.scope)?;
-        let base_schemas = protocol::child_schemas();
+        let scope = self.scope;
+        let mcp = self.app.mcp_for_child(self.parent, self.id, scope)?;
+        let mut base_schemas = protocol::child_schemas();
+        base_schemas.extend(knowledge::definitions(KnowledgeAccess::ReadOnly));
+        base_schemas.extend(web::definitions());
+        base_schemas.push(web::save_definition());
+        base_schemas.extend(todos::schemas());
+        base_schemas.push(media::definition(media::READ));
+        let images = self.model.supports_images();
+        let videos = self.model.supports_videos();
+        let data = self.app.registry.data_dir();
+        if let Some(saved) = self.app.registry.stats(self.id).map_err(io_error)?
+            && saved["token_usage"]["total"].as_u64().unwrap_or_default() >
+                context.document["stats"]["token_usage"]["total"].as_u64().unwrap_or_default()
+        {
+            context.document["stats"] = saved;
+        }
+        self.app.runtime.recover_child_billing(
+            &self.parent.conversation_id,self.id,&mut context.document["stats"],
+        ).await.map_err(io_error)?;
+        let child_name = context.document["name"].as_str().filter(|name|!name.trim().is_empty())
+            .unwrap_or(self.id).to_owned();
         let mut budget = RoundBudget::new(context.document["stats"]["current_context_tokens"].as_u64());
+        let mut rebound_scope = None;
         loop {
             self.app.consume_guidance(self.parent, self.id, context)?;
-            self.scope.check()?;
+            if let Some(updated) = self.app.child_worktree_at_safe_point(self.parent, self.id, context)? {
+                rebound_scope = Some(updated);
+            }
+            let scope = rebound_scope.as_ref().unwrap_or(self.scope);
+            scope.check()?;
             if self.timeout.is_some_and(|deadline| Instant::now() >= deadline) { return Ok(End::Timeout); }
             if stop.borrow().cancelled() { return Ok(End::Failed("子智能体已停止。".into())); }
             let mcp_snapshot = tokio::select! {
@@ -155,20 +219,39 @@ impl Worker<'_> {
             };
             let mut schemas = base_schemas.clone();
             schemas.extend_from_slice(mcp_snapshot.schemas());
-            let request = crate::mcp::model_messages(context.messages(), self.model.supports_images());
-            let completion = {
+            schemas.extend(self.app.process_tools(scope));
+            let opencode = self.model.is_opencode_endpoint()
+                && crate::web_assets::personalization::external_session_enabled(data);
+            if opencode && context.document["external_session_id"].as_str().is_none_or(|id|id.trim().is_empty()) {
+                context.document["external_session_id"] = json!(uuid::Uuid::new_v4().simple().to_string());
+                // Preserve this actor's provider identity even when the first request fails.
+                context.save(&self.app.registry).map_err(io_error)?;
+            }
+            let external_id = context.document["external_session_id"].as_str().map(str::trim).filter(|id|!id.is_empty());
+            let model = external_id.map_or_else(||self.model.clone(),|id|self.model.clone().with_session(id,false))
+                .with_opencode_headers(external_id.filter(|_|opencode),true);
+            let request = media::model_messages(context.messages(), data, images, videos);
+            let request = crate::mcp::model_messages(&request, images);
+            let (mut completion, billing) = {
                 let mut attempt = 0;
                 loop {
                     if self.timeout.is_some_and(|deadline| Instant::now() >= deadline) { return Ok(End::Timeout); }
                     if stop.borrow().cancelled() { return Ok(End::Failed("子智能体已停止。".into())); }
                     attempt += 1;
+                    let mut billing = tokio::select! {
+                        biased;
+                        _ = stop.changed() => return Ok(End::Failed("子智能体已停止。".into())),
+                        billing = self.app.runtime.begin_child_billing(&self.parent.conversation_id,self.id,
+                            &child_name,&context.document["stats"],&model) => billing,
+                    };
+                    if self.timeout.is_some_and(|deadline| Instant::now() >= deadline) { return Ok(End::Timeout); }
                     let response = tokio::select! {
                         biased;
                         _ = stop.changed() => return Ok(End::Failed("子智能体已停止。".into())),
-                        response = self.model.complete_with_budget(&request, &schemas, &mut budget, |_| {}) => response,
+                        response = model.complete_with_budget(&request, &schemas, &mut budget, |text|billing.observe_text(text)) => response,
                     };
                     match response {
-                        Ok(completion) => break completion,
+                        Ok(completion) => break (completion,billing),
                         Err(error) if attempt < 5 && GoalFailure::from_message(&error).reason() == "retryable" => {
                             let retry = Instant::now() + Duration::from_secs(10);
                             let wake = self.timeout.map_or(retry, |deadline| deadline.min(retry));
@@ -182,12 +265,24 @@ impl Worker<'_> {
                     }
                 }
             };
+            if let Some(actor) = self.app.runtime.settle_child_billing(
+                &billing,completion.usage.as_ref(),completion.responses_duration_ms,
+            ).await? {
+                context.usage(completion.usage.as_ref());
+                context.document["stats"]["cost_usd"] = actor["cost_usd"].clone();
+                context.document["stats"]["cost_ledger_requests"] = actor["requests"].clone();
+            }
+            web::annotate(&mut completion.message, context.messages());
             let calls = calls(context.messages(), &completion.message)?;
             let content = completion.message["content"].as_str().unwrap_or_default().to_owned();
             budget.observe_usage(completion.usage.as_ref());
-            context.usage(completion.usage.as_ref());
+            let compressed = super::compression::compact(context, &self.parent.root, data).map_err(io_error)?;
             context.append(completion.message);
             context.save(&self.app.registry).map_err(io_error)?;
+            if let Some(round) = compressed {
+                budget=RoundBudget::new(None);
+                context.activity(&self.app.registry,json!({"subtype":"compression","round":round})).map_err(io_error)?;
+            }
             if calls.is_empty() { return Ok(End::Completed(content)); }
             if !content.is_empty() {
                 context.activity(&self.app.registry, json!({"subtype":"output","content":content,"is_final":false})).map_err(io_error)?;
@@ -199,11 +294,74 @@ impl Worker<'_> {
                 let result = match name.as_str() {
                     read_file::NAME if allowed_args(args) => {
                         context.add_stat("files_read");
-                        self.scope.read(args.clone())
+                        scope.read(args.clone())
                     }
                     WRITE_NAME | EDIT_NAME if allowed_args(args) => {
                         context.add_stat(if name == WRITE_NAME { "write_files" } else { "edit_files" });
-                        self.scope.write(id, name, args.clone(), context.messages())
+                        scope.write(id, name, args.clone(), context.messages())
+                    }
+                    media::READ => {
+                        match scope.path(&args["path"]) {
+                            Ok(path) => {
+                                let root = self.parent.root.clone();
+                                let data = data.to_path_buf();
+                                let result = tokio::task::spawn_blocking(move || media::execute(
+                                    &data, &root, &root, &Value::Null, media::READ, &path, images, videos,
+                                )).await.map_err(|error| error.to_string())?;
+                                Ok(result)
+                            }
+                            Err(error) => Err(error),
+                        }
+                    }
+                    name if knowledge::is_read_only_tool(name) => {
+                        let root = self.parent.root.clone();
+                        let data = self.app.registry.data_dir().to_path_buf();
+                        let name = name.to_owned();
+                        let args = args.clone();
+                        tokio::task::spawn_blocking(move || {
+                            let knowledge = Knowledge::open(&root, &data).map_err(io_error)?;
+                            knowledge.execute_read_only(&name, &args).ok_or("未知知识工具。".into())
+                        }).await.map_err(|error| error.to_string())?
+                    }
+                    web::SAVE => {
+                        if !self.web_enabled()? {
+                            Ok(json!({"success":false,"code":"network_disabled","error":"当前对话已禁止联网。"}))
+                        } else {
+                            let save = tokio::select! {
+                                biased;
+                                _ = stop.changed() => return Ok(End::Failed("子智能体已停止。".into())),
+                                result = web::prepare_save(data, args) => result,
+                            };
+                            match save {
+                                Ok(save) => scope.write(id, WRITE_NAME, save.arguments.clone(), context.messages())
+                                    .map(|written| save.result(written)),
+                                Err(result) => Ok(result),
+                            }
+                        }
+                    }
+                    name if web::supports(name) => {
+                        let data = self.app.registry.data_dir();
+                        if !self.web_enabled()? {
+                            Ok(json!({"success":false,"code":"network_disabled","error":"当前对话已禁止联网。"}))
+                        } else {
+                            tokio::select! {
+                                biased;
+                                _ = stop.changed() => return Ok(End::Failed("子智能体已停止。".into())),
+                                result = web::execute(data, name, args) => Ok(result),
+                            }
+                        }
+                    }
+                    todos::CREATE | todos::UPDATE => {
+                        let update = if name == todos::CREATE {
+                            todos::create(args, false)
+                        } else {
+                            todos::update(context.document["todo_list"].clone(), args, false)
+                        };
+                        update.map(|(list, message)| {
+                            let snapshot = todos::snapshot(list.clone());
+                            context.document["todo_list"] = list;
+                            json!({"success":true,"message":message,"todo_list":snapshot})
+                        })
                     }
                     protocol::STATUS => self.app.status(self.parent, args),
                     protocol::ANSWER_OTHER => self.app.answer(self.parent, Some(self.id), args),
@@ -212,6 +370,14 @@ impl Worker<'_> {
                             biased;
                             _ = stop.changed() => return Ok(End::Failed("子智能体已停止。".into())),
                             result = self.app.question(self.parent, self.id, name, args) => result,
+                        }
+                    }
+                    name if super::processes::is_tool(name) => {
+                        let cancellation = stop.clone();
+                        tokio::select! {
+                            biased;
+                            _ = stop.changed() => return Ok(End::Failed("子智能体已停止。".into())),
+                            result = self.app.process_tool(scope, self.id, name, args, cancellation) => result,
                         }
                     }
                     name if mcp_snapshot.allows(name) => {

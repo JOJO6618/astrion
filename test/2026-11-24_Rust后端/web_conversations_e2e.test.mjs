@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readDocument, migrate } from '../2026-11-27_Rust对话格式迁移/fixture.mjs';
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -34,8 +35,8 @@ test('browser creates from explicit settings, scopes lookups and pages after fil
   assert.equal(response.status,201,JSON.stringify(created));
   const id = created.conversation_id;
   const directory = join(dataDir,'conversations','default');
-  assert.deepEqual((await readdir(directory)).filter(f=>f.startsWith('conv_')), [id+'.json']);
-  const document = JSON.parse(await readFile(join(directory,id+'.json'),'utf8'));
+  assert.deepEqual((await readdir(directory)).filter(f=>f.startsWith('conv_')), []);
+  const document = readDocument(directory,id);
   assert.equal(document.metadata.permission_mode,'approval');
   assert.equal(document.metadata.browser_tools_enabled,true);
   assert.equal(document.metadata.compress_limit_tokens,120000);
@@ -49,6 +50,7 @@ test('browser creates from explicit settings, scopes lookups and pages after fil
   const older = 'conv_20000101_000000_000';
   const old = {...document,id:older,updated_at:'2000-01-01T00:00:00',metadata:{...document.metadata,total_messages:1},messages:[{role:'user',content:'earlier'}]};
   await writeFile(join(directory,older+'.json'),JSON.stringify(old));
+  await migrate(origin,{cookie:session,origin,'x-csrf-token':token});
   const filtered = await (await request('/api/conversations?non_empty=1&limit=1',{headers})).json();
   assert.equal(filtered.data.total,1);
   assert.equal(filtered.data.conversations[0].id,older);

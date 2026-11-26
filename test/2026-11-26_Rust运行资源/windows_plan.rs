@@ -21,7 +21,7 @@ fn wsl_argv_enforces_bound_mounts_without_reparsing_shell_content() {
     let script = "printf '%s' \"isolated fixture\"";
     let restricted = sandbox_args("fixture", workspace, cwd, SandboxAccess {
         write: false, network: Network::Restricted,
-    }, script, std::slice::from_ref(&read), std::slice::from_ref(&write));
+    }, script, std::slice::from_ref(&read), std::slice::from_ref(&write), None);
     assert_eq!(&restricted[..4], &["-d", "fixture", "-e", "/usr/bin/bwrap"]);
     assert!(restricted.windows(3).any(|args| args == ["--ro-bind", workspace, workspace]));
     assert!(restricted.windows(3).any(|args| args == ["--ro-bind", &read, &read]));
@@ -29,7 +29,23 @@ fn wsl_argv_enforces_bound_mounts_without_reparsing_shell_content() {
     assert_eq!(restricted.last().unwrap(), script);
     let full = sandbox_args("fixture", workspace, cwd, SandboxAccess {
         write: true, network: Network::Full,
-    }, script, &[], std::slice::from_ref(&write));
+    }, script, &[], std::slice::from_ref(&write), None);
     assert!(full.iter().any(|arg| arg == "--share-net"));
     assert!(full.windows(3).any(|args| args == ["--bind", &write, &write]));
+}
+
+#[test]
+fn narrow_wsl_child_can_write_only_its_fixed_directory() {
+    let workspace = "/mnt/e/project";
+    let fixed = "/mnt/e/project/.astrion/child";
+    let cwd = "/mnt/e/project/worktrees/next";
+    let external = "/mnt/e/authorized-exports".to_owned();
+    let args = sandbox_args("fixture", workspace, cwd, SandboxAccess {
+        write: true, network: Network::Restricted,
+    }, "pwd", std::slice::from_ref(&external), std::slice::from_ref(&external), Some(fixed));
+    assert!(args.windows(3).any(|args| args == ["--ro-bind", workspace, workspace]));
+    assert!(args.windows(3).any(|args| args == ["--bind", fixed, fixed]));
+    assert!(args.windows(3).any(|args| args == ["--ro-bind", &external, &external]));
+    assert!(!args.windows(3).any(|args| args == ["--bind", &external, &external]));
+    assert!(args.windows(2).any(|args| args == ["--chdir", cwd]));
 }

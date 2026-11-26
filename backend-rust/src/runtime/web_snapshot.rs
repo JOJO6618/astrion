@@ -1,15 +1,16 @@
 use serde_json::{Map, Value};
 
-use crate::legacy::LegacyDocument;
+
 use crate::interactions::Kind;
 
-use super::{Runtime, RuntimeError, Status, iso_time, legacy_error, now, public_document};
+use super::{Runtime, RuntimeError, Status, iso_time, now, public_document};
 
 /// Durable messages and the current live projection captured at one runtime cursor.
 pub struct WebConversationSnapshot {
     pub document: Value,
     pub activity: Option<Value>,
     pub goal_progress: Option<Value>,
+    pub compression: Value,
     pub pending_user_questions: Vec<Value>,
     pub pending_plan_approvals: Vec<Value>,
     pub pending_tool_approvals: Vec<crate::approval::Approval>,
@@ -32,6 +33,7 @@ impl Runtime {
         });
         let principal = task.and_then(|task| task.approval.as_ref()).map(|settings| settings.principal.clone());
         let activity = task.map(|task| task.activity(u64::MAX));
+        let compression = super::compression::projection(task, conversation_id, &document.raw()["metadata"]);
         let goal_progress = self.read_goal_progress(&store, workspace_id, &document)?;
         let has_running_background_commands = Self::conversation_has_background(&store, workspace_id, conversation_id);
         let (children_running, children_pending) = self.child_activity(&store, workspace_id, conversation_id);
@@ -45,16 +47,26 @@ impl Runtime {
             || Ok(Vec::new()),
             |principal| store.approvals.list_pending(principal, Some(conversation_id)),
         ).map_err(RuntimeError::storage)?;
+        let mut document = public_document(document);
+        let path = store.conversation_path(workspace_id, conversation_id)?;
+        super::thinking::decorate(path.parent().expect("conversation parent"), conversation_id, &mut document);
         Ok(WebConversationSnapshot {
-            document: public_document(document),
+            document,
             activity,
             goal_progress,
+            compression,
             pending_user_questions: questions,
             pending_plan_approvals: plans,
             pending_tool_approvals: tool_approvals,
             has_running_background_commands,
             has_running_multi_agent: children_running || children_pending,
         })
+    }
+
+    pub(crate) fn web_compression_projection(&self, workspace: &str, id: &str, metadata: &Value) -> Result<Value, RuntimeError> {
+        let store = self.store()?;
+        let task = store.tasks.values().find(|task| task.workspace_id == workspace && task.conversation_id == id && task.status == Status::Running);
+        Ok(super::compression::projection(task, id, metadata))
     }
 
     pub(crate) fn web_header(&self, workspace: &str, id: &str) -> Result<(Value,usize),RuntimeError> {
@@ -126,7 +138,7 @@ impl Runtime {
         update: impl FnOnce(&mut Value) -> Result<(T, bool), RuntimeError>,
     ) -> Result<T, RuntimeError> {
         let mut store = self.store()?;
-        let mut document = store.read(workspace_id, conversation_id)?.into_raw();
+        let (mut document, _) = store.header(workspace_id,conversation_id)?;
         if store.tasks.values().any(|task| {
             task.status == Status::Running
                 && task.workspace_id == workspace_id
@@ -144,8 +156,12 @@ impl Runtime {
             let reset_terminals = mode_keys.iter().zip(before).any(|(field, prior)| {
                 document["metadata"][*field] != prior
             });
-            let document = LegacyDocument::from_value(document).map_err(legacy_error)?;
-            store.persist(workspace_id, document, false)?;
+            let path=store.conversation_path(workspace_id,conversation_id)?;
+            let mut db=crate::conversation_db::Database::open(path.parent().unwrap()).map_err(RuntimeError::storage)?;
+            db.append(conversation_id,Vec::new(),|_,_,_,_,prior|{
+                let summary=super::store::index_row(&document,Some(&prior));
+                Ok((document,summary))
+            }).map_err(RuntimeError::storage)?;
             if reset_terminals {
                 store.process_resources.close_terminals(Some(workspace_id), Some(conversation_id));
             }

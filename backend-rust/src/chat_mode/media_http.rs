@@ -72,6 +72,7 @@ fn inspect(bytes: &[u8]) -> Result<Kind, ChatError> {
 }
 
 fn save(root: &Path, bytes: &[u8], (kind, mime, ext): Kind) -> Result<Value, ChatError> {
+    let _index = crate::legacy::media::index_lock()?;
     let conversations = open_canonical_dir(&root.join("conversations"))?;
     let store = ensure_dir(&conversations, "media_store")?;
     let blobs = ensure_dir(&store, "blobs")?;

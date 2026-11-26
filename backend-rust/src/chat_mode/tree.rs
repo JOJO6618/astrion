@@ -7,7 +7,10 @@
 use serde_json::{Map, Value, json};
 
 use super::{ChatError, store::ChatPaths};
-use crate::legacy::{LegacyChatTurn, LegacyDocument};
+use crate::{
+    conversation_db::chat_delta::Messages,
+    legacy::{LegacyChatTurn, LegacyDocument},
+};
 
 pub(super) const MAX_OPERATION_ID: usize = 128;
 
@@ -30,9 +33,13 @@ impl<'a> Selection<'a> {
         match self {
             Self::Send { parent_id, message } => LegacyChatTurn::Send { parent_id, message },
             Self::Regenerate { turn_id } => LegacyChatTurn::Regenerate { turn_id },
-            Self::EditAndSend { message_id, content } => {
-                LegacyChatTurn::EditAndSend { message_id, content }
-            }
+            Self::EditAndSend {
+                message_id,
+                content,
+            } => LegacyChatTurn::EditAndSend {
+                message_id,
+                content,
+            },
         }
     }
 }
@@ -52,43 +59,102 @@ pub(super) fn operation_id(value: Option<&Value>) -> Result<String, ChatError> {
     operation_id_str(value.and_then(Value::as_str))
 }
 
-/// Applies one durable Chat command with an idempotency receipt stored in
-/// `metadata.chat.commands`, exactly like Python's ChatStorage.command.
+enum MessageChange<'a> {
+    Append,
+    Replace(&'a str),
+    Unchanged,
+}
+
+fn prior_receipt(
+    raw: &Value,
+    operation: &str,
+    fingerprint: &str,
+) -> Result<Option<Value>, ChatError> {
+    let Some(previous) = raw["metadata"]["chat"]["commands"].get(operation) else {
+        return Ok(None);
+    };
+    if previous["fingerprint"].as_str() != Some(fingerprint) {
+        return Err(ChatError::conflict(
+            "Operation ID reused for a different Chat command",
+        ));
+    }
+    Ok(Some(previous["result"].clone()))
+}
+
+fn receipt(raw: &mut Value, operation: &str, fingerprint: String, value: Value) -> Value {
+    let receipt = json!({"revision":raw["metadata"]["chat"]["revision"],"value":value});
+    raw["metadata"]["chat"]["commands"][operation] = json!({
+        "fingerprint":fingerprint, "result":receipt,
+    });
+    receipt
+}
+
+/// Commit the tree operation and original Python-compatible receipt together.
 fn command(
     paths: &ChatPaths,
     id: &str,
-    operation_id: &str,
+    operation: &str,
     payload: &Value,
-    create: bool,
+    initial: Option<Value>,
     expected_revision: Option<u64>,
+    change: MessageChange<'_>,
     apply: impl FnOnce(&mut LegacyDocument) -> Result<Value, ChatError>,
 ) -> Result<Value, ChatError> {
-    let mut raw = paths.read_raw(id)?;
+    let create = initial.is_some();
+    let raw = match initial {
+        Some(raw) => raw,
+        None => paths.read_raw(id)?,
+    };
     let fingerprint = fingerprint(payload);
-    if let Some(previous) = raw["metadata"]["chat"]["commands"].get(operation_id) {
-        if previous["fingerprint"].as_str() != Some(fingerprint.as_str()) {
-            return Err(ChatError::conflict(
-                "Operation ID reused for a different Chat command",
-            ));
-        }
-        return Ok(previous["result"].clone());
+    if let Some(receipt) = prior_receipt(&raw, operation, &fingerprint)? {
+        return Ok(receipt);
     }
-    let mut document = LegacyDocument::from_value(raw.clone())?;
+    let before_count = message_rows(&raw)?.len();
+    let mut document = LegacyDocument::from_value(raw)?;
     document.check_chat_revision(expected_revision)?;
     let value = apply(&mut document)?;
-    raw = document.into_raw();
-    // Python's ChatStorage.command stores ``{revision, value}``; the receipt is
-    // also the REST response body, so both implementations must agree on disk.
-    let receipt = json!({
-        "revision": raw["metadata"]["chat"]["revision"],
-        "value": value,
-    });
-    raw["metadata"]["chat"]["commands"][operation_id] = json!({
-        "fingerprint": fingerprint,
-        "result": receipt.clone(),
-    });
-    paths.write_raw(id, raw, create)?;
+    let mut raw = document.into_raw();
+    let receipt = receipt(&mut raw, operation, fingerprint, value);
+    if create {
+        paths.create(id, raw)?;
+    } else {
+        commit_change(paths, id, &raw, before_count, change)?;
+    }
     Ok(receipt)
+}
+
+fn message_rows(raw: &Value) -> Result<&[Value], ChatError> {
+    raw["messages"]
+        .as_array()
+        .map(Vec::as_slice)
+        .ok_or_else(|| ChatError::storage("Invalid Chat message rows"))
+}
+
+fn commit_change(
+    paths: &ChatPaths,
+    id: &str,
+    raw: &Value,
+    count: usize,
+    change: MessageChange<'_>,
+) -> Result<(), ChatError> {
+    let rows = message_rows(raw)?;
+    let invalid = || ChatError::storage("Invalid Chat message delta");
+    let delta = match change {
+        MessageChange::Append => Messages::Append(rows.get(count..).ok_or_else(invalid)?),
+        MessageChange::Replace(message) if count == rows.len() => {
+            let seq = rows
+                .iter()
+                .position(|row| row["message_id"] == message)
+                .ok_or_else(invalid)?;
+            Messages::Replace {
+                seq,
+                body: &rows[seq],
+            }
+        }
+        MessageChange::Unchanged if count == rows.len() => Messages::Unchanged,
+        _ => return Err(invalid()),
+    };
+    paths.commit_delta(id, count, raw, delta)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -97,7 +163,7 @@ pub(super) fn begin(
     id: &str,
     operation_id: &str,
     selection: Selection<'_>,
-    create: bool,
+    initial: Option<Value>,
     revision: Option<u64>,
     presentation_id: Option<&str>,
     configured: &Value,
@@ -106,36 +172,55 @@ pub(super) fn begin(
     // Python's payload always carries these five keys (with null for unused
     // selectors). Fingerprints are compared byte-for-byte on canonical JSON, so
     // field names and nulls here are part of the durable compatibility contract.
+    let input = selection.message();
+    let refs = input
+        .as_ref()
+        .and_then(|message| message["media_refs"].as_array());
+    let images = refs.is_some_and(|refs| refs.iter().any(|entry| entry["kind"] == "image"));
+    let videos = refs.is_some_and(|refs| refs.iter().any(|entry| entry["kind"] == "video"));
     let payload = json!({
         "action": "begin",
         "parent_id": selection.parent_id(),
-        "message": selection.message(),
+        "message": input,
         "regenerate_turn_id": selection.regenerate_turn_id(),
         "edit_message_id": selection.edit_message_id(),
     });
-    command(paths, id, operation_id, &payload, create, revision, |document| {
-        super::handoff::before_send(document.raw(), operation_id)?;
-        let previous_leaf = document.raw()["metadata"]["chat"]["latest_leaf_id"].clone();
-        let empty = document.raw()["messages"]
-            .as_array()
-            .is_none_or(Vec::is_empty);
-        let mut raw = apply_configured(document.raw().clone(), configured)?;
-        if empty
-            && let Some(presentation) = presentation_id.filter(|value| !value.is_empty())
-        {
-            raw["metadata"]["chat"]["handoff_presentation_id"] = json!(presentation);
-        }
-        *document = LegacyDocument::from_value(raw)?;
-        let turn_id = document.begin_chat_turn(selection.into_legacy(), updated_at)?;
-        super::handoff::after_send(document, &previous_leaf)?;
-        let raw = document.raw();
-        let turn = raw["metadata"]["chat"]["turns"]
-            .as_array()
-            .and_then(|turns| turns.iter().find(|turn| turn["id"] == turn_id))
-            .cloned()
-            .ok_or_else(|| ChatError::storage("Chat begin receipt is incomplete"))?;
-        Ok(turn)
-    })
+    command(
+        paths,
+        id,
+        operation_id,
+        &payload,
+        initial,
+        revision,
+        MessageChange::Append,
+        |document| {
+            super::handoff::before_send(document.raw(), operation_id)?;
+            let previous_leaf = document.raw()["metadata"]["chat"]["latest_leaf_id"].clone();
+            let empty = document.raw()["messages"]
+                .as_array()
+                .is_none_or(Vec::is_empty);
+            let mut raw = apply_configured(document.raw().clone(), configured)?;
+            if images {
+                raw["metadata"]["has_images"] = json!(true);
+            }
+            if videos {
+                raw["metadata"]["has_videos"] = json!(true);
+            }
+            if empty && let Some(presentation) = presentation_id.filter(|value| !value.is_empty()) {
+                raw["metadata"]["chat"]["handoff_presentation_id"] = json!(presentation);
+            }
+            *document = LegacyDocument::from_value(raw)?;
+            let turn_id = document.begin_chat_turn(selection.into_legacy(), updated_at)?;
+            super::handoff::after_send(document, &previous_leaf)?;
+            let raw = document.raw();
+            let turn = raw["metadata"]["chat"]["turns"]
+                .as_array()
+                .and_then(|turns| turns.iter().find(|turn| turn["id"] == turn_id))
+                .cloned()
+                .ok_or_else(|| ChatError::storage("Chat begin receipt is incomplete"))?;
+            Ok(turn)
+        },
+    )
 }
 
 /// Applies conversation-local settings before a turn begins. Validation happens
@@ -204,6 +289,23 @@ pub(super) fn append(
     updated_at: f64,
     statistics: Option<&Value>,
 ) -> Result<Value, ChatError> {
+    let (message_id, payload) = append_payload(turn_id, &message)?;
+    command(
+        paths,
+        id,
+        &message_id,
+        &payload,
+        None,
+        None,
+        MessageChange::Append,
+        |document| {
+            document.append_chat_messages(turn_id, vec![message], updated_at, statistics)?;
+            Ok(json!({"message_id":message_id}))
+        },
+    )
+}
+
+fn append_payload(turn_id: &str, message: &Value) -> Result<(String, Value), ChatError> {
     let message_id = message["message_id"]
         .as_str()
         .filter(|id| !id.is_empty())
@@ -220,10 +322,44 @@ pub(super) fn append(
         "turn":turn_id,
         "message":stable_message,
     });
-    command(paths, id, &message_id, &payload, false, None, |document| {
-        document.append_chat_messages(turn_id, vec![message], updated_at, statistics)?;
-        Ok(json!({"message_id":message_id}))
-    })
+    Ok((message_id, payload))
+}
+
+pub(super) fn append_batch(
+    paths: &ChatPaths,
+    id: &str,
+    turn_id: &str,
+    messages: Vec<Value>,
+    updated_at: f64,
+    after: impl FnOnce(&mut Value),
+) -> Result<(), ChatError> {
+    let mut document = paths.read_document(id)?;
+    let count = message_rows(document.raw())?.len();
+    let revision = document.chat_revision()?;
+    let mut receipts = Vec::new();
+    let mut appended = Vec::new();
+    for message in messages {
+        let (operation, payload) = append_payload(turn_id, &message)?;
+        let fingerprint = fingerprint(&payload);
+        if prior_receipt(document.raw(), &operation, &fingerprint)?.is_some() {
+            continue;
+        }
+        receipts.push((operation, fingerprint));
+        appended.push(message);
+    }
+    document.append_chat_messages(turn_id, appended, updated_at, None)?;
+    let mut raw = document.into_raw();
+    for (index, (operation, fingerprint)) in receipts.into_iter().enumerate() {
+        let revision = revision
+            .checked_add(index as u64 + 1)
+            .ok_or_else(|| ChatError::storage("Chat revision overflow"))?;
+        raw["metadata"]["chat"]["commands"][&operation] = json!({
+            "fingerprint":fingerprint,
+            "result":{"revision":revision,"value":{"message_id":operation}},
+        });
+    }
+    after(&mut raw);
+    commit_change(paths, id, &raw, count, MessageChange::Append)
 }
 
 pub(super) fn finish(
@@ -235,11 +371,20 @@ pub(super) fn finish(
 ) -> Result<Value, ChatError> {
     let operation = format!("finish:{turn_id}:{status}");
     let payload = json!({"action":"finish","turn":turn_id,"status":status});
-    command(paths, id, &operation, &payload, false, None, |document| {
-        document.finish_chat_turn(turn_id, status, updated_at)?;
-        super::handoff::after_finish(document, turn_id, status == "complete")?;
-        Ok(Value::Null)
-    })
+    command(
+        paths,
+        id,
+        &operation,
+        &payload,
+        None,
+        None,
+        MessageChange::Unchanged,
+        |document| {
+            document.finish_chat_turn(turn_id, status, updated_at)?;
+            super::handoff::after_finish(document, turn_id, status == "complete")?;
+            Ok(Value::Null)
+        },
+    )
 }
 
 pub(super) fn edit(
@@ -252,11 +397,20 @@ pub(super) fn edit(
     updated_at: f64,
 ) -> Result<Value, ChatError> {
     let payload = json!({"action":"edit","message_id":message_id,"content":content});
-    command(paths, id, operation_id, &payload, false, revision, |document| {
-        document.edit_chat_message(message_id, content, updated_at)?;
-        super::handoff::after_edit(document)?;
-        Ok(json!({"message_id": message_id}))
-    })
+    command(
+        paths,
+        id,
+        operation_id,
+        &payload,
+        None,
+        revision,
+        MessageChange::Replace(message_id),
+        |document| {
+            document.edit_chat_message(message_id, content, updated_at)?;
+            super::handoff::after_edit(document)?;
+            Ok(json!({"message_id": message_id}))
+        },
+    )
 }
 
 pub(super) fn recover(
@@ -270,8 +424,8 @@ pub(super) fn recover(
     // command receipt; keep the same on-disk shape and rely on turn state for
     // idempotence.
     let mut document = paths.read_document(id)?;
-    let raw = document.raw().clone();
-    let Some(turn) = raw["metadata"]["chat"]["turns"]
+    let before_count = message_rows(document.raw())?.len();
+    let Some(turn) = document.raw()["metadata"]["chat"]["turns"]
         .as_array()
         .and_then(|turns| turns.iter().find(|turn| turn["id"] == turn_id))
         .cloned()
@@ -329,7 +483,7 @@ pub(super) fn recover(
     }
     let raw = document.into_raw();
     let revision = raw["metadata"]["chat"]["revision"].clone();
-    paths.write_raw(id, raw, false)?;
+    commit_change(paths, id, &raw, before_count, MessageChange::Append)?;
     Ok(json!({
         "turn_id": turn_id,
         "status": status,
@@ -346,29 +500,27 @@ pub(super) fn set_network(
     updated_at: f64,
 ) -> Result<Value, ChatError> {
     let payload = json!({"action":"network","enabled":enabled});
-    command(paths, id, operation_id, &payload, false, None, |document| {
-        let mut raw = document.raw().clone();
-        {
-            let metadata = raw["metadata"].as_object_mut().expect("validated metadata");
-            if metadata["network_enabled"].as_bool() != Some(enabled) {
-                let revision = metadata["network_revision"].as_u64().unwrap_or(0) + 1;
-                metadata.insert("network_enabled".into(), json!(enabled));
-                metadata.insert("network_revision".into(), json!(revision));
-                metadata["pending_network_notices"]
-                    .as_array_mut()
-                    .ok_or_else(|| ChatError::storage("Invalid Chat network notice queue"))?
-                    .push(json!({"revision":revision,"enabled":enabled}));
-                let chat_revision = metadata["chat"]["revision"].as_u64().unwrap_or(0) + 1;
-                metadata["chat"]["revision"] = json!(chat_revision);
-                raw["updated_at"] = json!(crate::chat_mode::store::timestamp(updated_at)?);
-            }
+    let fingerprint = fingerprint(&payload);
+    paths.update_header(id, |raw, _| {
+        if let Some(previous) = prior_receipt(raw, operation_id, &fingerprint)? {
+            return Ok(previous);
         }
-        *document = LegacyDocument::from_value(raw)?;
-        let raw = document.raw();
-        Ok(json!({
-            "enabled": raw["metadata"]["network_enabled"],
-            "revision": raw["metadata"]["network_revision"],
-        }))
+        let metadata = raw["metadata"].as_object_mut().expect("validated metadata");
+        if metadata["network_enabled"].as_bool() != Some(enabled) {
+            let revision = metadata["network_revision"].as_u64().unwrap_or(0) + 1;
+            metadata.insert("network_enabled".into(), json!(enabled));
+            metadata.insert("network_revision".into(), json!(revision));
+            metadata["pending_network_notices"]
+                .as_array_mut()
+                .ok_or_else(|| ChatError::storage("Invalid Chat network notice queue"))?
+                .push(json!({"revision":revision,"enabled":enabled}));
+            let chat_revision = metadata["chat"]["revision"].as_u64().unwrap_or(0) + 1;
+            metadata["chat"]["revision"] = json!(chat_revision);
+            raw["updated_at"] = json!(crate::chat_mode::store::timestamp(updated_at)?);
+        }
+        let value = json!({"enabled":raw["metadata"]["network_enabled"],
+            "revision":raw["metadata"]["network_revision"]});
+        Ok(receipt(raw, operation_id, fingerprint, value))
     })
 }
 
@@ -379,7 +531,7 @@ pub(super) fn consume_network_notices(
     turn_id: &str,
     updated_at: f64,
 ) -> Result<(), ChatError> {
-    let raw = paths.read_raw(id)?;
+    let (raw, _) = paths.read_header(id)?;
     let notices = raw["metadata"]["pending_network_notices"]
         .as_array()
         .cloned()
@@ -409,13 +561,9 @@ pub(super) fn consume_network_notices(
             })
         })
         .collect();
-    for message in messages {
-        append(paths, id, turn_id, message, updated_at, None)?;
-    }
-    let mut raw = paths.read_raw(id)?;
-    raw["metadata"]["pending_network_notices"] = json!([]);
-    paths.write_raw(id, raw, false)?;
-    Ok(())
+    append_batch(paths, id, turn_id, messages, updated_at, |raw| {
+        raw["metadata"]["pending_network_notices"] = json!([]);
+    })
 }
 
 pub(super) fn configure(
@@ -424,30 +572,27 @@ pub(super) fn configure(
     settings: &Map<String, Value>,
     updated_at: f64,
 ) -> Result<Value, ChatError> {
-    let mut raw = paths.read_raw(id)?;
-    if raw["metadata"]["chat"]["active_turn_id"]
-        .as_str()
-        .is_some()
-    {
-        return Err(ChatError::conflict(
-            "Model settings can change after the current generation",
-        ));
-    }
-    let metadata = raw["metadata"]
-        .as_object_mut()
-        .ok_or_else(|| ChatError::bad_request("Chat metadata must be an object"))?;
-    for (key, value) in settings {
-        metadata.insert(key.clone(), value.clone());
-    }
-    if let Some(thinking) = settings.get("thinking_mode").and_then(Value::as_bool) {
-        metadata.insert(
-            "run_mode".into(),
-            json!(if thinking { "thinking" } else { "fast" }),
-        );
-    }
-    raw["updated_at"] = json!(crate::chat_mode::store::timestamp(updated_at)?);
-    paths.write_raw(id, raw, false)?;
-    Ok(json!(settings))
+    paths.update_header(id, |raw, _| {
+        if raw["metadata"]["chat"]["active_turn_id"].as_str().is_some() {
+            return Err(ChatError::conflict(
+                "Model settings can change after the current generation",
+            ));
+        }
+        let metadata = raw["metadata"]
+            .as_object_mut()
+            .ok_or_else(|| ChatError::bad_request("Chat metadata must be an object"))?;
+        for (key, value) in settings {
+            metadata.insert(key.clone(), value.clone());
+        }
+        if let Some(thinking) = settings.get("thinking_mode").and_then(Value::as_bool) {
+            metadata.insert(
+                "run_mode".into(),
+                json!(if thinking { "thinking" } else { "fast" }),
+            );
+        }
+        raw["updated_at"] = json!(crate::chat_mode::store::timestamp(updated_at)?);
+        Ok(json!(settings))
+    })
 }
 
 pub(super) fn compress_limit(
@@ -457,15 +602,15 @@ pub(super) fn compress_limit(
     source: &str,
     updated_at: f64,
 ) -> Result<Value, ChatError> {
-    let mut raw = paths.read_raw(id)?;
-    let metadata = raw["metadata"]
-        .as_object_mut()
-        .ok_or_else(|| ChatError::bad_request("Chat metadata must be an object"))?;
-    metadata.insert("compress_limit_tokens".into(), json!(tokens));
-    metadata.insert("compress_limit_source".into(), json!(source));
-    raw["updated_at"] = json!(crate::chat_mode::store::timestamp(updated_at)?);
-    paths.write_raw(id, raw, false)?;
-    Ok(json!({"compress_limit_tokens":tokens,"compress_limit_source":source}))
+    paths.update_header(id, |raw, _| {
+        let metadata = raw["metadata"]
+            .as_object_mut()
+            .ok_or_else(|| ChatError::bad_request("Chat metadata must be an object"))?;
+        metadata.insert("compress_limit_tokens".into(), json!(tokens));
+        metadata.insert("compress_limit_source".into(), json!(source));
+        raw["updated_at"] = json!(crate::chat_mode::store::timestamp(updated_at)?);
+        Ok(json!({"compress_limit_tokens":tokens,"compress_limit_source":source}))
+    })
 }
 
 pub(super) fn register_presentation(
@@ -483,11 +628,12 @@ pub(super) fn register_presentation(
     if presentation_id.chars().count() > 200 {
         return Err(ChatError::bad_request("Invalid presentation identity"));
     }
-    let mut raw = paths.read_raw(id)?;
-    let empty = raw["messages"].as_array().is_none_or(Vec::is_empty);
-    if empty {
-        raw["metadata"]["chat"]["handoff_presentation_id"] = json!(presentation_id);
-        paths.write_raw(id, raw, false)?;
+    let (_, count) = paths.read_header(id)?;
+    if count == 0 {
+        paths.update_header(id, |raw, _| {
+            raw["metadata"]["chat"]["handoff_presentation_id"] = json!(presentation_id);
+            Ok(())
+        })?;
     }
     Ok(json!({"success": true}))
 }
@@ -497,7 +643,6 @@ pub(super) fn active_turn(raw: &Value) -> Option<&str> {
         .as_str()
         .filter(|id| !id.is_empty())
 }
-
 
 fn fingerprint(payload: &Value) -> String {
     let mut canonical = String::new();
@@ -557,3 +702,7 @@ mod tests {
         assert_ne!(fingerprint(&json!({"a":1})), fingerprint(&json!({"a":2})));
     }
 }
+
+#[cfg(test)]
+#[path = "../../../test/2026-11-27_Chat增量存储/delta.rs"]
+mod delta_tests;

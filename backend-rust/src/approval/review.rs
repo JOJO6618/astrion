@@ -6,7 +6,7 @@ use std::{
 };
 
 use futures_util::future::BoxFuture;
-use ring::digest::{SHA256, digest};
+use ring::digest::SHA256;
 use serde::Deserialize;
 use serde_json::{Value, json};
 
@@ -30,7 +30,9 @@ impl ReviewSnapshot {
         trigger: &str,
         history: &[Value],
         batch: &[Value],
+        goal: Option<&str>,
     ) -> Self {
+        let mut approved_plan = None;
         let mut calls = HashMap::<&str, (&str, &Value)>::new();
         let mut evidence = Vec::new();
         for row in history.iter().chain(batch) {
@@ -65,6 +67,13 @@ impl ReviewSnapshot {
                             .unwrap_or_else(|| row["content"].to_string());
                         write!(text, "结果\n{}", indent(&output))
                             .expect("String writes are infallible");
+                        if name == crate::interactions::SUBMIT_PLAN
+                            && let Ok(result)=serde_json::from_str::<Value>(&output)
+                            && result["status"]=="approved" && result["success"]==true
+                            && result["plan_content"].is_string()
+                        {
+                            approved_plan=Some(evidence.len());
+                        }
                         evidence.push((false, text));
                     }
                 }
@@ -75,7 +84,8 @@ impl ReviewSnapshot {
         // Recent inputs and paired tool evidence have independent display budgets.
         let mut recent = Vec::new();
         let (mut users, mut tools) = (0, 0);
-        for (is_user, text) in evidence.iter().rev() {
+        for (index,(is_user,text)) in evidence.iter().enumerate().rev() {
+            if Some(index)==approved_plan {continue;}
             let seen = if *is_user { &mut users } else { &mut tools };
             if *seen < 5 {
                 recent.push(text.as_str());
@@ -94,6 +104,12 @@ impl ReviewSnapshot {
         if let Some(site) = request.browser_site.as_deref() {
             writeln!(prompt, "当前站点 {site}").expect("String writes are infallible");
         }
+        if let Some(goal)=goal.filter(|s|!s.trim().is_empty()) {
+            writeln!(prompt,"当前目标\n{}",indent(goal)).expect("String writes are infallible");
+        }
+        if let Some(index)=approved_plan {
+            writeln!(prompt,"已批准计划\n{}",evidence[index].1).expect("String writes are infallible");
+        }
         let trigger = format!("用户输入\n{}", indent(trigger));
         if !recent.contains(&trigger.as_str()) {
             writeln!(prompt, "当前任务触发消息\n{trigger}").expect("String writes are infallible");
@@ -107,10 +123,13 @@ impl ReviewSnapshot {
         .expect("String writes are infallible");
         render_arguments(&mut prompt, &Value::Object(request.arguments.clone()));
         let history: Vec<_> = evidence.into_iter().map(|(_, row)| row).collect();
-        let inputs =
-            serde_json::to_vec(&json!([prompt, history, trigger])).expect("strings serialize");
+        let mut digest = ring::digest::Context::new(&SHA256);
+        for value in std::iter::once(prompt.as_str()).chain(history.iter().map(String::as_str)).chain(std::iter::once(trigger.as_str())) {
+            digest.update(&(value.len() as u64).to_le_bytes());
+            digest.update(value.as_bytes());
+        }
         let mut fingerprint = String::with_capacity(64);
-        for byte in digest(&SHA256, &inputs).as_ref() {
+        for byte in digest.finish().as_ref() {
             write!(fingerprint, "{byte:02x}").expect("String writes are infallible");
         }
         Self {
@@ -155,7 +174,7 @@ fn user_input(row: &Value) -> Option<&str> {
         .or_else(|| metadata["source"].as_str())
     {
         Some("guidance") => metadata["runtime_guidance_original"].as_str(),
-        Some("user" | "user_input" | "human" | "manual") | None
+        Some("user" | "presend" | "user_input" | "human" | "manual") | None
             if metadata["is_auto_generated"] != true && metadata["runtime_injected"] != true =>
         {
             row["content"].as_str()

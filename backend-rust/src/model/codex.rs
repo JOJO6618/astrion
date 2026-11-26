@@ -26,7 +26,16 @@ pub async fn complete(
     messages: &[Value],
     tools: &[Value],
     options: &CodexRequestOptions<'_>,
-    on_text: impl FnMut(&str),
+    mut on_text: impl FnMut(&str),
+) -> Result<Completion, String> {
+    complete_with_updates(transport, model, messages, tools, options, |delta| {
+        if let super::StreamDelta::Text(text) = delta { on_text(text); }
+    }).await
+}
+
+pub(crate) async fn complete_with_updates(
+    transport: &CodexTransport, model: &str, messages: &[Value], tools: &[Value], options: &CodexRequestOptions<'_>,
+    on_delta: impl FnMut(super::StreamDelta<'_>),
 ) -> Result<Completion, String> {
     if options.session_id.trim().is_empty() {
         return Err("Codex Responses requires a session ID".into());
@@ -54,7 +63,7 @@ pub async fn complete(
             chat::response_detail(response).await
         ));
     }
-    super::collect_responses(response, tools, connection, on_text).await
+    super::collect_responses(response, tools, connection, on_delta).await
 }
 
 fn request_body(

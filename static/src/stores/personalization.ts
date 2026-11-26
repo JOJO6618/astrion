@@ -502,9 +502,10 @@ interface AutoSaveOutcome {
 const KEEPALIVE_BODY_LIMIT = 60 * 1024;
 
 // 自动保存合并队列（非响应式，避免触发不必要的重渲染）：停手 1s 保存、连续修改最长 3s 一次、
-// 同时最多一个请求在途。所有写 /api/personalization 的前端入口统一走这里，避免并发整表写互相覆盖。
+// 同时最多一个请求在途。每个窗口只提交实际改动的字段，避免用旧表单覆盖其他窗口已保存的值。
 let autoSaveQueue: SaveQueue<AutoSaveOutcome> | null = null;
 let autoSaveLifecycleBound = false;
+const pendingAutoSave = new Map<keyof PersonalForm, PersonalForm[keyof PersonalForm]>();
 
 /** 离开页面／切到后台立即保存；输入框失焦时保存积压修改 */
 const bindAutoSaveLifecycle = (queue: SaveQueue<AutoSaveOutcome>) => {
@@ -874,7 +875,7 @@ export const usePersonalizationStore = defineStore('personalization', {
       const cachedCompact = this.experiments.compactMessageDisplay;
       if (this.form.compact_message_display === 'full' && cachedCompact === 'brief') {
         this.form = { ...this.form, compact_message_display: 'brief' };
-        this.scheduleAutoSave();
+        this.scheduleAutoSave('compact_message_display');
       }
       // 一次性迁移：堆叠块显示模式旧版仅在 localStorage 保存，后端默认 minimal 时回写本地缓存值。
       const cachedBlockMode = this.experiments.blockDisplayMode;
@@ -1014,8 +1015,7 @@ export const usePersonalizationStore = defineStore('personalization', {
       this.error = '';
       this.form.enabled = newValue;
       try {
-        // 并入统一保存队列并立即发出：与积压的其它修改合并为一次整表保存，避免并发写互相覆盖
-        this.scheduleAutoSave();
+        this.scheduleAutoSave('enabled');
         const outcome = await this.flushAutoSave();
         if (!outcome || !outcome.ok) {
           throw new Error(outcome?.error || t('stores.updateFailed'));
@@ -1030,6 +1030,9 @@ export const usePersonalizationStore = defineStore('personalization', {
         }, 2000);
       } catch (error: any) {
         this.form.enabled = previousValue;
+        if (pendingAutoSave.get('enabled') === newValue) {
+          pendingAutoSave.delete('enabled');
+        }
         this.error = error?.message || t('stores.updateFailed');
       } finally {
         this.toggleUpdating = false;
@@ -1050,10 +1053,11 @@ export const usePersonalizationStore = defineStore('personalization', {
         persistMinimalExpandHeightLimited(!!payload.value);
       }
       this.clearFeedback();
-      this.scheduleAutoSave();
+      this.scheduleAutoSave(payload.key);
     },
     /** 记一次修改，按「停手 1s / 连续修改最长 3s」合并保存（见 utils/saveQueue.ts） */
-    scheduleAutoSave() {
+    scheduleAutoSave(key: keyof PersonalForm) {
+      pendingAutoSave.set(key, this.form[key]);
       if (!autoSaveQueue) {
         autoSaveQueue = createSaveQueue<AutoSaveOutcome>({
           run: (context) => this.performAutoSave(context)
@@ -1066,11 +1070,13 @@ export const usePersonalizationStore = defineStore('personalization', {
     flushAutoSave(): Promise<AutoSaveOutcome | undefined> {
       return autoSaveQueue ? autoSaveQueue.flush() : Promise.resolve(undefined);
     },
-    /** 整表静默保存：每次读取当前最新表单；成功不提示、不回写表单（避免打断编辑），失败显示错误 */
+    /** 发送本轮变更，保留请求期间产生的下一轮修改。 */
     async performAutoSave(context: SaveRunContext): Promise<AutoSaveOutcome> {
+      const patch = new Map(pendingAutoSave);
+      pendingAutoSave.clear();
       this.saving = true;
       try {
-        const body = JSON.stringify(this.form);
+        const body = JSON.stringify(Object.fromEntries(patch));
         const resp = await fetch('/api/personalization', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1087,6 +1093,11 @@ export const usePersonalizationStore = defineStore('personalization', {
         }
         return { ok: true, result };
       } catch (error: any) {
+        for (const [key, value] of patch) {
+          if (!pendingAutoSave.has(key)) {
+            pendingAutoSave.set(key, value);
+          }
+        }
         const message = error?.message || t('stores.autoSaveFailed');
         this.error = message;
         return { ok: false, error: message };
@@ -1104,7 +1115,7 @@ export const usePersonalizationStore = defineStore('personalization', {
         recent_conversations_prompt_limit: target
       };
       this.clearFeedback();
-      this.scheduleAutoSave();
+      this.scheduleAutoSave('recent_conversations_prompt_limit');
     },
     setProjectMemoryInjectLimit(value: number | null) {
       // null = 无上限
@@ -1117,7 +1128,7 @@ export const usePersonalizationStore = defineStore('personalization', {
         project_memory_inject_limit: target
       };
       this.clearFeedback();
-      this.scheduleAutoSave();
+      this.scheduleAutoSave('project_memory_inject_limit');
     },
     restoreProjectMemoryInjectLimit() {
       this.form = {
@@ -1125,7 +1136,7 @@ export const usePersonalizationStore = defineStore('personalization', {
         project_memory_inject_limit: DEFAULT_PROJECT_MEMORY_INJECT_LIMIT
       };
       this.clearFeedback();
-      this.scheduleAutoSave();
+      this.scheduleAutoSave('project_memory_inject_limit');
     },
     toggleDefaultToolCategory(categoryId: string) {
       if (!categoryId) {
@@ -1142,7 +1153,7 @@ export const usePersonalizationStore = defineStore('personalization', {
         disabled_tool_categories: Array.from(current)
       };
       this.clearFeedback();
-      this.scheduleAutoSave();
+      this.scheduleAutoSave('disabled_tool_categories');
     },
     toggleSkill(skillId: string) {
       if (!skillId) {
@@ -1159,7 +1170,7 @@ export const usePersonalizationStore = defineStore('personalization', {
         enabled_skills: Array.from(current)
       };
       this.clearFeedback();
-      this.scheduleAutoSave();
+      this.scheduleAutoSave('enabled_skills');
     },
     setDefaultRunMode(mode: RunMode | null) {
       let target: RunMode | null = null;
@@ -1171,7 +1182,7 @@ export const usePersonalizationStore = defineStore('personalization', {
         default_run_mode: target
       };
       this.clearFeedback();
-      this.scheduleAutoSave();
+      this.scheduleAutoSave('default_run_mode');
     },
     setDefaultReasoningEffort(effort: ReasoningEffort | null) {
       let target: ReasoningEffort | null = null;
@@ -1186,7 +1197,7 @@ export const usePersonalizationStore = defineStore('personalization', {
         default_reasoning_effort: target
       };
       this.clearFeedback();
-      this.scheduleAutoSave();
+      this.scheduleAutoSave('default_reasoning_effort');
     },
     setDefaultPermissionMode(mode: PermissionMode) {
       const allowed: PermissionMode[] = ['readonly', 'approval', 'auto_approval', 'unrestricted'];
@@ -1196,7 +1207,7 @@ export const usePersonalizationStore = defineStore('personalization', {
         default_permission_mode: target
       };
       this.clearFeedback();
-      this.scheduleAutoSave();
+      this.scheduleAutoSave('default_permission_mode');
     },
     setDefaultWorkMode(mode: WorkMode) {
       const allowed: WorkMode[] = ['plan', 'ask', 'execute'];
@@ -1206,7 +1217,7 @@ export const usePersonalizationStore = defineStore('personalization', {
         default_work_mode: target
       };
       this.clearFeedback();
-      this.scheduleAutoSave();
+      this.scheduleAutoSave('default_work_mode');
     },
     setVersioningRestoreMode(_mode: 'overwrite') {
       // 当前仅支持 overwrite 一种恢复模式，入参保留用于未来扩展，此处显式忽略
@@ -1217,7 +1228,7 @@ export const usePersonalizationStore = defineStore('personalization', {
         versioning_restore_mode: target
       };
       this.clearFeedback();
-      this.scheduleAutoSave();
+      this.scheduleAutoSave('versioning_restore_mode');
     },
     setVersioningBackupMode(mode: VersioningBackupMode) {
       const target: VersioningBackupMode = mode === 'full' ? 'full' : 'shallow';
@@ -1226,7 +1237,7 @@ export const usePersonalizationStore = defineStore('personalization', {
         versioning_backup_mode: target
       };
       this.clearFeedback();
-      this.scheduleAutoSave();
+      this.scheduleAutoSave('versioning_backup_mode');
     },
     setDefaultModel(model: string | null) {
       const modelStore = useModelStore();
@@ -1237,7 +1248,7 @@ export const usePersonalizationStore = defineStore('personalization', {
         default_model: target
       };
       this.clearFeedback();
-      this.scheduleAutoSave();
+      this.scheduleAutoSave('default_model');
     },
     /** 模型可见性（用户级）：更新 hidden_models 并同步 model store 过滤，走防抖自动保存 */
     setHiddenModels(keys: string[]) {
@@ -1250,7 +1261,7 @@ export const usePersonalizationStore = defineStore('personalization', {
       };
       useModelStore().setHiddenModels(target);
       this.clearFeedback();
-      this.scheduleAutoSave();
+      this.scheduleAutoSave('hidden_models');
     },
     setImageCompression(mode: string) {
       const allowed = ['original', '1080p', '720p', '540p'];
@@ -1260,7 +1271,7 @@ export const usePersonalizationStore = defineStore('personalization', {
         image_compression: mode
       };
       this.clearFeedback();
-      this.scheduleAutoSave();
+      this.scheduleAutoSave('image_compression');
     },
     applyTonePreset(preset: string) {
       if (!preset) {
@@ -1271,7 +1282,7 @@ export const usePersonalizationStore = defineStore('personalization', {
         tone: preset
       };
       this.clearFeedback();
-      this.scheduleAutoSave();
+      this.scheduleAutoSave('tone');
     },
     updateConsiderations(value: string) {
       this.form = {
@@ -1279,7 +1290,7 @@ export const usePersonalizationStore = defineStore('personalization', {
         considerations: value
       };
       this.clearFeedback();
-      this.scheduleAutoSave();
+      this.scheduleAutoSave('considerations');
     },
     async logout() {
       try {
@@ -1328,7 +1339,7 @@ export const usePersonalizationStore = defineStore('personalization', {
         ...this.form,
         block_display_mode: mode
       };
-      this.scheduleAutoSave();
+      this.scheduleAutoSave('block_display_mode');
     },
     setCompactMessageDisplay(mode: CompactMessageDisplay) {
       const target: CompactMessageDisplay = mode === 'brief' || mode === 'hidden' ? mode : 'full';
@@ -1344,7 +1355,7 @@ export const usePersonalizationStore = defineStore('personalization', {
       this.persistExperiments();
       this.clearFeedback();
       // 持久化到后端配置文件（即时保存，并入统一保存队列）
-      this.scheduleAutoSave();
+      this.scheduleAutoSave('compact_message_display');
       void this.flushAutoSave();
     },
     setCommunicationStyle(style: CommunicationStyle) {
@@ -1353,7 +1364,7 @@ export const usePersonalizationStore = defineStore('personalization', {
         communication_style: style
       };
       this.clearFeedback();
-      this.scheduleAutoSave();
+      this.scheduleAutoSave('communication_style');
     },
     setConversationContinuity(value: ConversationContinuity) {
       this.form = {
@@ -1361,7 +1372,7 @@ export const usePersonalizationStore = defineStore('personalization', {
         conversation_continuity: value
       };
       this.clearFeedback();
-      this.scheduleAutoSave();
+      this.scheduleAutoSave('conversation_continuity');
     }
   }
 });

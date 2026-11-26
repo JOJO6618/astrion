@@ -1,4 +1,4 @@
-use std::{cell::OnceCell, path::Path};
+use std::{cell::OnceCell, io, path::Path, sync::{Mutex, MutexGuard}};
 
 use base64::{Engine, engine::general_purpose::STANDARD};
 use cap_fs_ext::DirExt;
@@ -11,6 +11,13 @@ use crate::{
 };
 
 const MAX_MEDIA_BYTES: u64 = 100 * 1024 * 1024;
+
+static INDEX_LOCK: Mutex<()> = Mutex::new(());
+
+pub(crate) fn index_lock() -> io::Result<MutexGuard<'static, ()>> {
+    INDEX_LOCK.lock().map_err(|_| io::Error::other("Conversation media index is unavailable"))
+}
+
 
 pub(crate) struct BlobStore {
     blobs: Dir,
@@ -37,7 +44,7 @@ impl BlobStore {
         self.read(&json!({"media_id": id}))
     }
 
-    fn read(&self, reference: &Value) -> Option<Vec<u8>> {
+    pub(crate) fn read(&self, reference: &Value) -> Option<Vec<u8>> {
         let entry = reference["media_id"]
             .as_str()
             .and_then(|id| self.index["media"].get(id));
@@ -208,4 +215,38 @@ pub(crate) fn attach(document: &Value, history: &mut [Value], data: &Path, works
             Value::Array(parts)
         };
     }
+}
+
+
+/// Chat has an account blob store but no workspace file authority.
+pub(crate) fn attach_chat_blobs(messages: &[Value], projected: &mut [Value], account: &Path) -> Result<(), String> {
+    let blobs = OnceCell::new();
+    for (source, projected) in messages.iter().zip(projected) {
+        let refs = entries(source, "media_refs");
+        if refs.is_empty() || source["metadata"]["media_paths_only"] == true { continue; }
+        if !matches!(source["role"].as_str(), Some("user" | "assistant")) { continue; }
+        let store = blobs.get_or_init(|| BlobStore::open(account)).as_ref()
+            .ok_or("Chat media store unavailable")?;
+        let mut parts = Vec::new();
+        if let Some(text) = projected["content"].as_str().filter(|text| !text.is_empty()) {
+            parts.push(json!({"type":"text","text":text}));
+        }
+        for reference in refs {
+            let id = reference["media_id"].as_str().ok_or("Invalid Chat media reference")?;
+            let entry = store.entry(id).ok_or("Chat media unavailable")?;
+            let kind = entry["kind"].as_str().filter(|kind| matches!(*kind, "image" | "video"))
+                .ok_or("Invalid Chat media type")?;
+            let mime = entry["mime_type"].as_str().filter(|mime| {
+                mime.strip_prefix(kind).is_some_and(|suffix| suffix.starts_with('/'))
+            }).ok_or("Invalid Chat media MIME type")?;
+            let bytes = store.registered_bytes(id).ok_or("Chat media unavailable")?;
+            let mut media = part(kind, mime, &bytes);
+            if kind == "video" && let Some(fps) = reference["fps"].as_f64().filter(|fps| *fps > 0.0) {
+                media["fps"] = json!(fps);
+            }
+            parts.push(media);
+        }
+        projected["content"] = Value::Array(parts);
+    }
+    Ok(())
 }

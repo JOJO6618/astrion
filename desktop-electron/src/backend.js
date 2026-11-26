@@ -239,14 +239,22 @@ export function spawnBackend({ python, backendDir, port, bridgePort, browserToke
 
 export function spawnRustBackend(runtime, options) {
   const launch = rustDesktopLaunch(runtime, { ...options, identity: desktopUpdateIdentity() });
+  const transport = credentialTransport({ bridgePort: runtime.bridgePort, browserToken: options.browserToken });
+  delete launch.env.ASTRION_DESKTOP_BROWSER_TOKEN;
+  delete launch.env.ASTRION_DESKTOP_BROWSER_TOKEN_FD;
+  Object.assign(launch.env, transport.env);
   if (process.platform === 'win32') {
     const guarded = rustGuardianLaunch({ ...launch, guardian: windowsHelper() });
     const child = spawnTracked(guarded, { cwd: launch.cwd, env: guarded.env, stdio: guarded.stdio }, 'rust');
     child.guarded = true;
     watchGuardedPid(child);
+    if (transport.env.ASTRION_DESKTOP_BROWSER_TOKEN_FD === '0') {
+      child.stdin.write(`${options.browserToken}\n`);
+    }
     return child;
   }
-  const child = spawnTracked(launch, { cwd: launch.cwd, env: launch.env, stdio: ['ignore', 'pipe', 'pipe'] }, 'rust');
+  const child = spawnTracked(launch, { cwd: launch.cwd, env: launch.env, stdio: transport.stdio }, 'rust');
+  transport.write(child);
   child.backendPid = child.pid;
   return child;
 }

@@ -122,6 +122,10 @@ test('Web serves conversation and workspace routes with cookie, CSRF and workspa
   await checkShared(request, bearer);
   const browser = await browserSession(request, base);
   await checkShared(request, browser.session);
+  const allowed = await request('/api/status', 200, { method: 'OPTIONS', headers: browser.session });
+  assert.deepEqual(new Set(allowed.headers.get('allow').split(',').map(v => v.trim())), new Set(['GET', 'HEAD', 'OPTIONS']));
+  assert.equal(allowed.text, '');
+  await request('/api/synthetic-absent-options', 404, { method: 'OPTIONS', headers: browser.session });
   const skill = join(workspace, '.astrion/skills/local');
   await mkdir(skill, { recursive: true });
   await writeFile(join(skill, 'SKILL.md'), '---\nname: Local fixture\ndescription: example\n---\nBody\n');

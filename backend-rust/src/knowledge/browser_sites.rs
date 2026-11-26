@@ -55,6 +55,25 @@ pub(super) fn list(data: &Dir) -> io::Result<Vec<Value>> {
     Ok(rows(load(data)?))
 }
 
+pub(super) fn grant(data: &Dir, site: &str) -> io::Result<()> {
+    if !valid_site(site) {
+        return Err(io::Error::new(
+            ErrorKind::InvalidInput,
+            "Invalid browser site",
+        ));
+    }
+    let _guard = SITE_WRITES
+        .lock()
+        .map_err(|_| io::Error::other("Browser site lock is unavailable"))?;
+    let mut sites = load(data)?;
+    if !sites.contains_key(site) {
+        sites.insert(site.into(), json!({"granted_at":std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs_f64()}));
+        let replacement = serde_json::to_vec_pretty(&json!({"version":1,"sites":sites}))?;
+        publish(data, FILE, &replacement, true)?;
+    }
+    Ok(())
+}
+
 pub(super) fn revoke(data: &Dir, site: &str) -> io::Result<(bool, Vec<Value>)> {
     let _guard = SITE_WRITES
         .lock()

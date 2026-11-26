@@ -1,11 +1,11 @@
 # 正常 macOS Rust 目录包（Astrion.app）交接
 
-只记录**已验证**的事实与**未完成**项。本轮没有构建、没有启动应用、没有触碰在用的服务或已安装应用。
+本文保存暂停交接时的构建路径与历史命令。1.0.0 已在隔离数据上构建并启动，当前 build ID、严格签名和实包业务验收见[迁移状态](../MIGRATION_STATUS.md)。
 
 ## 1. 目标与边界
 
 - 交付形态：可正常直接启动的 `Astrion.app`，包内**只有 Rust 后端**（`Contents/Resources/runtime/rust`），启动后默认使用包内 Rust。
-- 沿用正式标识：`appId=com.astrion.desktop`、`productName=Astrion`、版本取仓库版本；本地目录包，不签名、不公证、不发布、不替换已安装应用。
+- 沿用正式标识：`appId=com.astrion.desktop`、`productName=Astrion`、版本取仓库版本。本地目录包使用 ad-hoc 签名，不公证、不发布、不替换已安装应用。
 - 与两个既有入口区分：
   - `npm run build:dir`（`scripts/run_builder.mjs`）= 正式 Python 包，会 staging 内嵌 Python；
   - `npm run build:rust:dir`（`scripts/build_rust_dir.mjs`）= 隔离实验包，`Astrion Rust Experiment` / `com.astrion.desktop.rust-experiment`，要求专用空数据根、跳过控制桥与更新策略。
@@ -17,7 +17,7 @@
 |---|---|---|
 | `desktop-electron/src/rust-backend.js` | `resolveDesktopBackend` 默认后端判定 | 有 `runtime/rust` 且**没有** `runtime/python` 时，默认 `mode='rust'`；开发形态（无 `resourcesPath`）仍默认 Python；显式 `ASTRION_DESKTOP_BACKEND` 始终优先；`python` + 只有 Rust 运行时仍抛原有错误（防御性保留） |
 | `desktop-electron/scripts/build_rust_app.mjs` | 新增 | 正常目录包构建：`cargo build --release` → 根前端 `npm run build -- --emptyOutDir` → `stageRustBackend` → electron-builder `dir`（`identity:null`、`notarize:false`、`publish:'never'`）；产物 `desktop-electron/dist-rust/mac-arm64/Astrion.app`；构建后自检 runtime 只有 `rust`、无 `runtime/python`、前端 manifest 与资源种子存在，并打印二进制字节数与 SHA256 |
-| `desktop-electron/package.json` | 新增脚本 | `"build:rust:app": "node scripts/build_rust_app.mjs"` |
+| `desktop-electron/package.json` | 新增脚本 | `"build:rust:app": "npm run build:quick-native && node scripts/build_rust_app.mjs"` |
 | `test/2026-11-26_Rust目录包/verify_bundle.py` | 新增 | 选择逻辑预演（`--logic-only`）、包静态校验（`--app`）、隔离启动验证（`--launch`） |
 
 `build_rust_app.mjs` 接受的复用开关（用于共享产物、避免重复编译）：
@@ -86,15 +86,15 @@ env     = ASTRION_DATA_ROOT / ASTRION_RESOURCE_ROOT / DEPLOY_CONFIG_DIR /
 
 即：包内二进制、包内 static、隔离数据根、隔离注册表都在启动参数里被显式传递，没有落到仓库路径或真实数据根。
 
-## 6. 未完成项
+## 6. 交接暂停时的历史未完成项
 
 1. **正式包未构建**：本轮按要求保持暂停。此前（11-26 06:xx）用 release 试编时源码正处于他人集成中间态，报 `chat_mode/handoff.rs` 缺 `materials`/`service` 模块与 `project_git/workspace/checkout.rs` 借用错误；现已由共享 check/build 通过，但**尚未重新跑 release**。
 2. **包静态校验未跑**：`verify_bundle.py --app` 需要真实产物（`dist-rust/mac-arm64/Astrion.app`）。
 3. **启动 PID 验证未跑**：`--launch` 已写好但未执行。需要确认的实际链路：Electron 主进程 PID → 包内 `astrion-headless` 子进程 PID → `<profile>/backend-port.json` 端口 → `/api/host-mode-enabled` 的 `backend=rust` 与 `pid` 匹配 → 带 Bearer 的 `/api/runtime/sessions` 返回 200。
 4. **退出方式未验证**：沙箱对本会话的子进程禁发任何信号（`kill -0` 都是 EPERM），故 `--launch` 设计为通过 `--inspect` + DevTools `Runtime.evaluate(require('electron').app.quit())` 让应用自己退出；该路径**从未执行过**，需在首次预演时确认。
 5. **`verify_bundle.py` 的 `buildId` 字段是空壳**：脚本目前没有解 asar（`app.asar` 被当成 `{}`），需要补 `@electron/asar` 读取包内 `package.json` 的 `astrionBuildId` 后才能作为证据。诊断 `mtime/sha256` 已有，buildId 仍未取证。
-6. **CLI 启动探测未做**：CLI 是 bun 工程（`cli/package.json` 无 `dist`，本机无 bun），无法在此环境编译启动 TUI；只能做契约级探测（`ASTRION_API_BASE` + `ASTRION_HOST_TOKEN_FILE` 打同一网关）。本轮未执行。
-7. **签名/公证不做**：`identity:null`、`CSC_IDENTITY_AUTO_DISCOVERY=false`，产物为 adhoc/linker-signed，`codesign --verify --deep --strict` 预期非 0。不要把 `codesign` 通过当验收项。
+6. CLI 已使用常规 `cli/bin/astrion` 进入隔离 TUI，由默认 Rust 模式启动目录包的后端并通过 Bearer 读取工作区。 [CLI 可复跑脚本](../../test/2026-11-27_Rust快捷对话/README.md)
+7. 本地目录包先让 electron-builder 装配文件，再用系统 ad-hoc 身份签封嵌套 Mach-O、Swift 辅助程序和整个 App。构建结束严格验证签名。正式发布入口使用独立的开发者身份配置。
 8. **包内无 `node_modules`**：`files: ['src/**','package.json']`，`electron-updater` 只被 `bridge.js` 惰性 `import()`。正常形态会启动控制桥，更新类端点一旦被调用会因缺模块失败；验收不覆盖更新，需在文档中写明。
 9. **release 编译的沙箱前置**：`ring`/clang 在本沙箱会因临时文件权限失败（`clang: unable to make temporary file: Operation not permitted`）。可用组合（未写入脚本，需在命令里给）：
 

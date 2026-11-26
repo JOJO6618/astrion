@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { migrate } from '../2026-11-27_Rust对话格式迁移/fixture.mjs';
 import { mkdir, readdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
@@ -85,6 +86,7 @@ test('Host browser preferences use authenticated live workspaces and keep passiv
     await request(path, 401, { headers: tokens });
   }
   const firstSession = await login(request, gateway.baseUrl);
+  await migrate(gateway.baseUrl,firstSession.write);
   const secondSession = await login(request, gateway.baseUrl);
   const files = [join(dataDir, 'conversations', 'first', `${SHARED_ID}.json`), join(dataDir, 'conversation_tabs.json')];
   const saved = await Promise.all(files.map((file) => readFile(file, 'utf8')));
@@ -139,6 +141,7 @@ test('Host browser preferences use authenticated live workspaces and keep passiv
   const third = { workspace_id: 'third', label: 'third', path: join(dirname(dataDir), 'third') };
   await mkdir(third.path);
   await fixtureConversation(dataDir, 'third', SHARED_ID, { pending_browser_tools: 'on' });
+  await migrate(gateway.baseUrl,firstSession.write);
   await replaceCatalog(workspaceCatalog, [workspaces[0], third]);
   assert.deepEqual((await request(`${conversation}&workspace_id=third`, 200, { headers: firstSession.read })).json,
     { ...OFF, pending: 'on' });

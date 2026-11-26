@@ -1,4 +1,4 @@
-use std::{collections::HashSet, io, path::Path};
+use std::{collections::HashSet, io, path::Path, sync::MutexGuard};
 
 use base64::{
     Engine,
@@ -169,16 +169,40 @@ impl<'a> Writer<'a> {
             }
             None => (original, self.execution_root, &mut self.execution_files),
         };
-        let mime = validated_mime(
-            kind,
-            mime.or_else(|| legacy_mime(path).map(|(_, mime)| mime)),
-        )?;
+        let mime = validated_mime(kind, mime.or_else(|| legacy_mime(path).map(|(_, mime)| mime)))?;
         if files.is_none() {
             *files = ReadFile::open(root, self.data).ok();
         }
         let bytes = files.as_ref()?.read_bytes(path).ok()?;
         (!bytes.is_empty() && bytes.len() as u64 <= MAX_MEDIA_BYTES).then_some((bytes, mime))
     }
+}
+
+pub(crate) fn store_tool_media(
+    data: &Path, workspace: &Path, execution_root: &Path, aliases: &Value,
+    path: &str, kind: &str, mime: &str,
+) -> Result<Value, String> {
+    let (bytes, mime) = read_tool_media(data, workspace, execution_root, aliases, path, kind, mime)?;
+    let hash = crate::conversation_transfer::sha256(&bytes);
+    let mut storage = Storage::open(data).map_err(|error| error.to_string())?;
+    let reference = storage.put(&hash, &bytes, &mime, kind, Some(path)).map_err(|error| error.to_string())?;
+    storage.publish_index().map_err(|error| error.to_string())?;
+    Ok(reference)
+}
+
+pub(crate) fn read_tool_media(
+    data: &Path, workspace: &Path, execution_root: &Path, aliases: &Value,
+    path: &str, kind: &str, mime: &str,
+) -> Result<(Vec<u8>, String), String> {
+    let mut writer = Writer::new(data, workspace, execution_root, &json!({
+        "metadata":{"conversation_transfer":{"paths":aliases}}
+    }));
+    let source = json!({"path":path,"mime_type":mime});
+    let (bytes, mime) = writer.read(kind, &source).ok_or("无法读取工作区媒体，或文件超出大小限制。")?;
+    if kind == "image" && bytes.len() > 10 * 1024 * 1024 {
+        return Err("图片不能超过 10 MiB。".into());
+    }
+    Ok((bytes, mime))
 }
 
 fn validated_mime(kind: &str, mime: Option<&str>) -> Option<String> {
@@ -203,6 +227,7 @@ fn decode(payload: &str) -> Option<Vec<u8>> {
 struct Storage {
     root: Dir,
     blobs: Dir,
+    _index_lock: MutexGuard<'static, ()>,
     index: Value,
     exists: bool,
     timestamp: String,
@@ -210,6 +235,7 @@ struct Storage {
 
 impl Storage {
     fn open(data: &Path) -> io::Result<Self> {
+        let index_lock = crate::legacy::media::index_lock()?;
         let data = open_canonical_dir(data)?;
         let conversations = ensure_dir(&data, "conversations")?;
         let root = ensure_dir(&conversations, "media_store")?;
@@ -233,6 +259,7 @@ impl Storage {
         Ok(Self {
             root,
             blobs,
+            _index_lock: index_lock,
             index,
             exists,
             timestamp,

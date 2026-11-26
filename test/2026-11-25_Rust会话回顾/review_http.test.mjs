@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { migrate } from '../2026-11-27_Rust对话格式迁移/fixture.mjs';
 import { execFileSync } from 'node:child_process';
 import { scryptSync } from 'node:crypto';
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
@@ -167,6 +168,7 @@ test('Agent review preview and Markdown export match the Python formatter with r
   await api(gateway, previewPath(MAIN), 401, { headers: bearer });
   await api(gateway, exportPath(MAIN), 401, { headers: { ...challenge, ...bearer }, method: 'POST', body: {} });
   const { headers, posting } = await login(gateway, challenge);
+  await migrate(gateway.baseUrl,posting);
   await api(gateway, exportPath(MAIN), 403, { headers, method: 'POST', body: {} });
   await api(gateway, previewPath(MAIN), 200, { headers, method: 'HEAD' });
 

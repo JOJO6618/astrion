@@ -3,11 +3,12 @@ use std::collections::{BTreeMap, HashSet};
 use serde::Deserialize;
 use serde_json::{Value, json};
 
-use super::{Completion, provider_error};
+use super::{Completion, StreamDelta, provider_error};
 
 #[derive(Default)]
 pub(crate) struct Assistant {
     content: String,
+    thinking: String,
     calls: BTreeMap<u64, ToolCall>,
     finish_reason: Option<FinishReason>,
     usage: Option<Value>,
@@ -31,6 +32,8 @@ struct Choice {
 struct Delta {
     role: Option<String>,
     content: Option<String>,
+    reasoning_content: Option<String>,
+    reasoning_details: Option<Vec<Value>>,
     tool_calls: Option<Vec<ToolDelta>>,
 }
 
@@ -66,7 +69,7 @@ impl Assistant {
     pub(crate) fn push_value(
         &mut self,
         value: Value,
-        on_text: &mut impl FnMut(&str),
+        on_delta: &mut impl FnMut(StreamDelta<'_>),
     ) -> Result<(), String> {
         if !value.is_object() {
             return Err("invalid Chat Completions SSE chunk: expected a JSON object".into());
@@ -82,6 +85,7 @@ impl Assistant {
         let chunk: Chunk = serde_json::from_value(value)
             .map_err(|error| format!("invalid Chat Completions SSE chunk: {error}"))?;
         if let Some(usage) = chunk.usage {
+            on_delta(StreamDelta::Usage(&usage));
             self.usage = Some(usage);
         }
         for choice in chunk.choices.unwrap_or_default() {
@@ -95,7 +99,7 @@ impl Assistant {
                 return Err("Chat Completions sent another choice after its finish reason".into());
             }
             if let Some(delta) = choice.delta {
-                self.push_delta(delta, on_text)?;
+                self.push_delta(delta, on_delta)?;
             }
             self.finish_reason = match choice.finish_reason.as_deref() {
                 None => None,
@@ -111,9 +115,16 @@ impl Assistant {
         Ok(())
     }
 
-    fn push_delta(&mut self, delta: Delta, on_text: &mut impl FnMut(&str)) -> Result<(), String> {
+    fn push_delta(&mut self, delta: Delta, on_delta: &mut impl FnMut(StreamDelta<'_>)) -> Result<(), String> {
         if let Some(role) = delta.role.as_deref().filter(|role| *role != "assistant") {
             return Err(format!("unexpected Chat Completions delta role {role:?}"));
+        }
+        let thinking = delta.reasoning_content.unwrap_or_else(|| delta.reasoning_details.unwrap_or_default().iter()
+            .filter(|item| matches!(item["type"].as_str(), None | Some("reasoning.text" | "reasoning.summary" | "text")))
+            .filter_map(|item| item["text"].as_str()).collect());
+        if !thinking.is_empty() {
+            self.thinking.push_str(&thinking);
+            on_delta(StreamDelta::Thinking(&thinking));
         }
         if let Some(calls) = delta.tool_calls {
             for fragment in calls {
@@ -130,7 +141,7 @@ impl Assistant {
         }
         if let Some(text) = delta.content.filter(|text| !text.is_empty()) {
             self.content.push_str(&text);
-            on_text(&text);
+            on_delta(StreamDelta::Text(&text));
         }
         Ok(())
     }
@@ -141,8 +152,11 @@ impl Assistant {
 
     pub(crate) fn finish(mut self) -> Result<Completion, String> {
         let usage = self.usage.take();
+        let thinking = std::mem::take(&mut self.thinking);
+        let mut message = self.finish_message()?;
+        if !thinking.is_empty() { message["reasoning_content"] = Value::String(thinking); }
         Ok(Completion {
-            message: self.finish_message()?,
+            message,
             usage,
             responses_duration_ms: None,
         })

@@ -73,9 +73,29 @@ impl Store {
         Ok(merged)
     }
 
-    pub(super) fn agent_tool_loading(&self) -> io::Result<Option<Value>> {
+    pub(super) fn title_preferences(&self) -> io::Result<(bool, String)> {
+        let personal = read_strict(&self.personal)?.unwrap_or_default();
+        Ok((
+            personal.get("auto_generate_title").and_then(Value::as_bool).unwrap_or(true),
+            personal.get("title_model").and_then(Value::as_str).unwrap_or_default().to_owned(),
+        ))
+    }
+
+    pub(super) fn external_session_enabled(&self) -> io::Result<bool> {
+        let personal = read_strict(&self.personal)?.unwrap_or_default();
+        Ok(personal.get("external_session_header").and_then(Value::as_bool).unwrap_or(true))
+    }
+
+    pub(super) fn agent_creation_tools(&self) -> io::Result<Object> {
         let preferences = read_strict(&self.personal)?.unwrap_or_default();
-        Ok(super::tool_loading_snapshot(&preferences))
+        let mut tools = Object::new();
+        if let Some(snapshot) = super::tool_loading_snapshot(&preferences) {
+            tools.insert("tool_loading".into(), snapshot);
+        }
+        if preferences.get("git_worktree_enabled") == Some(&Value::Bool(true)) {
+            tools.insert("git_worktree_enabled".into(), Value::Bool(true));
+        }
+        Ok(tools)
     }
 
     pub(super) fn network_settings(&self) -> io::Result<Object> {
@@ -113,7 +133,7 @@ impl Store {
     /// Merge Chat-owned fields into the raw preference document without running
     /// Agent's schema normalization. Chat touches neither `service_config.json`
     /// nor `secrets.json`, and a corrupt document fails before any replacement.
-    pub(super) fn write_chat_patch(&self, patch: &Object) -> io::Result<Object> {
+    pub(super) fn write_ordinary_patch(&self, patch: &Object) -> io::Result<Object> {
         let mut personal = read_strict(&self.personal)?.unwrap_or_default();
         // Validate the service document even though Chat never rewrites it, so a
         // damaged file cannot make the returned merged snapshot silently wrong.

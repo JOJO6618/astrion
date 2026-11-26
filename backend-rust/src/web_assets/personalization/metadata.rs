@@ -153,7 +153,7 @@ pub(super) fn skills_catalog(global: &Path, private: &Path) -> Vec<Value> {
     entries.into_values().collect()
 }
 
-fn parse_frontmatter(text: &str) -> Option<Object> {
+pub(super) fn parse_frontmatter(text: &str) -> Option<Object> {
     let mut lines = text.trim_start_matches('\u{feff}').lines();
     if lines.next()?.trim() != "---" {
         return None;

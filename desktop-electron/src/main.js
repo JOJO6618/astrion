@@ -23,7 +23,8 @@ import { isUpdaterInstalling } from './updater-state.js';
 import { focusUpdatePolicyWindow, updatePolicyTransitioning } from './update-policy-window.js';
 import { resolveDesktopBackend } from './rust-backend.js';
 
-const rust = resolveDesktopBackend({ resourcesPath: app.isPackaged ? process.resourcesPath : undefined });
+const quickDebug = !app.isPackaged && process.argv.includes('--quick-debug');
+const rust = quickDebug ? null : resolveDesktopBackend({ resourcesPath: app.isPackaged ? process.resourcesPath : undefined });
 app.setName(rust?.experimental ? 'Astrion Rust Experiment' : 'Astrion');
 const isolatedUserData = rust?.profile || process.env.ASTRION_ELECTRON_USER_DATA;
 if (isolatedUserData) {
@@ -32,7 +33,6 @@ if (isolatedUserData) {
   app.setPath('userData', directory);
   app.setPath('sessionData', directory);
 }
-const quickDebug = !rust && !app.isPackaged && process.argv.includes('--quick-debug');
 if (quickDebug) app.setPath('userData', app.getPath('userData') + '-quick-debug');
 protocol.registerSchemesAsPrivileged([{ scheme: 'astrion-quick', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }]);
 

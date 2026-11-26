@@ -122,7 +122,7 @@ Chat 独立装配以下部分：
 ## 7. 数据存储与压缩
 
 - 数据归属用户：免登录 host 使用 DATA_DIR/chat；账号使用可信 personal/chat；尊重现有数据根优先级。
-- Chat 与 Agent 沿用同一对话字段和消息格式，仅增加必要的模式／树关系信息。Rust Host 把 Chat 对话写入 `<DATA_DIR>/chat/conversations/conversations.sqlite3`，在同一事务提交会话摘要与完整消息树。Python Host 沿用单对话 JSON。
+- Chat 与 Agent 沿用同一对话字段和消息格式，仅增加必要的模式／树关系信息。Rust Host 把 Chat 对话写入 `<DATA_DIR>/chat/conversations/conversations.sqlite3`。新对话与第一条消息同事务保存，后续事务只提交新增或编辑的消息行、会话摘要和树关系。标题、联网和会话选项只更新会话字段。Python Host 沿用单对话 JSON。
 - Rust 的旧文件仅作为迁移源，未迁移的记录可显示于列表，详情返回 `409 conversation_migration_required`。导入保留旧文件与迁移标记，删除已迁移记录后仍保留该标记，避免旧记录重新出现在列表。媒体清理同时保留现役消息树和未迁移源引用的媒体。
 - 原始消息树为权威，传给循环的单路径为投影；不能用路径覆盖全树，也不能保存两套互相漂移的正文。
 - Chat 全局记忆、专题记忆、媒体、草稿与交接状态独立保存；不借假工作区存放。

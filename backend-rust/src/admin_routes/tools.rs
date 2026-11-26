@@ -94,6 +94,12 @@ impl ToolRegistry {
         Ok(registry)
     }
 
+    pub(super) fn model_tools(&self) -> io::Result<Vec<Value>> {
+        if !self.enabled { return Ok(Vec::new()); }
+        let tools = self.tools.lock().map_err(|_|io::Error::other("Custom tool registry is unavailable"))?;
+        Ok(tools.iter().filter(|tool|tool["invalid_id"] == false).cloned().collect())
+    }
+
     pub(super) fn ids(&self) -> Result<Vec<String>> {
         if !self.enabled {
             return Ok(Vec::new());

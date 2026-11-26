@@ -389,6 +389,7 @@ fn projects_connected_codex_cache_metadata_without_exposing_tokens() {
         keys(&catalog),
         ["openai-codex/model-id", "account-on/model-id"]
     );
+    assert_eq!(catalog.auxiliary_key(""), Some("openai-codex/model-id"));
     let response = catalog.models_response();
     let item = &response["items"][0];
     assert_eq!(item["provider_name"], "OpenAI（ChatGPT 订阅）-abcd12");
@@ -426,6 +427,14 @@ fn projects_connected_codex_cache_metadata_without_exposing_tokens() {
     assert_eq!(keys(&discovered), ["account-on/model-id"]);
     assert_eq!(discovered.select(Some("account-on/model-id"), true).unwrap().codex.unwrap().account_id, "account-on");
     assert!(!data.join("codex_accounts.json").exists());
+    store(
+        data.join("codex_models/account-on.json"),
+        json!({"models":[model,{"slug":"fixture-luna","visibility":"list","supported_in_api":true}]}),
+    );
+    let codex_only = source.load();
+    assert_eq!(codex_only.auxiliary_key("  "), Some("account-on/fixture-luna"));
+    assert_eq!(codex_only.auxiliary_key("account-on/model-id"), Some("account-on/model-id"));
+    assert_eq!(codex_only.auxiliary_key("invalid-explicit-model"), None);
 }
 
 #[test]

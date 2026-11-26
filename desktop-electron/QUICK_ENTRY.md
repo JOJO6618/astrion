@@ -18,7 +18,7 @@ ASTRION_API_PORT=8092 npm --prefix desktop-electron run dev:quick
 
 如需选择特定运行数据根目录，同时设置 `ASTRION_DATA_ROOT`。显式配置优先于自动发现。
 
-未指定端口/数据根时优先探测新版桌面端发布的本地 Gateway 记录；没有可用记录时使用 host/CLI 默认 8091 和 `~/.astrion/astrion`。兼容服务已在运行时复用；没有服务时自启动 `server.headless_app`。不终止或重启已有服务，退出快捷客户端也不终止共享 headless 服务。
+端口和数据根均未指定时，优先探测桌面端发布的本机 Gateway 记录。没有可用记录时使用默认 8091 和 `~/.astrion/astrion`。已运行的兼容服务直接复用，空闲端口默认启动 Rust headless。源码调试需要已构建的 Rust 后端，也可用 `ASTRION_DESKTOP_BACKEND=python` 选 Python 对照入口。退出快捷客户端时，独立的共享 Gateway 继续运行。
 
 ## 首次权限
 
@@ -54,7 +54,7 @@ ASTRION_API_PORT=8092 npm --prefix desktop-electron run dev:quick
 
 正式桌面端「设置 → 快捷对话」可启用快捷模式、选择双击按键、默认工作区与默认图片模型。留空分别继承 `/api/host/workspaces` 的 `default_workspace_id` 与个性化 `default_model`，每次唤起刷新；不可用的默认模型会提示选择，不自动替换。
 
-启用后显式启动应用会打开主窗口，保留同一个 `server.app` 后端及菜单栏。程序坞激活在后端尚未就绪时会保留打开意图，无需第二次点击。主应用保持 macOS regular 身份，快捷窗及截图覆盖层不设置 macOS 的 skipTaskbar，避免把整个应用变成 UIElement。关闭主窗口保留后台客户端，退出应用则停止自有后端。当前仍需先启动应用，登录后台自启动留待后续实现。
+启用后显式启动应用会打开主窗口。快捷窗使用同一个桌面 Rust Gateway、数据目录和前端资源。程序坞激活在后端尚未就绪时会保留打开意图，无需第二次点击。主应用保持 macOS regular 身份，快捷窗及截图覆盖层不设置 macOS 的 skipTaskbar，避免把整个应用变成 UIElement。关闭主窗口保留后台客户端，退出应用则停止自有后端。当前仍需先启动应用，登录后台自启动留待后续实现。
 
 快捷窗与截图覆盖层通过 `workspace-visibility.js` 统一设置跨桌面/全屏可见性，必须启用 `skipTransformProcessType: true`。Electron 默认会为全屏兼容切换应用的进程类型；只去掉 skipTaskbar 仍可能让程序坞运行点消失。该策略保留全屏可见配置，同时让应用持续保持 Foreground 身份。
 

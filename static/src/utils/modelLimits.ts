@@ -29,7 +29,10 @@ export function readModelLimits(model: WireModelLimits): ModelLimits {
 }
 
 export function modelContextCapacity(model: ModelLimits): number | null {
-  return model.maxContextWindow ?? (model.defaultContextWindow == null ? (model.contextWindow ?? null) : null);
+  return (
+    model.maxContextWindow ??
+    (model.defaultContextWindow == null ? (model.contextWindow ?? null) : null)
+  );
 }
 
 export function modelInputCapacity(model?: ModelLimits | null): number {

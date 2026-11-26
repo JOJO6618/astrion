@@ -340,7 +340,11 @@ def rust_routes(root: Path) -> dict[tuple[str, str], list[RustRoute]]:
                 method = json.loads(method_arg[1]).upper()
             register(routes, path, {method: 'route attribute'}, (), filename)
 
+    auto_options = 'from_fn(route_options)' in sources['main.rs']
     for (method, path), declarations in list(routes.items()):
+        if auto_options and method not in ('ANY', 'OPTIONS'):
+            for declaration in declarations:
+                routes['OPTIONS', path].add(RustRoute(declaration.modes, 'via_options', declaration.label))
         if method == 'GET':
             for declaration in declarations:
                 routes['HEAD', path].add(RustRoute(declaration.modes, 'via_get', declaration.label))

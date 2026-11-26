@@ -201,7 +201,9 @@ export const toolingMethods = {
     debugLog('[ToolSettings] Fetch start', { force, hasConnection: this.isConnected });
     this.toolSetSettingsLoading(true);
     try {
-      const query = this.currentConversationId ? `?conversation_id=${encodeURIComponent(this.currentConversationId)}` : '';
+      const query = this.currentConversationId
+        ? `?conversation_id=${encodeURIComponent(this.currentConversationId)}`
+        : '';
       const response = await fetch(`/api/tool-settings${query}`);
       const data = await response.json();
       debugLog('[ToolSettings] Fetch response', { status: response.status, data });
@@ -242,7 +244,9 @@ export const toolingMethods = {
     });
     this.toolSetSettings(updatedSettings);
     try {
-      const query = this.currentConversationId ? `?conversation_id=${encodeURIComponent(this.currentConversationId)}` : '';
+      const query = this.currentConversationId
+        ? `?conversation_id=${encodeURIComponent(this.currentConversationId)}`
+        : '';
       const response = await fetch(`/api/tool-settings${query}`, {
         method: 'POST',
         headers: {

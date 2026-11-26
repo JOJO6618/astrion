@@ -24,7 +24,9 @@
       <div ref="bodyRef" class="qd-detail__body" :class="{ 'body-fade': bodyFading }">
         <!-- 子智能体：工具调用 + 文本输出时间线 -->
         <template v-if="effectiveDetail?.kind === 'agent'">
-          <div v-if="subAgentStore.activityError" class="qd-detail__empty" role="status">{{ subAgentStore.activityError }}</div>
+          <div v-if="subAgentStore.activityError" class="qd-detail__empty" role="status">
+            {{ subAgentStore.activityError }}
+          </div>
           <div v-else-if="!timelineItems.length" class="qd-detail__empty">
             {{ activityLoading ? $t('common.loading') : $t('quickdock.noProgress') }}
           </div>

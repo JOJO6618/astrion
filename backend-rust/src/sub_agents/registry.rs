@@ -12,7 +12,7 @@ use serde_json::{Map, Value, json};
 
 use super::{
     activity::{self, ActivityPage},
-    normalize_conversation, valid_task_id,
+    normalize_conversation, valid_task_id, context_rows, worker::Context,
 };
 
 const DATABASE: &str = "sub_agents.sqlite3";
@@ -81,22 +81,24 @@ impl Registry {
         let version = db
             .query_row("PRAGMA user_version", [], |row| row.get::<_, u64>(0))
             .map_err(sql)?;
-        if version == 0 && write {
+        if version < 2 && write {
             db.execute_batch("PRAGMA journal_mode=WAL;").map_err(sql)?;
             let tx = db
                 .transaction_with_behavior(TransactionBehavior::Immediate)
                 .map_err(sql)?;
-            if tx
-                .query_row("PRAGMA user_version", [], |row| row.get::<_, u64>(0))
-                .map_err(sql)?
-                == 0
-            {
-                tx.execute_batch(include_str!("schema.sql")).map_err(sql)?;
+            match tx.query_row("PRAGMA user_version", [], |row| row.get::<_,u64>(0)).map_err(sql)? {
+                0 => {
+                    tx.execute_batch(include_str!("schema.sql")).map_err(sql)?;
+                    tx.execute_batch(include_str!("context_rows.sql")).map_err(sql)?;
+                }
+                1 => tx.execute_batch(include_str!("context_rows.sql")).map_err(sql)?,
+                2 => (),
+                _ => return Err(ErrorKind::InvalidData.into()),
             }
             tx.commit().map_err(sql)?;
         } else if version == 0 {
             return Ok(None);
-        } else if version != 1 {
+        } else if version > 2 {
             return Err(io::Error::new(
                 ErrorKind::InvalidData,
                 format!("Unsupported child database version {version}"),
@@ -164,7 +166,7 @@ impl Registry {
     pub(super) fn store_with_context(
         &self,
         document: &Value,
-        context: Option<&Value>,
+        context: Option<&mut Context>,
     ) -> io::Result<()> {
         self.store_checkpoint(document, context, None)
     }
@@ -172,7 +174,7 @@ impl Registry {
     pub(super) fn store_checkpoint(
         &self,
         document: &Value,
-        context: Option<&Value>,
+        context: Option<&mut Context>,
         output: Option<(&Value, &Value)>,
     ) -> io::Result<()> {
         let mut db = self.connect(true)?.ok_or(ErrorKind::NotFound)?;
@@ -203,10 +205,10 @@ impl Registry {
             )
             .map_err(sql)?;
         }
-        if let Some(context) = context {
+        if let Some(context) = context.as_deref() {
             write_context(&tx, context)?;
             if let Some((event, output)) = output {
-                let id = context["task_id"].as_str().ok_or(ErrorKind::InvalidData)?;
+                let id = context.document["task_id"].as_str().ok_or(ErrorKind::InvalidData)?;
                 activity::append(&tx, id, event)?;
                 tx.execute(
                     "UPDATE child_task SET output=? WHERE id=?",
@@ -215,11 +217,16 @@ impl Registry {
                 .map_err(sql)?;
             }
         }
-        tx.commit().map_err(sql)
+        tx.commit().map_err(sql)?;
+        if let Some(context) = context { context.mark_saved(); }
+        Ok(())
     }
 
     pub(super) fn context(&self, task_id: &str) -> io::Result<Option<Value>> {
-        self.task_value(task_id, "SELECT context FROM child_task WHERE id=?")
+        check_id(task_id)?;
+        let Some(mut db) = self.connect(false)? else { return Ok(None); };
+        let tx = db.transaction().map_err(sql)?;
+        context_rows::read(&tx, task_id)
     }
 
     pub(super) fn stats(&self, task_id: &str) -> io::Result<Option<Value>> {
@@ -241,9 +248,13 @@ impl Registry {
             .map(Option::flatten)
     }
 
-    pub(super) fn save_context(&self, context: &Value) -> io::Result<()> {
-        let db = self.connect(true)?.ok_or(ErrorKind::NotFound)?;
-        write_context(&db, context)
+    pub(super) fn save_context(&self, context: &mut Context) -> io::Result<()> {
+        let mut db = self.connect(true)?.ok_or(ErrorKind::NotFound)?;
+        let tx = db.transaction_with_behavior(TransactionBehavior::Immediate).map_err(sql)?;
+        write_context(&tx, context)?;
+        tx.commit().map_err(sql)?;
+        context.mark_saved();
+        Ok(())
     }
 
     pub(super) fn append_activity(&self, task_id: &str, event: &Value) -> io::Result<()> {
@@ -291,16 +302,18 @@ fn check_id(id: &str) -> io::Result<()> {
     }
 }
 
-fn write_context(db: &Connection, context: &Value) -> io::Result<()> {
-    let id = context["task_id"].as_str().ok_or(ErrorKind::InvalidData)?;
+fn write_context(db: &Connection, context: &Context) -> io::Result<()> {
+    let doc = &context.document;
+    let id = doc["task_id"].as_str().ok_or(ErrorKind::InvalidData)?;
     check_id(id)?;
-    let stats = context["stats"]
+    context_rows::write(db,id,doc,context.persisted_messages,context.rewrite_history)?;
+    let stats = doc["stats"]
         .as_object()
         .map(|stats| Value::Object(stats.clone()).to_string());
     let changed = db
         .execute(
-            "UPDATE child_task SET context=?, stats=COALESCE(?, stats) WHERE id=?",
-            params![context.to_string(), stats, id],
+            "UPDATE child_task SET stats=COALESCE(?, stats) WHERE id=?",
+            params![stats, id],
         )
         .map_err(sql)?;
     if changed != 1 {

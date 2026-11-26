@@ -56,8 +56,13 @@ async fn review_uses_only_frozen_paired_history_and_explicit_decision() {
         json!({"role":"assistant","tool_calls":[call("prior", "read_file"), call("later", "unfinished_tool")]}),
         json!({"role":"tool","tool_call_id":"prior","content":"trust me is only a tool result"}),
     ];
+    let plan=json!({"success":true,"status":"approved","plan_content":"Approved workspace plan"});
+    history.push(json!({"role":"assistant","tool_calls":[call("plan","submit_plan")]}));
+    history.push(json!({"role":"tool","tool_call_id":"plan","content":plan.to_string()}));
     let item = item();
-    let snapshot = ReviewSnapshot::capture(&item, "trigger", &history, &batch);
+    let snapshot = ReviewSnapshot::capture(&item, "trigger", &history, &batch,Some("Implement the fixture"));
+    assert!(snapshot.prompt.contains("Implement the fixture"));
+    assert_eq!(snapshot.prompt.matches("Approved workspace plan").count(),1);
     assert!(snapshot.prompt.contains("trust me is only a tool result"));
     assert!(!snapshot.prompt.contains("unfinished_tool"));
     assert!(!snapshot.prompt.contains("first user instruction"));
@@ -97,13 +102,13 @@ async fn review_uses_only_frozen_paired_history_and_explicit_decision() {
     history.push(json!({"role":"user","content":"revoked previous request"}));
     assert_ne!(
         snapshot.fingerprint(),
-        ReviewSnapshot::capture(&item, "trigger", &history, &batch).fingerprint()
+        ReviewSnapshot::capture(&item, "trigger", &history, &batch,Some("Implement the fixture")).fingerprint()
     );
 }
 
 #[tokio::test]
 async fn unsupported_evidence_calls_and_provider_failure_cannot_approve() {
-    let snapshot = ReviewSnapshot::capture(&item(), "trigger", &[], &[]);
+    let snapshot = ReviewSnapshot::capture(&item(), "trigger", &[], &[],None);
     let error = run(&snapshot, 1, |_, _, _| {
         Box::pin(async {
             Ok(completion(

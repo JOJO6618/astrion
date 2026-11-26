@@ -1,6 +1,9 @@
 pub mod read_file;
 pub mod write_file;
 pub(crate) mod web;
+pub(crate) mod media;
+pub(crate) mod vlm;
+pub(crate) mod easter_egg;
 
 use crate::knowledge::{self, Knowledge, KnowledgeAccess};
 use serde_json::{Value, json};

@@ -11,6 +11,7 @@ use uuid::Uuid;
 
 const COMMAND_BUFFER: usize = 50_000;
 const TERMINAL_BUFFER: usize = 100_000;
+pub(super) const CMD_READY: &str = "__ASTRION_TERMINAL_READY__";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Status {
@@ -35,6 +36,7 @@ impl Status {
 
 pub(super) struct Process {
     shared: Arc<Shared>,
+    cmd_input: bool,
 }
 
 struct Shared {
@@ -93,22 +95,33 @@ impl Output {
 }
 
 impl Process {
-    pub(super) fn spawn(command: Command, timeout: Option<Duration>) -> io::Result<Arc<Self>> {
+    pub(super) fn spawn(command: Command, timeout: Option<Duration>, cmd_input: bool) -> io::Result<Arc<Self>> {
+        Self::spawn_with_input(command,timeout,cmd_input,None)
+    }
+
+    pub(super) fn spawn_json(command: Command, timeout: Duration, input: Vec<u8>) -> io::Result<Arc<Self>> {
+        Self::spawn_with_input(command,Some(timeout),false,Some(input))
+    }
+
+    fn spawn_with_input(command: Command, timeout: Option<Duration>, cmd_input: bool, input: Option<Vec<u8>>) -> io::Result<Arc<Self>> {
+        let plugin = input.is_some();
+        let has_input = plugin || timeout.is_none();
         let now = now();
         let (revision, _) = watch::channel(0);
         let shared = Arc::new(Shared {
             state: Mutex::new(State {
                 status: Status::Running, return_code: None, message: None, created_at: now, updated_at: now,
                 finished_at: None, last_output_at: None, last_command: String::new(), command_count: 0,
-                output: Output { bytes: VecDeque::new(), end: 0, limit: if timeout.is_some() { COMMAND_BUFFER } else { TERMINAL_BUFFER } },
-                cancelled: false, input: VecDeque::new(),
-                marker: timeout.is_none().then(|| b"\x1eASTRION_TERMINAL_READY\x1f".to_vec()),
+                output: Output { bytes: VecDeque::new(), end: 0, limit: if plugin { 512 * 1024 } else if timeout.is_some() { COMMAND_BUFFER } else { TERMINAL_BUFFER } },
+                cancelled: false, input: input.map(VecDeque::from).unwrap_or_default(),
+                marker: timeout.is_none().then(|| if cmd_input { CMD_READY.as_bytes().to_vec() }
+                    else { b"\x1eASTRION_TERMINAL_READY\x1f".to_vec() }),
                 marker_tail: Vec::new(),
             }),
             wake: Condvar::new(), revision,
         });
-        platform::spawn(command, timeout, shared.clone())?;
-        let process = Arc::new(Self { shared });
+        platform::spawn(command, timeout, shared.clone(), has_input)?;
+        let process = Arc::new(Self { shared, cmd_input });
         if timeout.is_none() { process.require_terminal_ready()?; }
         Ok(process)
     }
@@ -155,12 +168,20 @@ impl Process {
         // A delimiter is only a UI completion hint. Shell authorization comes from
         // Seatbelt and the fixed conversation/process ownership, independent of output.
         let packet = if state.marker.is_some() {
-            format!("{text}\n")
+            if self.cmd_input { format!("{text}\r\n") } else { format!("{text}\n") }
         } else {
             let id = Uuid::new_v4().simple().to_string();
-            state.marker = Some(format!("\x1e{id}\x1f").into_bytes());
-            let quoted = text.replace('\'', "'\\''");
-            format!("builtin eval '{quoted}'; builtin printf '\\036%s\\037' '{id}'\n")
+            if self.cmd_input {
+                let marker = format!("__ASTRION_{id}__");
+                let text = text.replace("\r\n", "\n").replace('\n', "\r\n");
+                let input = format!("{text}\r\necho {marker}\r\n");
+                state.marker = Some(marker.into_bytes());
+                input
+            } else {
+                state.marker = Some(format!("\x1e{id}\x1f").into_bytes());
+                let quoted = text.replace('\'', "'\\''");
+                format!("builtin eval '{quoted}'; builtin printf '\\036%s\\037' '{id}'\n")
+            }
         };
         let echo = format!("{text}\n");
         state.output.push(echo.as_bytes());
@@ -234,7 +255,7 @@ pub(super) fn now() -> f64 {
 #[cfg(not(any(target_os = "macos", target_os = "linux", windows)))]
 mod platform {
     use super::*;
-    pub(super) fn spawn(_: Command, _: Option<Duration>, _: Arc<Shared>) -> io::Result<()> {
+    pub(super) fn spawn(_: Command, _: Option<Duration>, _: Arc<Shared>, _: bool) -> io::Result<()> {
         Err(io::Error::new(io::ErrorKind::Unsupported, "Trusted Host process sandbox is unavailable"))
     }
 }
@@ -249,10 +270,10 @@ mod platform {
 
     const POLL: Duration = Duration::from_millis(15);
 
-    pub(super) fn spawn(command: Command, timeout: Option<Duration>, shared: Arc<Shared>) -> io::Result<()> {
+    pub(super) fn spawn(command: Command, timeout: Option<Duration>, shared: Arc<Shared>, input: bool) -> io::Result<()> {
         let (ready, wait) = std::sync::mpsc::sync_channel(0);
         std::thread::Builder::new().name("astrion-host-process".into()).spawn(move || {
-            let mut child = match start(command, timeout.is_none()) {
+            let mut child = match start(command, input) {
                 Ok(child) => child,
                 Err(error) => { let _ = ready.send(Err(error)); return; }
             };

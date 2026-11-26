@@ -338,7 +338,7 @@ def run(scope):
             {'model_name': 'chat-local', 'model_id': 'chat-upstream', 'url': endpoint, 'apikey': 'fixture-only'},
             {'model_name': 'agent-local', 'model_id': 'agent-upstream', 'url': endpoint, 'apikey': 'fixture-only'},
         ])
-        dump(data / 'personalization.json', {'default_model': 'agent-local'})
+        dump(data / 'personalization.json', {'default_model': 'agent-local', 'auto_generate_title': False})
         provider.chats, provider.summaries, provider.agent = [], [], []
         provider.blocks = {key: tuple(threading.Event() for _ in range(3)) for key in ('latest branch only', 'cancel-summary')}
         provider.sent_failure = False

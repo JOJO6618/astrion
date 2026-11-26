@@ -213,6 +213,24 @@ impl Catalog {
             .ok_or_else(|| format!("未知模型 key: {candidate}"))
     }
 
+    pub(crate) fn auxiliary_key(&self, configured: &str) -> Option<&str> {
+        let configured = configured.trim();
+        if !configured.is_empty() {
+            return self.resolve_key(Some(configured), false).ok();
+        }
+        let mut visible = self.entries.iter().filter(|profile| !profile.hidden);
+        let first = visible.next()?;
+        if matches!(first.connection, ProfileConnection::Subscription(_))
+            && visible.clone().all(|profile| matches!(profile.connection, ProfileConnection::Subscription(_)))
+        {
+            return std::iter::once(first).chain(visible)
+                .find(|profile| profile.public.model_key.contains("-luna"))
+                .or(Some(first))
+                .map(|profile| profile.public.model_key.as_str());
+        }
+        Some(&first.public.model_key)
+    }
+
     pub(crate) fn supports_chatgpt_fast_mode(&self, candidate: Option<&str>) -> Result<bool, String> {
         let key = self.resolve_key(candidate, false)?;
         let profile = self.profile(key).expect("a resolved model is registered");

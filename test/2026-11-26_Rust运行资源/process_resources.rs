@@ -155,7 +155,7 @@ async fn native_seatbelt_runs_readonly_write_and_terminal_scopes() {
     assert!(input["output"].as_str().unwrap_or("").contains("terminal-ok"), "{input}");
     let store = fixture.runtime.store().unwrap();
     let make_owner = |id| Owner {
-        user: HOST.into(), workspace_id: "workspace".into(), workspace: fixture.workspace.clone(), conversation: id,
+        user: HOST.into(), workspace_id: "workspace".into(), workspace: fixture.workspace.clone(), conversation: id, actor: None,
     };
     assert!(store.process_resources.terminal_output(&make_owner(readonly), "fixture-terminal", 100).is_err());
     assert!(store.process_resources.terminal_output(&make_owner(write), "fixture-terminal", 100).is_ok());

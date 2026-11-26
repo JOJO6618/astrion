@@ -25,7 +25,7 @@ use crate::approval::ExecutionMode;
 pub(crate) use policy::{Network, SandboxAccess, terminal_allowed};
 use policy::{HostPolicy, denied};
 use process::{Process, Status, now};
-pub(crate) use tools::{Invocation, schemas, tools_category};
+pub(crate) use tools::{Invocation, child_schemas, schemas, tools_category};
 
 const TERMINALS: usize = 3;
 const BACKGROUND_WAIT: Duration = Duration::from_secs(5);
@@ -37,6 +37,7 @@ pub(crate) struct Owner {
     pub(crate) workspace_id: String,
     pub(crate) workspace: PathBuf,
     pub(crate) conversation: String,
+    pub(crate) actor: Option<String>,
 }
 
 #[derive(PartialEq, Eq)]
@@ -59,6 +60,7 @@ pub struct ProcessResources {
 #[derive(Default)]
 struct Resources {
     terminals: BTreeMap<String, Terminal>,
+    terminal_scope: Option<PathBuf>,
     active: Option<String>,
     background: Vec<Background>,
     foreground: Vec<Arc<Process>>,
@@ -120,7 +122,43 @@ impl ProcessResources {
         }
     }
 
+    pub(crate) fn start_plugin(&mut self, scope: Scope, request: &Value, timeout: Duration)
+        -> io::Result<PluginRun> {
+        if scope.approval_required || !scope.access.write || !self.available_mode(scope.mode) {
+            return Err(denied("当前对话缺少自定义工具执行权限。"));
+        }
+        let policy = self.policy.as_ref().expect("available process policy");
+        policy.validate_command(request["source"].as_str().unwrap_or_default())?;
+        let nonce = format!("ASTRION_PLUGIN_{}",Uuid::new_v4().simple());
+        let mut request = request.clone();
+        request["nonce"] = json!(&nonce);
+        let mut payload = serde_json::to_vec(&request)?;
+        if payload.len() >= 2 * 1024 * 1024 {
+            return Err(denied("自定义工具请求超过大小限制。"));
+        }
+        payload.push(b'\n');
+        let command = policy.command_plugin(&scope.owner.workspace,&scope.execution_root,scope.access,scope.mode)?;
+        let process = Process::spawn_json(command,timeout,payload)?;
+        let records = self.conversations.entry(scope.owner).or_default();
+        records.foreground.retain(|active| active.state().status == Status::Running);
+        records.foreground.push(process.clone());
+        Ok(PluginRun { guard:CancelOnDrop(Some(process.clone())), process, nonce })
+    }
+
     pub(crate) fn start(&mut self, scope: Scope, call: Invocation) -> io::Result<Operation> {
+        self.start_scoped(scope, call, None)
+    }
+
+    pub(crate) fn start_child(&mut self, scope: Scope, call: Invocation, fixed_write_root: Option<&Path>) -> io::Result<Operation> {
+        if scope.owner.actor.is_none() || matches!(call, Invocation::Command { background: true, .. }
+            | Invocation::Command { full_access: true, .. } | Invocation::Wait { .. } | Invocation::Sleep { .. })
+        {
+            return Err(denied("The requested process capability is not available for this child"));
+        }
+        self.start_scoped(scope, call, fixed_write_root)
+    }
+
+    fn start_scoped(&mut self, scope: Scope, call: Invocation, fixed_write_root: Option<&Path>) -> io::Result<Operation> {
         if !self.available_mode(scope.mode) { return Err(denied("The selected Host execution environment is unavailable")); }
         let policy = self.policy.as_ref().expect("available process policy");
         if call.requires_terminal_panel() && !policy.terminal_allowed()? {
@@ -137,12 +175,14 @@ impl ProcessResources {
         // The shell cannot change its security profile. Close sessions whose
         // captured mode or network policy no longer equals current authority.
         if call.requires_terminal_panel() {
+            let moved = records.terminal_scope.as_ref().is_some_and(|root| root != &scope.execution_root);
             records.terminals.retain(|_, terminal| {
-                if terminal.access == scope.access && terminal.mode == scope.mode { return true; }
+                if !moved && terminal.access == scope.access && terminal.mode == scope.mode { return true; }
                 terminal.process.cancel();
                 terminal.process.wait_blocking();
                 false
             });
+            records.terminal_scope = Some(scope.execution_root.clone());
             records.reselect();
         }
         let operation = match call {
@@ -151,8 +191,8 @@ impl ProcessResources {
                     return Err(denied("A full-access command requires its own execution grant"));
                 }
                 policy.validate_command(&command)?;
-                let plan = policy.command(&owner.workspace, &scope.execution_root, scope.access, scope.mode, Some(&command))?;
-                let process = Process::spawn(plan, Some(timeout))?;
+                let plan = policy.command(&owner.workspace, &scope.execution_root, scope.access, scope.mode, Some(&command), fixed_write_root)?;
+                let process = Process::spawn(plan, Some(timeout), false)?;
                 let row = Background { id: format!("cmd_{}", Uuid::new_v4().simple()), command, timeout,
                     process: process.clone(), consumed: false, suppress_notice: false };
                 let guard = CancelOnDrop(Some(process));
@@ -167,7 +207,7 @@ impl ProcessResources {
                 if records.terminals.contains_key(&name) { return Err(denied("Terminal session already exists")); }
                 if records.terminals.len() >= TERMINALS { return Err(denied("Maximum terminal session count reached")); }
                 let cwd = terminal_cwd(&owner.workspace, &scope.execution_root, &cwd)?;
-                let terminal = Terminal::start(policy, &owner.workspace, cwd, scope.access, scope.mode)?;
+                let terminal = Terminal::start(policy, &owner.workspace, cwd, scope.access, scope.mode, fixed_write_root)?;
                 let output = terminal_result("open", &name, &terminal);
                 records.terminals.insert(name.clone(), terminal);
                 records.active = Some(name);
@@ -183,12 +223,11 @@ impl ProcessResources {
             Invocation::Reset { name } => {
                 let name = records.terminal_name(name.as_deref())?.to_owned();
                 let cwd = records.terminals[&name].cwd.clone();
-                let plan = policy.command(&owner.workspace, &cwd, scope.access, scope.mode, None)?;
                 let previous = records.terminals.remove(&name).expect("existing session");
                 previous.process.cancel();
                 previous.process.wait_blocking();
                 records.reselect();
-                let terminal = Terminal { process: Process::spawn(plan, None)?, cwd, access: scope.access, mode: scope.mode };
+                let terminal = Terminal::start(policy, &owner.workspace, cwd, scope.access, scope.mode, fixed_write_root)?;
                 let output = terminal_result("reset", &name, &terminal);
                 records.terminals.insert(name.clone(), terminal);
                 records.active = Some(name);
@@ -311,6 +350,17 @@ impl ProcessResources {
         self.monitor.retain(|entry| entry.owner.workspace_id != workspace || conversation.is_some_and(|id| entry.owner.conversation != id));
     }
 
+    pub(crate) fn close_child(&mut self, workspace: &str, conversation: &str, actor: &str) {
+        self.conversations.retain(|owner, resources| {
+            if owner.workspace_id != workspace || owner.conversation != conversation || owner.actor.as_deref() != Some(actor) {
+                return true;
+            }
+            resources.cancel_all();
+            resources.wait_all();
+            false
+        });
+    }
+
     pub(crate) fn close_terminals(&mut self, workspace: Option<&str>, conversation: Option<&str>) {
         for (owner, resources) in &mut self.conversations {
             if workspace.is_some_and(|workspace| workspace != owner.workspace_id)
@@ -371,7 +421,7 @@ impl Resources {
             let state = terminal.process.state();
             json!({
                 "session_name":name,"is_active":self.active.as_ref()==Some(name),"working_dir":terminal.cwd,
-                "shell":"/bin/bash","execution_mode":"sandbox","is_running":state.status==Status::Running,
+                "shell":terminal.shell(),"execution_mode":terminal.mode_name(),"is_running":state.status==Status::Running,
                 "is_interactive":state.interactive(),"last_command":state.last_command,"command_count":state.command_count,
                 "buffer_size":state.output.len(),"last_activity":iso_time(state.updated_at),"start_time":iso_time(state.created_at),
                 "uptime_seconds":now()-state.created_at,"seconds_since_last_output":state.last_output_at.map(|at| now()-at),
@@ -396,9 +446,19 @@ impl Resources {
 }
 
 impl Terminal {
-    fn start(policy: &HostPolicy, workspace: &Path, cwd: PathBuf, access: SandboxAccess, mode: ExecutionMode) -> io::Result<Self> {
-        let command = policy.command(workspace, &cwd, access, mode, None)?;
-        Ok(Self { process: Process::spawn(command, None)?, cwd, access, mode })
+    fn start(policy: &HostPolicy, workspace: &Path, cwd: PathBuf, access: SandboxAccess, mode: ExecutionMode,
+        fixed_write_root: Option<&Path>) -> io::Result<Self> {
+        let command = policy.command(workspace, &cwd, access, mode, None, fixed_write_root)?;
+        let cmd = cfg!(windows) && mode == ExecutionMode::Direct;
+        Ok(Self { process: Process::spawn(command, None, cmd)?, cwd, access, mode })
+    }
+
+    fn shell(&self) -> &'static str {
+        if cfg!(windows) && self.mode == ExecutionMode::Direct { "cmd.exe" } else { "/bin/bash" }
+    }
+
+    fn mode_name(&self) -> &'static str {
+        match self.mode { ExecutionMode::Sandbox => "sandbox", ExecutionMode::Direct => "direct" }
     }
 
     fn snapshot(&self, name: &str, lines: Option<usize>, max_chars: usize) -> Value {
@@ -431,7 +491,8 @@ fn terminal_cwd(workspace: &Path, root: &Path, requested: &Path) -> io::Result<P
 }
 
 fn terminal_result(action: &str, name: &str, terminal: &Terminal) -> Value {
-    json!({"success":true,"action":action,"session":name,"working_dir":terminal.cwd,"shell":"/bin/bash"})
+    json!({"success":true,"action":action,"session":name,"working_dir":terminal.cwd,
+        "shell":terminal.shell(),"execution_mode":terminal.mode_name()})
 }
 
 fn terminal_missing() -> io::Error { io::Error::new(io::ErrorKind::NotFound, "Terminal session not found") }
@@ -476,6 +537,30 @@ impl Background {
             result["background_task_created"] = json!(running);
         }
         result
+    }
+}
+
+pub(crate) struct PluginRun {
+    guard: CancelOnDrop,
+    process: Arc<Process>,
+    nonce: String,
+}
+
+impl PluginRun {
+    pub(crate) async fn finish(mut self) -> Value {
+        self.process.wait().await;
+        self.guard.0.take();
+        let state = self.process.state();
+        let output = state.output.text(0);
+        let prefix = format!("{} ",self.nonce);
+        if state.status == Status::Completed
+            && let Some(result) = output.lines().rev().find_map(|line| line.strip_prefix(&prefix))
+                .and_then(|line| serde_json::from_str::<Value>(line).ok()).filter(Value::is_object)
+        {
+            return result;
+        }
+        json!({"success":false,"custom_tool":true,"error":state.message.as_deref().unwrap_or("自定义工具解释器未返回有效结果。"),
+            "status":state.status.text(),"return_code":state.return_code,"output":output})
     }
 }
 

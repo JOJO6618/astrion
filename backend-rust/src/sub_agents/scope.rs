@@ -7,6 +7,7 @@ use serde_json::{Value, json};
 use crate::{
     approval::{ApprovalPrincipal, ApprovalType, ExecutionMode, TaskScope, ToolRequest, exempt_workspace_write},
     knowledge::storage::open_canonical_dir,
+    process_runtime::{Network, Owner, SandboxAccess, Scope},
     tools::{read_file::ReadFile, write_file::WorkspaceFileWriter},
 };
 
@@ -108,6 +109,7 @@ pub(super) struct ChildScope {
     reader: ReadFile,
     writer: WorkspaceFileWriter,
     task: TaskScope,
+    access: Access,
 }
 
 impl ChildScope {
@@ -137,7 +139,7 @@ impl ChildScope {
             .map_err(|error| error.to_string())?;
         let task = TaskScope::new(principal, string(record, "conversation_id").ok_or(INVALID_SCOPE)?,
             task_id, task_id, writer_root.clone(), ExecutionMode::Sandbox).map_err(|error| error.to_string())?;
-        Ok(Self { workspace, working, execution, writer_root, identity: current, reader, writer, task })
+        Ok(Self { workspace, working, execution, writer_root, identity: current, reader, writer, task, access })
     }
 
     pub(super) fn check(&self) -> Result<(), String> {
@@ -149,7 +151,32 @@ impl ChildScope {
 
     pub(super) fn working_dir(&self) -> &Path { &self.working }
 
-    fn path(&self, raw: &Value) -> Result<String, String> {
+    pub(super) fn process_mode(&self) -> ExecutionMode {
+        match self.access {
+            Access::Full => ExecutionMode::Direct,
+            _ => ExecutionMode::Sandbox,
+        }
+    }
+
+    pub(super) fn process_scope(&self, actor: &str) -> Result<(Scope, Option<PathBuf>), String> {
+        self.check()?;
+        let principal = self.task.principal();
+        let fixed_write_root = match self.access {
+            Access::WorkDir => Some(self.working.clone()),
+            Access::Workspace => Some(self.workspace.clone()),
+            Access::Sandbox | Access::Full => None,
+        };
+        let scope = Scope {
+            owner: Owner { user: principal.username().into(), workspace_id: principal.workspace_id().into(),
+                workspace: self.workspace.clone(), conversation: self.task.conversation_id().into(), actor: Some(actor.into()) },
+            execution_root: self.execution.clone(),
+            access: SandboxAccess { write: true, network: Network::Restricted },
+            mode: self.process_mode(), approval_required: false,
+        };
+        Ok((scope, fixed_write_root))
+    }
+
+    pub(super) fn path(&self, raw: &Value) -> Result<String, String> {
         let raw = raw.as_str().filter(|path| !path.trim().is_empty()).ok_or("缺少文件路径参数。")?;
         let path = if let Some(path) = raw.strip_prefix("/workspace/") {
             self.workspace.join(path)

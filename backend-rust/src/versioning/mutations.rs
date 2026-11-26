@@ -13,6 +13,7 @@ use super::{
     verify_record_owner,
 };
 use crate::{
+    conversation_db::{Database, checkpoint_versions::MessageRevision},
     legacy::{LegacyDocument, LegacyKind},
     runtime::{legacy_error, store::Task},
 };
@@ -47,7 +48,9 @@ pub(super) fn configure(
     enabled: bool,
     requested: Option<&str>,
 ) -> Result<Value, RuntimeError> {
-    let document = agent(store, workspace, id)?;
+    let (header, _) = store.header(workspace, id)?;
+    let document = LegacyDocument::from_value(header).map_err(legacy_error)?;
+    if document.kind() != LegacyKind::Agent { return Err(RuntimeError::session_not_found()); }
     let record = Directories::open(store, workspace, id)?;
     let _lock = files::lock(&record.session).map_err(storage)?;
     let current = document.raw();
@@ -78,31 +81,21 @@ pub(super) fn configure(
         };
         let mut row = checkpoint_row(0, label, -1, "initial", &root, tracking, &tree, None);
         row["snapshot_file"] = json!("snapshots/0.json");
+        row["rust_snapshot_version"] = json!(1);
         rows.push(row);
-        initial = Some(snapshot(current, -1, "initial", None));
+        initial = Some(snapshot(store, workspace, current, -1, "initial", None)?);
     }
     let (seq, tree) = latest(&rows);
     let timestamp = timestamp();
     let versioning = next_config(config, enabled, full, tracking, seq, &tree, &timestamp);
     set_meta(&mut previous_meta, &versioning, &tree);
-    let mut next = current.clone();
-    next["metadata"]["versioning"] = versioning;
-    let next = LegacyDocument::from_value(next).map_err(legacy_error)?;
-    let mut tx = Transaction::new(
-        &record.session,
-        &record.records,
-        workspace,
-        id,
-        None,
-        Some(current),
-        &next,
-    )?;
+    let mut tx = Transaction::for_versioning(&record.session, &record.records, workspace, id, config, &versioning)?;
     if let Some(initial) = initial {
         put_json(&mut tx, id, "snapshots/0.json", &initial)?;
         put_rows(&mut tx, id, &rows)?;
     }
     put_json(&mut tx, id, META, &previous_meta)?;
-    tx.commit(store, next)?;
+    tx.commit_versioning(store, versioning)?;
     Ok(
         json!({"conversation_id":id,"enabled":enabled,"mode":"overwrite",
         "tracking_mode":tracking,"last_commit":tree,"last_input_seq":seq}),
@@ -177,6 +170,7 @@ pub(super) fn checkpoint(
         )
     };
     row["snapshot_file"] = json!(format!("snapshots/{seq}.json"));
+    row["rust_snapshot_version"] = json!(1);
     row["rust_task_id"] = json!(task.start.id);
     let has_shallow = !full
         && shallow::History::open(&record.session)
@@ -196,18 +190,7 @@ pub(super) fn checkpoint(
         &timestamp,
     );
     set_meta(&mut previous_meta, &versioning, &row["tree_hash"]);
-    let mut next = current.clone();
-    next["metadata"]["versioning"] = versioning;
-    let next = LegacyDocument::from_value(next).map_err(legacy_error)?;
-    let mut tx = Transaction::new(
-        &record.session,
-        &record.records,
-        workspace,
-        id,
-        None,
-        Some(current),
-        &next,
-    )?;
+    let mut tx = Transaction::for_versioning(&record.session, &record.records, workspace, id, config, &versioning)?;
     if has_shallow {
         shallow_write::checkpoint(
             &record.session,
@@ -224,15 +207,17 @@ pub(super) fn checkpoint(
         tx.put(&format!("{id}/git/index"), index).map_err(storage)?;
     }
     let state = snapshot(
+        store,
+        workspace,
         current,
         message_index as i64,
         run_status,
         has_shallow.then_some(message_id),
-    );
+    )?;
     put_json(&mut tx, id, &format!("snapshots/{seq}.json"), &state)?;
     put_rows(&mut tx, id, &rows)?;
     put_json(&mut tx, id, META, &previous_meta)?;
-    tx.commit(store, next)
+    tx.commit_versioning(store, versioning)
 }
 
 pub(super) fn restore(
@@ -271,7 +256,8 @@ pub(super) fn restore(
     );
     let full = is_full(config);
     let root = execution_root(store, workspace, current)?;
-    let current_snapshot = load_snapshot(&record.session, row)?;
+    let mut current_snapshot = load_snapshot(&record.session, row)?;
+    if let Some(snapshot) = &mut current_snapshot { materialize_messages(store, snapshot)?; }
     let shallow_id =
         super::message_id(row).or_else(|| current_snapshot.as_ref().and_then(super::message_id));
     let full_workspace = full && tracking == WORKSPACE_AND_CONVERSATION;
@@ -493,9 +479,30 @@ fn checkpoint_row(
         "files_changed":0,"files":[],"changed":false,"run_status":run_status,"tracking_mode":tracking})
 }
 
-fn snapshot(document: &Value, index: i64, status: &str, shallow_id: Option<&str>) -> Value {
-    json!({"conversation_id":document["id"],"title":document["title"],"metadata":document["metadata"],
-        "messages":document["messages"],"message_index":index,"run_status":status,"shallow_message_id":shallow_id})
+pub(super) fn database(store: &Store, workspace: &str, id: &str) -> Result<Database, RuntimeError> {
+    let path = store.conversation_path(workspace, id)?;
+    let dir = path.parent().expect("conversation path has a parent");
+    if !dir.join(crate::conversation_db::FILENAME).is_file() { return Err(RuntimeError::session_not_found()); }
+    Database::open(dir).map_err(RuntimeError::storage)
+}
+
+fn snapshot(
+    store: &Store, workspace: &str, document: &Value, index: i64, status: &str, shallow_id: Option<&str>,
+) -> Result<Value, RuntimeError> {
+    let id = document["id"].as_str().ok_or_else(RuntimeError::session_not_found)?;
+    let messages = database(store, workspace, id)?.capture_checkpoint(workspace, id).map_err(RuntimeError::storage)?;
+    Ok(json!({"conversation_id":document["id"],"title":document["title"],"metadata":document["metadata"],
+        "rust_message_revision":messages,"message_index":index,"run_status":status,"shallow_message_id":shallow_id}))
+}
+
+fn materialize_messages(store: &Store, snapshot: &mut Value) -> Result<(), RuntimeError> {
+    if let Some(revision) = snapshot.get("rust_message_revision") {
+        let reference: MessageRevision = serde_json::from_value(revision.clone()).map_err(RuntimeError::storage)?;
+        let messages = database(store, &reference.workspace, &reference.conversation)?
+            .checkpoint_messages(&reference).map_err(RuntimeError::storage)?;
+        snapshot["messages"] = Value::Array(messages);
+    }
+    Ok(())
 }
 
 fn snapshot_name(row: &Value) -> Result<Option<String>, RuntimeError> {
@@ -526,9 +533,13 @@ fn load_snapshot(record: &Dir, row: &Value) -> Result<Option<Value>, RuntimeErro
     let Some(name) = snapshot_name(row)? else {
         return Ok(None);
     };
-    read_snapshot_bytes(record, &name)?
+    let contents = read_snapshot_bytes(record, &name)?
         .map(|bytes| serde_json::from_slice(&bytes).map_err(|error| storage(error.into())))
-        .transpose()
+        .transpose()?;
+    if row["rust_snapshot_version"] == 1 && !contents.as_ref().is_some_and(|value: &Value| value["rust_message_revision"].is_object()) {
+        return Err(RuntimeError::storage("The checkpoint snapshot is missing its message revision"));
+    }
+    Ok(contents)
 }
 
 fn restored_document(

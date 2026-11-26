@@ -40,8 +40,9 @@ pub(super) fn helper_installed() -> bool {
         && fs::symlink_metadata(SOCKET).is_ok_and(|meta| meta.uid() == 0 && meta.file_type().is_socket())
 }
 
-pub(super) fn command(
-    workspace: &Path, cwd: &Path, access: SandboxAccess, script: &str, reads: Vec<String>, writes: Vec<String>,
+pub(super) fn command_argv(
+    workspace: &Path, cwd: &Path, access: SandboxAccess, argv: &[&str], reads: Vec<String>, writes: Vec<String>,
+    fixed_write_root: Option<&Path>,
 ) -> io::Result<Command> {
     if !helper_installed() { return Err(denied("The administrator-installed Linux sandbox is unavailable")); }
     let network = match access.network { Network::None => "none", Network::Restricted => "restricted", Network::Full => "full" };
@@ -50,10 +51,11 @@ pub(super) fn command(
         if let Ok(value) = std::env::var(key) { environment.insert(key.into(), json!(value)); }
     }
     environment.entry("PATH").or_insert(json!("/usr/bin:/bin"));
-    let request = json!({"operation":"run","workspace":workspace,"cwd":cwd,
+    let mut request = json!({"operation":"run","workspace":workspace,"cwd":cwd,
         "reads":reads,"writes":if access.write { writes } else { Vec::new() },"readonly":!access.write,
-        "workspace_only":false,"network":network,"argv":["/bin/bash","--noprofile","--norc","-c",script],
+        "workspace_only":fixed_write_root.is_some(),"network":network,"argv":argv,
         "env":environment,"umask":0o022});
+    if let Some(root) = fixed_write_root { request["workspace_write_root"] = json!(root); }
     let payload = serde_json::to_vec(&request)?;
     if payload.len() > 65_536 { return Err(denied("Linux sandbox request exceeds the broker packet limit")); }
     let mut command = Command::new(PYTHON);
