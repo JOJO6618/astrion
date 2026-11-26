@@ -230,9 +230,12 @@ ipcMain.on('shell:browser-panel-report', (event, open) => {
   if (fromContentView(event) && typeof open === 'boolean') views.reportBrowserPanel(event.sender, open);
 });
 // 乐观切换：仅 chrome 标签条可用。
-ipcMain.on('shell:show', (event, key) => {
-  if (!fromChrome(event)) return;
-  try { views.show(key); } catch (err) { console.error('[astrion-desktop] show 失败:', err); }
+ipcMain.on('shell:show', (event, key, requestId) => {
+  if (!fromChrome(event) || typeof requestId !== 'string' || !requestId) return;
+  try { views.show(key, requestId); } catch (err) { console.error('[astrion-desktop] show 失败:', err); }
+});
+ipcMain.on('shell:settle-show', (event, requestId) => {
+  if (fromChrome(event) && typeof requestId === 'string') views.settleShow(requestId);
 });
 ipcMain.on('shell:focus-main', (event) => {
   if (!fromContentView(event)) return;
@@ -465,8 +468,11 @@ export function createMainWindow(port, route = '/') {
     };
     loginView.webContents.once('did-stop-loading', resume);
   });
+  const releaseChromeShow = () => views?.settleShow(views.optimistic?.requestId);
+  chromeContents.on('did-navigate', releaseChromeShow);
   chromeContents.loadURL(chromeUrl);
   chromeContents.on('render-process-gone', () => {
+    releaseChromeShow();
     views?.endDragAsDrop();
     views?.setChromeOverlay(false);
     if (mainWindow && !mainWindow.isDestroyed() && !appQuitting) chromeView?.webContents.reload();

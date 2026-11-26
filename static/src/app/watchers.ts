@@ -31,11 +31,8 @@ export const watchers = {
       this.scheduleComposerDraftPersist('watch-input-message');
     }
   },
-  messages: {
-    deep: true,
-    handler() {
-      this.refreshBlankHeroState();
-    }
+  conversationBlank() {
+    this.refreshBlankHeroState();
   },
   currentConversationTitle(newVal, oldVal) {
     const target = (newVal && newVal.trim()) || '';

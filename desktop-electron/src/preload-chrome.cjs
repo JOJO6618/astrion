@@ -37,8 +37,9 @@ contextBridge.exposeInMainWorld('astrionShell', {
   browserPanels: () => ipcRenderer.invoke('shell:browser-panel-states'),
   onBrowserPanelState: callback => subscribe('shell:browser-panel-state', callback),
   focusTab: key => ipcRenderer.send('shell:focus-tab', key),
-  // 乐观切换：壳层立即显示该标签的视图（缺失则创建），随后以后端快照为准。
-  show: key => ipcRenderer.send('shell:show', key),
+  // 每次点击独立结算，慢请求期间保持最近一次点击的视图。
+  show: (key, requestId) => ipcRenderer.send('shell:show', key, requestId),
+  settleShow: requestId => ipcRenderer.send('shell:settle-show', requestId),
   // chrome 轮询到（或命令响应得到）的快照转交壳层；壳层只接受更高 revision 并广播。
   forwardTabsState: state => ipcRenderer.send('shell:tabs-forward', state),
   // 壳层广播的快照（其他视图转发的更新）。

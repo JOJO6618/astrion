@@ -299,6 +299,9 @@ export const computed = {
   composerStreamingForInput() {
     return this.composerBusy && !this.displayLockEngaged;
   },
+  conversationBlank() {
+    return this.isConversationBlank();
+  },
   composerHeroActive() {
     return (this.blankHeroActive || this.blankHeroExiting) && !this.composerInteractionActive;
   },
