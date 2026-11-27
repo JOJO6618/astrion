@@ -386,7 +386,7 @@ export function createMainWindow(port, route = '/') {
     backgroundColor: surfaceColor,
     width: 1280,
     height: 800,
-    minWidth: 960,
+    minWidth: 600,
     minHeight: 600,
     // macOS：隐藏标题栏、红绿灯悬浮于 chrome 条上（替代 Tauri Overlay + objc2 手动定位）
     ...windowChromeOptions()
