@@ -10,6 +10,7 @@ mod downloads;
 mod file_response;
 mod settings;
 pub(crate) use settings::{apply_pending_host_modes, recover_pending_host_modes};
+pub(crate) use preferences::effective_modes;
 
 pub use chatgpt_fast_mode::chatgpt_fast_mode_router;
 pub use attachments::attachment_router;

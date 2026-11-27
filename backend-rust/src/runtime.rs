@@ -19,6 +19,7 @@ mod goals;
 pub mod guidance;
 pub mod host_policy;
 mod host_modes;
+mod mode_notice;
 mod host_policy_setup;
 mod navigation;
 mod mcp;
@@ -686,6 +687,16 @@ impl Runtime {
             }
             task.approval = approval;
             system_prompt::freeze(store, workspace_id, &mut document, model, tools.writer().is_some())?;
+            // 空闲期切换的模式在下一条消息前补发一次；新对话在这里静默对齐基线。
+            let mode_notices = document["metadata"].as_object_mut()
+                .map(|metadata| {
+                    let changes = mode_notice::drift(&store.data_dir, metadata);
+                    if !changes.is_empty() { mode_notice::mark_known(&store.data_dir, metadata); }
+                    changes.into_iter()
+                        .map(|(kind, mode)| mode_notice::message(kind, &mode))
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default();
             guidance::admit(&document, &mut task);
             let document = LegacyDocument::from_value(document).map_err(legacy_error)?;
             let token_statistics = &document.raw()["token_statistics"];
@@ -697,6 +708,12 @@ impl Runtime {
             ).map_err(legacy_error)?;
             let mut durable = Vec::new();
             if let Some(notice) = worktree_notice {
+                let text = notice["content"].as_str().unwrap_or_default();
+                messages.push(json!({"role":"user","content":text}));
+                emit_user_message(&mut task, text, notice["metadata"].clone());
+                durable.push(notice);
+            }
+            for notice in mode_notices {
                 let text = notice["content"].as_str().unwrap_or_default();
                 messages.push(json!({"role":"user","content":text}));
                 emit_user_message(&mut task, text, notice["metadata"].clone());

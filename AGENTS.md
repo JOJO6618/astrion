@@ -540,6 +540,19 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 - 纯子串匹配，中文关键词搜不到英文正文；静态规则「关键词带英文词」不可删。`search_skills` 只回片段，不进已读白名单。
 - 回归 `test/2026-11-19_技能检索/`。
 
+## 30) 运行期模式切换通知（Rust 后端）
+
+> 唯一权威 `backend-rust/src/runtime/mode_notice.rs`（2026-11-27 补齐 Python 旧语义）。
+
+- **为什么必须有**：系统提示词首次受理后冻结，切换权限 / 执行环境 / 网络 / 运行模式不会重写它；变化必须以 user 消息注入对话，否则模型按冻结的旧规则静默降级。
+- **两处注入点**：① admission（`runtime.rs`，`system_prompt::freeze` 之后、`guidance::admit` 之前）补发空闲期切换；② `runtime/agent.rs` 轮次起点 `apply_pending_host_modes` 应用排队切换后注入。**只在完整工具批次边界注入**，禁止插进 `assistant.tool_calls` 与工具结果之间。
+- **基线去重**：metadata `runtime_mode_baseline` = 模型已知晓的模式。基线缺失（新对话 / 历史对话）静默对齐、不通知；**只有通知真正落库后才 `mark_known`**，因此同一变化只发一次。
+- **文本同源**：通知正文由 `system_prompt/sections.rs` 的 `permission_section` / `execution_section` / `work_section` 渲染，与冻结提示词共用模板，**禁止另写一份规则文案**。
+- **归一化复用** `web_status::preferences::effective_modes`（含 plan→readonly、readonly→sandbox 联动），**禁止在通知模块重复实现**。
+- **消息形态**：`visibility: compact` + `starts_work: false` + `runtime_mode_notice: true`，`source` 仍按 kind 分 `permission_change` / `execution_change` / `network_change` / `work_mode_change`；前端靠 `visibility` 与 `runtime_mode_notice` 识别，无需改动。
+- **已知边界**：Chat 模式（`allows_workflow()==false`）只在 admission 补发，运行中排队切换不注入；系统提示词 execution 段仍固定渲染 `sandbox`，direct 只在切换通知里表达。
+- 回归 `test/2026-11-27_运行期模式通知/mode_notice_contract.rs`（经 `#[path]` 挂进 `mode_notice` 模块）。
+
 ---
 
 ## 体积统计（改完必跑）

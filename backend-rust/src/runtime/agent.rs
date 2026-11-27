@@ -77,7 +77,10 @@ async fn run_inner(
             messages.push(notice);
         }
         if workflow {
-            runtime.apply_pending_host_modes(task_id, rounds == 1)?;
+            // 运行期模式切换在完整工具批次后生效；通知必须随本轮请求送达模型。
+            for notice in runtime.apply_pending_host_modes(task_id, rounds == 1)? {
+                messages.push(json!({"role": "user", "content": notice["content"].clone()}));
+            }
         }
         if workflow && let Some(compacted) = runtime.compress_turn(task_id, &model).await? {
             messages=compacted;
