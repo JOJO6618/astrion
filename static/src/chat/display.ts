@@ -46,7 +46,9 @@ export function toDisplayMessages(
   const liveContent = new Map<string, any[]>();
   const responseOwners = new Map<string, string>();
   const toolOwners = new Map<string, string>();
+  const projectedById = new Map<string, any>();
   for (const message of projected) {
+    projectedById.set(message.id, message);
     for (const action of message.actions || []) {
       if (action.type === 'tool') {
         for (const alias of toolAliases(action)) {
@@ -87,22 +89,35 @@ export function toDisplayMessages(
       };
       if (message.role === 'user') return { ...base, actions: [] };
       const actions: any[] = [];
-      const projectedThinking = liveContent.get(message.message_id)?.find(
-        (action) => action.type === 'thinking'
-      );
+      const projectedThinking = liveContent
+        .get(message.message_id)
+        ?.find((action) => action.type === 'thinking');
       const thinkingId = identity(
         `thinking:${message.message_id}`,
         projectedThinking?.id || `${message.message_id}:thinking`
       );
-      const runtimeContent = message.live && liveContent.get(message.message_id);
+      const runtimeContent =
+        message.live && projectedById.get(projectedId || message.message_id)?.actions;
       if (runtimeContent) {
-        // Preserve start events, show_html boundaries, and actual thinking/text transitions.
+        // A live response can already show tools before its assistant row
+        // contains tool_calls. Keep them in this same response with stable IDs.
         actions.push(
-          ...runtimeContent.map((action) => ({
-            ...action,
-            ...(action === projectedThinking ? { id: thinkingId, blockId: thinkingId } : {}),
-            content: action.type === 'text' ? visibleText(action.content || '') : action.content
-          }))
+          ...runtimeContent
+            .filter(
+              (action: any) =>
+                action.type === 'tool' || action.responseMessageId === message.message_id
+            )
+            .map((action: any) => {
+              if (action.type === 'tool' && action.tool?.id) {
+                const id = identity(`tool:${action.tool.id}`, action.id);
+                return { ...action, id, blockId: id };
+              }
+              return {
+                ...action,
+                ...(action === projectedThinking ? { id: thinkingId, blockId: thinkingId } : {}),
+                content: action.type === 'text' ? visibleText(action.content || '') : action.content
+              };
+            })
         );
       } else {
         if (message.reasoning_content)
@@ -110,10 +125,12 @@ export function toDisplayMessages(
             id: thinkingId,
             type: 'thinking',
             content: message.reasoning_content,
-            thinkingSummary: message.thinking_summary?.text || projectedThinking?.thinkingSummary || '',
+            thinkingSummary:
+              message.thinking_summary?.text || projectedThinking?.thinkingSummary || '',
             thinkingSummaryRevision:
               message.thinking_summary?.revision || projectedThinking?.thinkingSummaryRevision || 0,
-            thinkingGeneration: message.thinking_summary?.generation || projectedThinking?.thinkingGeneration,
+            thinkingGeneration:
+              message.thinking_summary?.generation || projectedThinking?.thinkingGeneration,
             streaming: !!message.live,
             blockId: thinkingId,
             responseMessageId: message.message_id
@@ -188,7 +205,8 @@ export function toDisplayMessages(
         ...action,
         content: action.type === 'text' ? visibleText(action.content || '') : action.content
       }));
-    if (!message.awaitingFirstContent && !actions.length) continue;
+    if (representedMessages.has(message.id) || (!message.awaitingFirstContent && !actions.length))
+      continue;
     // The server creates this placeholder before any response ID/text exists. Keep it,
     // and preparing tools, just as Agent does; it is a view node, never a tree edit target.
     const id = message.id;

@@ -8,7 +8,7 @@ use crate::knowledge::{Knowledge, prompt::Rules};
 
 use super::{Store, render};
 
-pub(super) fn personalization(prefs: &Value) -> Option<String> {
+pub(crate) fn personalization(prefs: &Value) -> Option<String> {
     if prefs["enabled"] != true {
         return None;
     }

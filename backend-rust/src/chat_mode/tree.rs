@@ -441,42 +441,16 @@ pub(super) fn recover(
             .or_else(|| turn["parent_id"].as_str())
             .ok_or_else(|| ChatError::storage("Chat turn has no path root"))?;
         let path = document.chat_path(Some(tip))?;
-        let mut pending: Map<String, Value> = Map::new();
-        for message in &path {
-            if message["role"] == "assistant"
-                && let Some(calls) = message["tool_calls"].as_array()
-            {
-                for call in calls {
-                    if let Some(call_id) = call["id"].as_str() {
-                        pending.insert(
-                            call_id.to_owned(),
-                            json!(call["function"]["name"].as_str().unwrap_or_default()),
-                        );
-                    }
-                }
-            } else if message["role"] == "tool"
-                && let Some(call_id) = message["tool_call_id"].as_str()
-            {
-                pending.shift_remove(call_id);
+        let tool_tail = path.iter().rposition(|message| message["role"] != "tool");
+        if let Some(index) = tool_tail
+            && path[index]["role"] == "assistant"
+            && path[index]["metadata"]["chat"]["turn_id"] == turn_id
+        {
+            let mut missing = crate::legacy::interrupted_chat_tool_results(&path[index], &path[index + 1..]);
+            for message in &mut missing {
+                message["message_id"] = json!(format!("msg_{}", uuid::Uuid::new_v4().simple()));
             }
-        }
-        for (call_id, name) in pending {
-            document.append_chat_messages(
-                turn_id,
-                vec![json!({
-                    "message_id": format!("msg_{}", uuid::Uuid::new_v4().simple()),
-                    "role": "tool",
-                    "tool_call_id": call_id,
-                    "name": name,
-                    "content": json!({
-                        "success": false,
-                        "status": "cancelled",
-                        "message": "执行已中断，未取得完成结果",
-                    }).to_string(),
-                })],
-                updated_at,
-                None,
-            )?;
+            document.append_chat_messages(turn_id, missing, updated_at, None)?;
         }
         document.finish_chat_turn(turn_id, status, updated_at)?;
         super::handoff::after_finish(&mut document, turn_id, false)?;
@@ -530,14 +504,14 @@ pub(super) fn consume_network_notices(
     id: &str,
     turn_id: &str,
     updated_at: f64,
-) -> Result<(), ChatError> {
+) -> Result<bool, ChatError> {
     let (raw, _) = paths.read_header(id)?;
     let notices = raw["metadata"]["pending_network_notices"]
         .as_array()
         .cloned()
         .unwrap_or_default();
     if notices.is_empty() {
-        return Ok(());
+        return Ok(false);
     }
     let messages: Vec<_> = notices
         .iter()
@@ -563,7 +537,8 @@ pub(super) fn consume_network_notices(
         .collect();
     append_batch(paths, id, turn_id, messages, updated_at, |raw| {
         raw["metadata"]["pending_network_notices"] = json!([]);
-    })
+    })?;
+    Ok(true)
 }
 
 pub(super) fn configure(
