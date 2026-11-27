@@ -57,13 +57,21 @@ async fn serve() -> io::Result<()> {
     })?;
     let desktop_browser = if config.web { DesktopBrowser::from_parent()? } else { None };
     let paths = host_paths::HostPaths::resolve(&config.data, config.static_root.as_deref())?;
+    let _writer = InstanceLock::acquire(&config.data)?;
+    let listener = TcpListener::bind(config.address()).await?;
+    if config.web {
+        let registry = astrion_headless::workspace_catalog::manage::WorkspaceRegistry::new(
+            paths.workspace_config.clone(), paths.resources.clone(),
+        );
+        // A non-writable home may prevent creating Default. Keep serving the
+        // normal empty-workspace screen; never replace an unreadable catalog.
+        let _ = registry.ensure_default_workspace();
+    }
     let workspace = host_paths::Workspace::resolve(
         &config.workspace,
         &paths.workspace_config,
         &paths.resources,
     )?;
-    let _writer = InstanceLock::acquire(&config.data)?;
-    let listener = TcpListener::bind(config.address()).await?;
     let runtime = Runtime::open(&config.data)
         .map_err(io::Error::other)?
         .with_pricing(paths.resources.join("config"));
