@@ -17,6 +17,28 @@ impl Drop for Scratch {
     }
 }
 
+#[test]
+fn crosspet_workspace_free_chat_has_no_background_work() {
+    let path = std::env::temp_dir().join(format!("astrion-crosspet-chat-{}", Uuid::new_v4()));
+    let scratch = Scratch(path);
+    let runtime = Runtime::open(&scratch.0).unwrap();
+    let (task_id, _receiver) = runtime.register_chat_task(crate::runtime::ChatTaskStart {
+        conversation_id: "conv_chat_fixture".into(),
+        message: "Fixture".into(),
+        model_key: None,
+        message_source: None,
+        created_at: 0.0,
+    }).unwrap();
+    let task = TaskRef {
+        task_id,
+        session: SessionIdentity {
+            workspace_id: String::new(),
+            conversation_id: "conv_chat_fixture".into(),
+        },
+    };
+    assert_eq!(runtime.crosspet_observation(&task, None).unwrap().background, Some(false));
+}
+
 #[tokio::test]
 async fn crosspet_runtime_observes_pending_command_until_delivery_after_main_stops() {
     let path = std::env::temp_dir().join(format!("astrion-crosspet-observation-{}", Uuid::new_v4()));

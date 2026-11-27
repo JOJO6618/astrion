@@ -237,25 +237,27 @@ impl Runtime {
             return Ok(None);
         }
         let notices = store.process_resources.take_notices(&owner);
-        let Some((notice, remaining)) = notices.split_first() else { return Ok(None); };
-        let rest = notice_ids(remaining);
-        store.process_resources.restore_notices(&owner, &rest);
-        let message = notice_message(notice, now(), false, crate::web_assets::personalization::english(&store.data_dir));
+        let Some((trigger, preceding)) = notices.split_last() else { return Ok(None); };
+        let timestamp = now();
+        let english = crate::web_assets::personalization::english(&store.data_dir);
+        let preceding = preceding.iter().map(|notice| notice_message(notice, timestamp, false, english))
+            .collect::<Vec<_>>();
+        let message = notice_message(trigger, timestamp, false, english);
         let payload = json!({"conversation_id":owner.conversation,"message":message["content"],
             "model_key":model.key(),"message_source":"background_command"});
         let tools = store.workspace_tools.get(&workspace.id).unwrap_or(&self.tools).clone();
         let admission = TaskAdmission { exclusive_workspace:false, title:None, metadata:None,
             new_conversation_id:None, user_message_metadata:Some(message["metadata"].clone()),
             tools:std::sync::Arc::new(tools) };
-        let result = self.admit_goal_task(&mut store, &workspace.id, &payload, &model,
-            admission, Some(approval), Origin::Automatic);
+        let result = self.admit_goal_task_with_notice(&mut store, &workspace.id, &payload, &model,
+            admission, Some(approval), Origin::Automatic, None, &preceding);
         match result {
             Ok(admitted) => {
                 drop(store);
                 Ok(Some(self.spawn_admitted(admitted, model)))
             }
             Err(error) => {
-                store.process_resources.restore_notices(&owner, &notice_ids(std::slice::from_ref(notice)));
+                store.process_resources.restore_notices(&owner, &notice_ids(&notices));
                 if error.status == 409 { Ok(None) } else { Err(error) }
             }
         }

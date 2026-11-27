@@ -264,6 +264,23 @@ async fn web_creation_applies_default_flag_and_full_workspace_baseline() {
 }
 
 #[tokio::test]
+async fn web_creation_returns_the_durable_id_when_initial_backup_fails() {
+    let f = Fixture::new();
+    let workspace = RegisteredWorkspace {
+        id: WORKSPACE.into(),
+        path: f.work.clone(),
+        label: "Fixture".into(),
+    };
+    fs::write(f.data.join("save"), b"obstruct backup directory").unwrap();
+    let result = f.runtime.create_web_conversation(&workspace, Default::default()).unwrap();
+    assert_eq!(result["success"], true);
+    assert!(result["versioning_error"].as_str().is_some_and(|error| !error.is_empty()));
+    let id = result["conversation_id"].as_str().unwrap();
+    assert_eq!(f.document(id)["messages"], json!([]));
+    assert!(f.document(id)["metadata"]["versioning"].is_null());
+}
+
+#[tokio::test]
 async fn toggle_and_finished_agent_checkpoint_use_python_layout_and_respect_active_tasks() {
     let f = Fixture::new();
     f.insert(ID, Value::Null, vec![]);

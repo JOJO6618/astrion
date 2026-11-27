@@ -119,7 +119,8 @@ impl Personalization {
                 let catalog = super::skills_catalog(&prefs.global_skills, &prefs.private_skills);
                 let (selected, _) = super::skill_selection(&config, &catalog);
                 let enabled = selected.into_iter().map(str::to_owned).collect::<Vec<_>>();
-                prefs.mirror(workspace, &enabled, &catalog)?;
+                let record = prefs.mirror(workspace, enabled, &catalog, &config)?;
+                prepared.insert(workspace.to_owned(), record);
                 return Ok(());
             }
             let root = open_canonical_dir(workspace)?;

@@ -123,6 +123,17 @@ def main(binary):
                 finished(app, task, s2)
                 assert not model.errors, model.errors
                 assert names(app, s2) == set(selected)
+                # A project skill added after mirroring must take precedence immediately.
+                project_skill = skill(two / ".agents" / "skills", "fixture-builtin", "Local project skill")
+                assert names(app, s2) == {"fixture-shared"}
+                assert "Local project skill" in project_skill.read_text()
+                project_skill.unlink()
+                assert names(app, s2) == set(selected)
+                mirror = two_skills / "fixture-builtin" / "SKILL.md"
+                mirror.unlink()
+                mirror.parent.rmdir()
+                assert names(app, s2) == set(selected)
+                assert mirror.read_bytes() == bundled.read_bytes()
                 # A locally edited mirror remains intact on disk even after deselection.
                 modified = skill(one_skills, "fixture-shared", "Retain this local edit")
                 assert app.api("POST", "/api/personalization" + s1, {"enabled_skills": []})["success"]

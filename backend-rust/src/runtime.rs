@@ -518,10 +518,23 @@ impl Runtime {
         let store = self.store()?;
         verify_workspace_binding(&store, workspace_id, expected_path)?;
         let document = new_document(&store, workspace_id, payload, now())?;
+        Self::persist_new_session(&store, workspace_id, document)
+    }
+
+    fn persist_new_session(
+        store: &Store,
+        workspace_id: &str,
+        document: LegacyDocument,
+    ) -> Result<Value, RuntimeError> {
         let id = document.source_id().to_owned();
         store.persist(workspace_id, document, true)?;
-        versioning::set_enabled_on_create(&store, workspace_id, &id)?;
-        Ok(json!({"success":true,"conversation_id":id}))
+        let mut response = json!({"success":true,"conversation_id":id});
+        // The conversation is already durable. Report a backup failure alongside
+        // its ID so clients do not retry creation and leave duplicate sessions.
+        if let Err(error) = versioning::set_enabled_on_create(store, workspace_id, &id) {
+            response["versioning_error"] = json!(error.message);
+        }
+        Ok(response)
     }
 
     /// Durably accepts the user message before starting the model on Tokio.
@@ -602,7 +615,7 @@ impl Runtime {
         approval: Option<TaskApprovalSettings>,
         origin: Origin<'_>,
     ) -> Result<AdmittedTask, RuntimeError> {
-        self.admit_goal_task_with_notice(store, workspace_id, payload, model, admission, approval, origin, None)
+        self.admit_goal_task_with_notice(store, workspace_id, payload, model, admission, approval, origin, None, &[])
     }
 
     fn admit_goal_task_with_notice(
@@ -615,6 +628,7 @@ impl Runtime {
         mut approval: Option<TaskApprovalSettings>,
         origin: Origin<'_>,
         hidden_user_notice: Option<&str>,
+        preceding_notices: &[Value],
     ) -> Result<AdmittedTask, RuntimeError> {
         validate_payload(workspace_id, payload)?;
         if store.shutting_down { return Err(RuntimeError::new(503, "Runtime is shutting down")); }
@@ -766,6 +780,12 @@ impl Runtime {
                 messages.push(json!({"role":"user","content":text}));
                 emit_user_message(&mut task, text, notice["metadata"].clone());
                 durable.push(notice);
+            }
+            for notice in preceding_notices {
+                let text = notice["content"].as_str().unwrap_or_default();
+                messages.push(json!({"role":"user","content":text}));
+                emit_user_message(&mut task, text, notice["metadata"].clone());
+                durable.push(notice.clone());
             }
             let (submitted, model_input) = if guidance::has_attachments(payload) {
                 guidance::initial_media(

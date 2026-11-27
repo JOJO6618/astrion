@@ -52,6 +52,41 @@ impl Drop for Fixture {
     }
 }
 
+#[tokio::test]
+async fn idle_background_batch_enters_history_and_model_input_in_one_task() {
+    let fixture = Fixture::new();
+    let runtime = &fixture.runtime;
+    let workspace = "workspace";
+    let session = runtime.create_session(workspace, &json!({})).unwrap();
+    let id = session["conversation_id"].as_str().unwrap();
+    let first = notice_message(&json!({"command_id":"first","command":"pwd","return_code":0}), 1.0, false, true);
+    let last = notice_message(&json!({"command_id":"last","command":"ls","return_code":0}), 2.0, false, true);
+    let payload = json!({"conversation_id":id,"message":last["content"],"message_source":"background_command"});
+    let model = ModelConfig::fixed("http://127.0.0.1:9/v1/chat/completions".into(), None, "fixture".into());
+    let admission = TaskAdmission {
+        exclusive_workspace: false,
+        title: None,
+        metadata: None,
+        new_conversation_id: None,
+        user_message_metadata: Some(last["metadata"].clone()),
+        tools: std::sync::Arc::new(runtime.tools.clone()),
+    };
+    let mut store = runtime.store().unwrap();
+    let task = runtime.admit_goal_task_with_notice(&mut store, workspace, &payload, &model,
+        admission, None, Origin::Automatic, None, std::slice::from_ref(&first)).unwrap();
+    let wire = task.messages.iter().filter(|row| row["role"] == "user").map(|row| &row["content"])
+        .collect::<Vec<_>>();
+    assert_eq!(wire, [&first["content"], &last["content"]]);
+    let document = store.read(workspace, id).unwrap();
+    let history = document.raw()["messages"].as_array().unwrap();
+    assert_eq!(history.len(), 2);
+    for (stored, notice) in history.iter().zip([first, last]) {
+        assert_eq!(stored["message_id"], notice["message_id"]);
+        assert_eq!(stored["content"], notice["content"]);
+    }
+    assert_eq!(store.tasks.len(), 1);
+}
+
 #[test]
 fn command_scope_uses_workspace_and_effective_admission_modes() {
     let fixture = Fixture::new();

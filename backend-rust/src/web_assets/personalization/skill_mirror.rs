@@ -19,18 +19,60 @@ use super::skill_archive::{copy_atomic, inspect_tree};
 
 type Manifest = BTreeMap<String, String>;
 
+pub(super) struct Prepared {
+    selected: Vec<String>,
+    scan_project: bool,
+    presence: Vec<(bool, bool)>,
+}
+
+impl Prepared {
+    pub(super) fn capture(workspace: &Path, selected: Vec<String>, scan_project: bool) -> Self {
+        let presence = skill_presence(workspace, &selected, scan_project);
+        Self { selected, scan_project, presence }
+    }
+
+    pub(super) fn is_current(&self, workspace: &Path) -> bool {
+        self.presence == skill_presence(workspace, &self.selected, self.scan_project)
+    }
+}
+
+fn skill_presence(workspace: &Path, selected: &[String], scan_project: bool) -> Vec<(bool, bool)> {
+    if selected.is_empty() {
+        return Vec::new();
+    }
+    let root = open_canonical_dir(workspace).ok();
+    let mirror = root.as_ref().and_then(|dir| skill_dir(dir, ".astrion"));
+    let project = root.filter(|_| scan_project).and_then(|dir| skill_dir(&dir, ".agents"));
+    selected.iter().map(|id| (has_skill(mirror.as_ref(), id), has_skill(project.as_ref(), id))).collect()
+}
+
+fn skill_dir(root: &Dir, parent: &str) -> Option<Dir> {
+    root.open_dir_nofollow(parent).ok()?.open_dir_nofollow("skills").ok()
+}
+
+fn has_skill(root: Option<&Dir>, id: &str) -> bool {
+    root.and_then(|dir| dir.open_dir_nofollow(id).ok())
+        .and_then(|dir| dir.symlink_metadata("SKILL.md").ok())
+        .is_some_and(|info| info.is_file())
+}
+
 pub(super) fn sync(
     workspace: &Path, data: &Path, global: &Path, private: &Path,
-    selected: &[String], catalog: &[Value],
+    selected: &[String], catalog: &[Value], scan_project: bool,
 ) -> io::Result<()> {
     let destination = workspace.join(".astrion").join("skills");
-    if [global, private, data].iter().any(|root| {
+    let data = data.canonicalize()?;
+    let global_path = global.canonicalize().ok();
+    let private_path = private.canonicalize().ok();
+    let global = global_path.as_deref().unwrap_or(global);
+    let private = private_path.as_deref().unwrap_or(private);
+    if [global, private, data.as_path()].iter().any(|root| {
         destination.starts_with(root) || root.starts_with(&destination)
     }) {
         return Err(io::Error::new(ErrorKind::PermissionDenied, "Skill mirror overlaps a Host data or library directory"));
     }
     let root = open_canonical_dir(workspace)?;
-    let state = open_canonical_dir(data)?;
+    let state = open_canonical_dir(&data)?;
     if catalog.is_empty() && state.symlink_metadata("workspace_skill_mirrors").is_err() {
         return Ok(());
     }
@@ -45,6 +87,7 @@ pub(super) fn sync(
         return Ok(());
     }
     let target = ensure_dir(&ensure_dir(&root, ".astrion")?, "skills")?;
+    let project = scan_project.then(|| skill_dir(&root, ".agents")).flatten();
     let chosen: BTreeSet<&str> = selected.iter().map(String::as_str).collect();
     let mut ids = BTreeMap::new();
     for item in catalog {
@@ -65,6 +108,8 @@ pub(super) fn sync(
         let prior = previous.get(id);
         let result = (|| {
             let source = library
+                // Project skills take precedence over automatic copies.
+                .filter(|_| !has_skill(project.as_ref(), id))
                 .filter(|_| chosen.contains(id))
                 .map(|path| open_canonical_dir(path)?.open_dir_nofollow(id))
                 .transpose()?;

@@ -54,11 +54,15 @@ async fn workspace_menu(
     settings: Option<Extension<Personalization>>,
 ) -> Response {
     run(move || {
-        if let Some(Extension(settings)) = settings {
-            settings.prepare_workspace_skills(&workspace.path)?;
-        }
+        let mirror_failed = settings.is_some_and(|Extension(settings)| {
+            settings.prepare_workspace_skills(&workspace.path).is_err()
+        });
         let knowledge = Knowledge::open(&workspace.path, &data)?;
-        Ok(json!({"success": true, "skills": skills::workspace_menu(&knowledge)?}))
+        let mut response = json!({"success": true, "skills": skills::workspace_menu(&knowledge)?});
+        if mirror_failed {
+            response["skill_sync_warning"] = json!(crate::web_assets::personalization::skill_mirror_warning(&data));
+        }
+        Ok(response)
     }).await
 }
 

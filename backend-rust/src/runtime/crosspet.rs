@@ -31,7 +31,9 @@ impl Runtime {
             .filter(|entry| store.workspaces.get(&entry.id) == Some(&entry.path))
             .map(|_| Self::conversation_has_background(
                 &store, &task.workspace_id, &task.conversation_id,
-            ));
+            ))
+            // Chat does not own a workspace process or child-agent scope.
+            .or_else(|| task.workspace_id.is_empty().then_some(false));
         Some(TaskObservation { terminal: terminal(task.status), background })
     }
 }

@@ -33,7 +33,7 @@ use metadata::{Policy, skill_selection, skills_catalog};
 use schema::{Object, compression, compression_triggers, normalize, resolved_deep_trigger, schema};
 use serde_json::{Map, Value, json};
 use std::{
-    collections::HashSet,
+    collections::HashMap,
     io,
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
@@ -81,7 +81,7 @@ struct HostPreferences {
     catalog: CatalogSource,
     global_skills: PathBuf,
     private_skills: PathBuf,
-    updates: Mutex<HashSet<PathBuf>>,
+    updates: Mutex<HashMap<PathBuf, skill_mirror::Prepared>>,
 }
 
 impl Personalization {
@@ -91,7 +91,7 @@ impl Personalization {
                 catalog,
                 global_skills,
                 private_skills,
-                updates: Mutex::new(HashSet::new()),
+                updates: Mutex::new(HashMap::new()),
             }),
             skill_sync: None,
             workspace_skill_mirror: false,
@@ -124,13 +124,14 @@ impl Personalization {
         let prefs = &self.preferences;
         let mut prepared = prefs.updates.lock()
             .map_err(|_| io::Error::other("personalization settings lock is poisoned"))?;
-        if !prepared.contains(workspace) {
+        if !prepared.get(workspace).is_some_and(|record| record.is_current(workspace)) {
+            prepared.remove(workspace);
             let config = Store::open(prefs.catalog.host_data_dir())?.read(&prefs.catalog.load())?;
             let catalog = skills_catalog(&prefs.global_skills, &prefs.private_skills);
             let (selected, _) = skill_selection(&config, &catalog);
             let selected = selected.into_iter().map(str::to_owned).collect::<Vec<_>>();
-            prefs.mirror(workspace, &selected, &catalog)?;
-            prepared.insert(workspace.to_owned());
+            let record = prefs.mirror(workspace, selected, &catalog, &config)?;
+            prepared.insert(workspace.to_owned(), record);
         }
         Ok(())
     }
@@ -373,9 +374,17 @@ async fn run(
 }
 
 impl HostPreferences {
-    fn mirror(&self, workspace: &Path, selected: &[String], catalog: &[Value]) -> io::Result<()> {
+    fn mirror(
+        &self,
+        workspace: &Path,
+        selected: Vec<String>,
+        catalog: &[Value],
+        config: &Object,
+    ) -> io::Result<skill_mirror::Prepared> {
+        let scan_project = config.get("agents_skills_scan_enabled").and_then(Value::as_bool).unwrap_or(true);
         skill_mirror::sync(workspace, self.catalog.host_data_dir(), &self.global_skills,
-            &self.private_skills, selected, catalog)
+            &self.private_skills, &selected, catalog, scan_project)?;
+        Ok(skill_mirror::Prepared::capture(workspace, selected, scan_project))
     }
 
     fn update(
@@ -408,6 +417,7 @@ impl HostPreferences {
         let is_update = patch.is_some();
         let old_selection = config["enabled_skills"].clone();
         let old_snapshot = config["skills_catalog_snapshot"].clone();
+        let old_project_scan = config.get("agents_skills_scan_enabled").cloned();
         if let Some(patch) = patch {
             let english = config["ui_locale"] == "en-US";
             config = match normalize(&patch, &config, &catalog, true) {
@@ -445,12 +455,17 @@ impl HostPreferences {
             store.write(&config)?;
             let enabled = selected.iter().map(|id| (*id).to_owned()).collect::<Vec<_>>();
             if workspace_skill_mirror {
-                if old_selection != config["enabled_skills"] || old_snapshot != config["skills_catalog_snapshot"] {
+                if old_selection != config["enabled_skills"] || old_snapshot != config["skills_catalog_snapshot"]
+                    || old_project_scan.as_ref() != config.get("agents_skills_scan_enabled")
+                {
                     prepared.clear();
                 }
-                if let Some(workspace) = workspace.filter(|space| !prepared.contains(&space.path)) {
-                    match self.mirror(&workspace.path, &enabled, &skills) {
-                        Ok(()) => { prepared.insert(workspace.path.clone()); }
+                if let Some(workspace) = workspace.filter(|space| {
+                    !prepared.get(&space.path).is_some_and(|record| record.is_current(&space.path))
+                }) {
+                    prepared.remove(&workspace.path);
+                    match self.mirror(&workspace.path, enabled.clone(), &skills, &config) {
+                        Ok(record) => { prepared.insert(workspace.path.clone(), record); }
                         Err(_) => mirror_warning = true,
                     }
                 }

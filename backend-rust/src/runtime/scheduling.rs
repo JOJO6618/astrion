@@ -118,6 +118,7 @@ impl Runtime {
                 Some(approval),
                 Origin::Automatic,
                 start.hidden_user_notice,
+                &[],
             )?
         };
         Ok(self.spawn_admitted(admitted, model))

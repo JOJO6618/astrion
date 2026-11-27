@@ -213,12 +213,19 @@ pub(crate) fn composer_messages(workspace: &Path, data: &Path, references: &Valu
     for reference in references {
         let path = reference["path"].as_str().ok_or("技能引用必须提供 path。")?;
         let path = composer_path(path.trim());
-        // Older saved messages contain absolute workspace paths. Strip the known
-        // prefix lexically; never open any directory named by an incoming ref.
-        let relative = path.strip_prefix(workspace_prefix.as_str())
-            .and_then(|tail| tail.strip_prefix('/')).unwrap_or(&path);
-        let id = relative.strip_prefix(".astrion/skills/")
-            .and_then(|tail| tail.strip_suffix("/SKILL.md"))
+        const SKILL_ROOT: &str = ".astrion/skills/";
+        let tail = path.strip_prefix(SKILL_ROOT).or_else(|| {
+            let (prefix, tail) = path.rsplit_once("/.astrion/skills/")?;
+            let root = Path::new(&path[..prefix.len() + 1]);
+            // Resolve the workspace alias only. The skill itself is always opened
+            // relative to the trusted directory handle below.
+            let same_workspace = prefix == workspace_prefix.trim_end_matches('/')
+                || (root.is_absolute()
+                    && !root.components().any(|part| part == std::path::Component::ParentDir)
+                    && root.canonicalize().ok().as_deref() == Some(workspace));
+            same_workspace.then_some(tail)
+        });
+        let id = tail.and_then(|tail| tail.strip_suffix("/SKILL.md"))
             .filter(|id| valid_id(id))
             .ok_or("技能引用必须指向当前工作区的 .astrion/skills/<id>/SKILL.md。")?;
         let identity = if cfg!(windows) { id.to_ascii_lowercase() } else { id.to_owned() };

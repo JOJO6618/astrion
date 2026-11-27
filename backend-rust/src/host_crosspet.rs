@@ -97,7 +97,7 @@ impl CrossPetRuntime for HostCrossPetRuntime {
                     .as_ref()
                     .and_then(|catalog| catalog.by_id(&task.session.workspace_id));
                 let mut observed = self.runtime.crosspet_observation(task, workspace)?;
-                if observed.background == Some(false) {
+                if observed.background == Some(false) && !task.session.workspace_id.is_empty() {
                     // Do not report idle if either activity source is unknown.
                     observed.background = workspace.and_then(|workspace| {
                         self.children
