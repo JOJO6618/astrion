@@ -9,7 +9,7 @@ import threading
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 
-from knowledge_media_http import Browser, HERE, LocalServices, ROOT, call, fixture_environment, model_catalog_host, stored_document, wait_for_task
+from knowledge_media_http import Browser, LocalServices, ROOT, call, fixture_environment, model_catalog_host, stored_document, wait_for_task
 
 BRANCH = 'feature/roundtrip'
 FIRST_CHILD = 'Inspect the original child marker'
@@ -49,6 +49,10 @@ class WorktreeServices(LocalServices):
         if 'child-resume' not in results:
             return [call('send_message_to_sub_agent','child-resume',{'name':'reader','message':SECOND_CHILD})]
         assert results['child-resume']['success'], results
+        if 'exit-busy' not in results:
+            return [call('exit_worktree','exit-busy',{'intent':'Check active child prevents exit'})]
+        assert results['exit-busy']['success'] is False and '子智能体' in results['exit-busy']['error'], results
+        self.server.allow_child_finish.set()
         if not self.idle(results, 'second-status'):
             self.server.second_child.wait(2)
             return [call('get_sub_agent_status',f'second-status-{len(results)}',{'names':['reader']})]
@@ -77,6 +81,7 @@ class WorktreeServices(LocalServices):
         if 'child-rebound' not in results:
             return [call('read_file','child-rebound',{'path':'marker.txt'})]
         assert results['child-rebound']['content'].strip() == 'base value', results
+        assert self.server.allow_child_finish.wait(10), 'Parent did not check the busy exit'
         self.server.second_child.set()
         return 'Child resumed and read the worktree value'
 
@@ -89,7 +94,7 @@ def git(project, *args):
 
 def run():
     binary = Path(os.environ.get('ASTRION_HEADLESS_BIN', ROOT/'backend-rust/target-master/debug/astrion-headless')).resolve(strict=True)
-    with tempfile.TemporaryDirectory(dir=HERE) as temporary, ThreadingHTTPServer(('127.0.0.1', 0), WorktreeServices) as service:
+    with tempfile.TemporaryDirectory(prefix='astrion-worktree-') as temporary, ThreadingHTTPServer(('127.0.0.1', 0), WorktreeServices) as service:
         root = Path(temporary)
         env = fixture_environment(root)
         env['ASTRION_RESOURCE_ROOT'] = str(ROOT)
@@ -105,6 +110,7 @@ def run():
         service.errors = []
         service.first_child = threading.Event()
         service.second_child = threading.Event()
+        service.allow_child_finish = threading.Event()
         config = Path(env['DEPLOY_CONFIG_DIR'])/'custom_models.json'
         config.write_text(json.dumps({'models':[{'model_name':'chat-local','model_id':'chat-local',
             'url':service.origin+'/v1','apikey':'fixture-only'}]}))
@@ -137,7 +143,7 @@ def run():
         finally:
             service.shutdown()
             worker.join()
-    print('Agent worktree tools rejected mixed batches and rebound the main Agent and resumed child.')
+    print('Agent worktree tools rejected mixed batches and exit while a child held the worktree.')
 
 
 if __name__ == '__main__':

@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use serde_json::{Value, json};
 
-use crate::worktree::{Target, Worktree};
+use crate::{workspace_catalog::RegisteredWorkspace, worktree::{Target, Worktree}};
 
 use super::{
     LegacyDocument, Runtime, RuntimeError, approval::task_scope, legacy_error, writable_task,
@@ -92,7 +92,12 @@ impl Runtime {
                 let source = worktree.execution_root(meta).map_err(invalid)?;
                 worktree.prepare(target, &source, "execute", "approval").map_err(invalid)?
             }
-            None => worktree.main_binding().map_err(invalid)?,
+            None => {
+                if let Some(source) = departing_tree(meta) {
+                    self.require_idle_worktree(&store, &workspace_id, &conversation, &root, source)?;
+                }
+                worktree.main_binding().map_err(invalid)?
+            }
         };
         if !super::host_policy::scheduled_worktree_authorized(&store, &root, &binding.directory,
             execution == crate::approval::ExecutionMode::Direct)?
@@ -199,7 +204,12 @@ impl Runtime {
                     )
                     .map_err(invalid)?
             }
-            None => worktree.main_binding().map_err(invalid)?,
+            None => {
+                if let Some(source) = departing_tree(meta) {
+                    self.require_idle_worktree(&store, workspace_id, conversation_id, root, source)?;
+                }
+                worktree.main_binding().map_err(invalid)?
+            }
         };
         let saved = &meta["git_worktree"];
         if saved["directory"] == json!(binding.directory) && saved["branch"] == binding.branch {
@@ -235,6 +245,30 @@ impl Runtime {
         )
     }
 
+    fn require_idle_worktree(
+        &self, store: &Store, workspace_id: &str, conversation: &str, workspace: &Path, source: &Path,
+    ) -> Result<(), RuntimeError> {
+        if workspace == source { return Ok(()); }
+        let mut reasons = Vec::new();
+        if let Some(children) = &self.sub_agents {
+            let bound = RegisteredWorkspace { id: workspace_id.into(), path: workspace.to_owned(), label: String::new() };
+            if children.has_running_for_bound(&bound, conversation).map_err(RuntimeError::storage)? {
+                reasons.push("还有子智能体在运行".to_owned());
+            }
+        }
+        let (background, terminal) = store.process_resources.worktree_busy(workspace_id, workspace, conversation, source);
+        if background {
+            reasons.push("还有后台命令在运行".to_owned());
+        }
+        if let Some(terminal) = terminal {
+            reasons.push(format!("终端 {terminal} 仍在当前执行目录运行"));
+        }
+        if reasons.is_empty() { return Ok(()); }
+        Err(RuntimeError::new(409, format!(
+            "当前执行目录仍有进行中的工作，暂不能退出：{}。", reasons.join("；")
+        )))
+    }
+
     /// The runtime workspace remains the identity for storage and knowledge.
     /// Only the task's filesystem capability and approval scope move.
     pub(super) fn worktree_execution_root(
@@ -251,6 +285,14 @@ impl Runtime {
             .map_err(invalid)?;
         Ok((actual != root).then_some(actual))
     }
+}
+
+// Compare process roots with the saved path only; do not open or re-authorize
+// that path. Exiting also recovers a binding whose tree was removed externally.
+fn departing_tree(metadata: &Value) -> Option<&Path> {
+    let state = &metadata["git_worktree"];
+    (state["active"] == true).then(|| state["directory"].as_str().map(Path::new))?
+        .filter(|path| path.is_absolute())
 }
 
 pub(super) fn complete_notice(raw: &Value, batch: &[Value]) -> bool {

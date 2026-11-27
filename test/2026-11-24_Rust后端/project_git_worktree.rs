@@ -8,7 +8,6 @@ use serde_json::{Value, json};
 use uuid::Uuid;
 
 use super::{Target, Worktree};
-use crate::{runtime::Runtime, workspace_catalog::RegisteredWorkspace};
 
 struct Temp(PathBuf);
 
@@ -192,3 +191,6 @@ fn unsafe_refs_and_untracked_path_conflicts_preserve_the_source() {
         "local source\n"
     );
 }
+
+#[path = "../2026-11-27_Rust工作树活动退出/worktree_exit_contract.rs"]
+mod exit_contract;
