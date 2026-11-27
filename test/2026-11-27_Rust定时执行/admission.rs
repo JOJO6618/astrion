@@ -81,6 +81,12 @@ async fn custom_plan_delivers_hidden_notice_and_preserves_real_readonly_mode() {
     let mut plan = definition();
     plan["configuration"] = json!({"mode":"custom","work_mode":"plan","network_enabled":false});
     service.submit(&host, &plan, &Value::Null, false).unwrap();
+    // The browser default is intentionally taken when a fresh scheduled
+    // conversation starts, not frozen into the plan at submission.
+    fs::write(
+        data.0.join("data/personalization.json"),
+        r#"{"browser_tools_default":true}"#,
+    ).unwrap();
     service
         .manage("native", "run", None, None, Some("custom"))
         .unwrap();
@@ -96,6 +102,7 @@ async fn custom_plan_delivers_hidden_notice_and_preserves_real_readonly_mode() {
     assert_eq!(metadata["schedule_id"], "native");
     assert_eq!(metadata["schedule_run_id"], result["id"]);
     assert_eq!(metadata["skip_auto_title_generation"], true);
+    assert_eq!(metadata["browser_tools_enabled"], true);
     assert_eq!(result["summary"], "fixture answer");
     drop(runtime);
     server.abort();

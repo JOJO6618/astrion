@@ -444,6 +444,12 @@ impl ScheduleAdapter for RuntimeScheduleAdapter {
         }
         let mut metadata = snapshot;
         if is_new {
+            // Like an ordinary new Agent conversation, a scheduled conversation
+            // picks up the current browser default as it is created. The normal
+            // runtime still checks platform support and tool permissions.
+            let prefs = read_object(&self.catalog.host_data_dir().join("personalization.json"))
+                .map_err(StartError::Deferred)?;
+            metadata["browser_tools_enabled"] = json!(prefs["browser_tools_default"] == true);
             metadata["schedule_id"] = json!(request.schedule_id);
             metadata["schedule_run_id"] = json!(request.run_id);
             metadata["skip_auto_title_generation"] = json!(true);
