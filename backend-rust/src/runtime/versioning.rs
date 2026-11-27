@@ -45,6 +45,7 @@ async fn toggle(
                 id,
                 python_bool(&body["enabled"]),
                 body["tracking_mode"].as_str(),
+                None,
             )
         },
     )
@@ -94,8 +95,15 @@ pub(in crate::runtime) fn set_enabled_on_create(
     workspace: &str,
     id: &str,
 ) -> Result<(), RuntimeError> {
-    if crate::web_assets::personalization::versioning_default(&store.data_dir).map_err(storage)? {
-        mutations::configure(store, workspace, id, true, Some(super::CONVERSATION_ONLY))?;
+    let defaults = crate::web_assets::personalization::versioning_defaults(&store.data_dir)
+        .map_err(storage)?;
+    if defaults.enabled {
+        let tracking = if defaults.full_backup {
+            super::WORKSPACE_AND_CONVERSATION
+        } else {
+            super::CONVERSATION_ONLY
+        };
+        mutations::configure(store, workspace, id, true, Some(tracking), Some(defaults.full_backup))?;
     }
     Ok(())
 }
