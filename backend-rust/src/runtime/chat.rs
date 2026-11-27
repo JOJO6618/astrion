@@ -82,6 +82,44 @@ impl ChatProgress {
 }
 
 impl Runtime {
+    pub(crate) fn chat_partial_response(&self, id: &str, status: &str) -> Result<Option<Value>, RuntimeError> {
+        let store = self.store()?;
+        let task = store.tasks.get(id).filter(|task| task.workspace_id.is_empty())
+            .ok_or_else(RuntimeError::task_not_found)?;
+        Ok(task.interrupted_chat_response(status))
+    }
+
+    pub(crate) fn with_running_chat_storage<T, E>(
+        &self, id: &str, conversation: &str,
+        action: impl FnOnce(&std::path::Path) -> Result<T, E>,
+    ) -> Result<T, E>
+    where E: From<RuntimeError> {
+        let store = self.store()?;
+        let task = store.tasks.get(id).filter(|task| task.workspace_id.is_empty()
+            && task.conversation_id == conversation).ok_or_else(RuntimeError::task_not_found)?;
+        if task.status != Status::Running || task.cancel_requested {
+            return Err(RuntimeError::new(409, "Chat task is stopped").into());
+        }
+        action(&store.data_dir.join("chat"))
+    }
+
+    pub(crate) async fn chat_summary(
+        &self, model: &super::ModelConfig, conversation: &str, previous: &Value,
+        messages: &[Value],
+    ) -> Result<crate::chat::Completion, String> {
+        use super::billing::{BillingScope, ModelPrice};
+        let responses = reqwest::Url::parse(&model.endpoint).is_ok_and(|url| {
+            url.path().trim_end_matches('/').rsplit('/').next() == Some("responses")
+        });
+        let mut bill = self.billing.begin(BillingScope::main(conversation.to_owned(), previous), ModelPrice {
+            model_key: model.key(), model_id: model.model_id(), identity: model.price_identity(), responses,
+        }).await;
+        let reply = model.complete(messages, &[], |text| bill.observe_text(text)).await?;
+        bill.settle_success(reply.usage.as_ref(), reply.responses_duration_ms).await
+            .map_err(|error| format!("Could not persist Chat summary usage: {error}"))?;
+        Ok(reply)
+    }
+
     pub(crate) fn with_chat_display<T, E>(
         &self, id: &str, action: impl FnOnce(&std::path::Path, Value) -> Result<T, E>,
     ) -> Result<T, E>
@@ -142,6 +180,9 @@ impl Runtime {
             .ok_or_else(RuntimeError::task_not_found)?;
         if task.status != Status::Running || task.cancel_requested {
             return Err(RuntimeError::new(409, "Chat task is stopped"));
+        }
+        if kind == "compression_state" {
+            task.compression_stage = (data["in_progress"] == true).then_some("generating_summary");
         }
         task.emit(kind, data);
         Ok(())

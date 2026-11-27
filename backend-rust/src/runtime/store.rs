@@ -796,7 +796,22 @@ impl Task {
     pub(super) fn chat_display_snapshot(&self, from: u64) -> Value {
         let mut activity = self.activity(from);
         activity["chat_progress"] = self.chat_progress.display();
+        activity["compressing"] = json!(self.status == Status::Running && self.compression_stage.is_some());
         activity
+    }
+
+    pub(super) fn interrupted_chat_response(&self, status: &str) -> Option<Value> {
+        let text = self.stream.as_ref().filter(|stream| !stream.content.trim().is_empty());
+        let reasoning = self.thinking_stream.as_ref().filter(|stream| !stream.content.trim().is_empty());
+        let response = text.or(reasoning)?.response_message_id.as_deref()?;
+        let content = text.filter(|stream| stream.response_message_id.as_deref() == Some(response))
+            .map_or("", |stream| stream.content.as_str());
+        let reasoning = reasoning.filter(|stream| stream.response_message_id.as_deref() == Some(response))
+            .map_or("", |stream| stream.content.as_str());
+        Some(json!({
+            "message_id":response,"role":"assistant","content":content,"reasoning_content":reasoning,
+            "metadata":{"interrupted":true,"stopped":status == "stopped","model_key":self.start.model_key},
+        }))
     }
 }
 

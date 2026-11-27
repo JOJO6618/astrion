@@ -7,6 +7,7 @@
 //! never opens a second writer lock.
 
 mod definitions;
+mod compression;
 mod drafts;
 mod duplicate;
 mod handoff;

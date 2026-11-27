@@ -420,6 +420,17 @@ pub(super) fn recover(
     status: &str,
     updated_at: f64,
 ) -> Result<Value, ChatError> {
+    recover_with_partial(paths, id, turn_id, status, updated_at, None)
+}
+
+pub(super) fn recover_with_partial(
+    paths: &ChatPaths,
+    id: &str,
+    turn_id: &str,
+    status: &str,
+    updated_at: f64,
+    partial: Option<Value>,
+) -> Result<Value, ChatError> {
     // Python's recovery mutates the document directly instead of writing a
     // command receipt; keep the same on-disk shape and rely on turn state for
     // idempotence.
@@ -451,6 +462,13 @@ pub(super) fn recover(
                 message["message_id"] = json!(format!("msg_{}", uuid::Uuid::new_v4().simple()));
             }
             document.append_chat_messages(turn_id, missing, updated_at, None)?;
+        }
+        // While tools run, the latest display can still contain the already
+        // persisted assistant. Do not append it again when cancelling tools.
+        if let Some(message) = partial
+            && !path.iter().any(|node| node["message_id"] == message["message_id"])
+        {
+            document.append_chat_messages(turn_id, vec![message], updated_at, None)?;
         }
         document.finish_chat_turn(turn_id, status, updated_at)?;
         super::handoff::after_finish(&mut document, turn_id, false)?;

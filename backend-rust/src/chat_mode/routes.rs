@@ -204,6 +204,7 @@ fn display(task: &Value) -> Value {
     json!({
         "messages":messages,
         "state":{"streaming":task["stream"]["streaming"] == true || task["thinking_stream"]["streaming"] == true,
+            "compressing":task["compressing"] == true,
             "api_request_pending":task["api_request_pending"] == true,
             "title_pending":task["title_pending"] == true},
         "task": task["task_id"].as_str().map(|id| json!({"task_id":id,"status":if task["cancel_requested"] == true { json!("cancel_requested") } else { task["status"].clone() }})),
