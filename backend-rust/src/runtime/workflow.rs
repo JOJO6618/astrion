@@ -231,7 +231,7 @@ impl Runtime {
             metadata: None,
             new_conversation_id,
             tools: Arc::new(tools),
-            user_message_metadata: Some(message_metadata(marker)),
+            user_message_metadata: Some(message_metadata(marker, "chat", true, now())),
         }
     }
 
@@ -497,9 +497,18 @@ impl Runtime {
         if content.is_empty() {
             return Ok(Vec::new());
         }
-        let metadata = message_metadata("workflow_notice");
+        // This notification continues the current task rather than starting a
+        // new user work segment. Use the same identity and metadata on reload.
+        let content = format!("[系统通知|workflow]\n{content}");
+        let timestamp = now();
+        let message_id = format!("msg_{}", uuid::Uuid::new_v4().simple());
+        let mut metadata = message_metadata("workflow_notice", "compact", false, timestamp);
+        metadata["message_id"] = json!(message_id);
+        metadata["is_auto_generated"] = json!(true);
+        metadata["auto_message_type"] = json!("runtime_workflow");
         let message = json!({"role":"user", "content":content});
         let mut durable_message = message.clone();
+        durable_message["message_id"] = json!(message_id);
         durable_message["metadata"] = metadata.clone();
         let messages = completed
             .cloned()
@@ -507,7 +516,7 @@ impl Runtime {
             .chain([durable_message])
             .collect();
         if let Err(error) =
-            store.append_messages(&workspace_id, &conversation_id, messages, now(), None, None)
+            store.append_messages(&workspace_id, &conversation_id, messages, timestamp, None, None)
         {
             workflow
                 .states
@@ -516,14 +525,7 @@ impl Runtime {
             return Err(error.message);
         }
         let task = writable_task(&mut store, task_id)?;
-        task.emit(
-            "user_message",
-            json!({
-                "message":content, "content":content, "conversation_id":conversation_id, "message_source":"workflow",
-                "workflow_notice":true, "visibility":"chat", "starts_work":true,
-                "timestamp":metadata["timestamp"], "metadata":metadata,
-            }),
-        );
+        super::emit_user_message(task, &content, metadata);
         task.checkpoint_events();
         Ok(vec![message])
     }
@@ -689,9 +691,11 @@ fn running(store: &Store, workspace_id: &str, conversation_id: &str) -> bool {
     })
 }
 
-fn message_metadata(marker: &str) -> Value {
-    let timestamp = super::iso_time(now());
-    let mut metadata = json!({"message_source":"workflow", "visibility":"chat", "starts_work":true, "timestamp":timestamp});
+fn message_metadata(marker: &str, visibility: &str, starts_work: bool, timestamp: f64) -> Value {
+    let timestamp = super::iso_time(timestamp);
+    let mut metadata = json!({
+        "message_source":"workflow","visibility":visibility,"starts_work":starts_work,"timestamp":timestamp,
+    });
     metadata[marker] = json!(true);
     metadata
 }
