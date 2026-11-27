@@ -11,11 +11,12 @@ import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { createConnection } from 'node:net';
 import { setTimeout as delay } from 'node:timers/promises';
+import { settingsEnvironment } from '../../scripts/host-config.mjs';
 import type { ToolApprovalItem } from './approval';
 
 const DEFAULT_PORT = 8091;
 const RUST_PORT = 8092;
-const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
+const REPO_ROOT = resolve(fileURLToPath(new URL('../../', import.meta.url)));
 const DEFAULT_DATA_ROOT = resolve(homedir(), '.astrion/astrion');
 
 export function cliExperiment(): boolean {
@@ -26,33 +27,48 @@ function pairedGateway(): boolean {
   return Boolean(process.env.ASTRION_API_BASE || process.env.ASTRION_HOST_TOKEN_FILE);
 }
 
-export function cliConfigRoot(): string | null {
+function cliEnvironment(): NodeJS.ProcessEnv {
+  if (cliExperiment() || pairedGateway()) return process.env;
+  return settingsEnvironment({ ...process.env });
+}
+
+export function cliConfigRoot(env = cliEnvironment()): string | null {
   if (cliExperiment()) {
     const root = process.env.ASTRION_RUST_DATA_ROOT;
     return root && isAbsolute(root) ? root : null;
   }
   if (process.env.ASTRION_HOST_TOKEN_FILE) return null;
-  return configuredPath('ASTRION_DATA_ROOT') || DEFAULT_DATA_ROOT;
+  return configuredPath('ASTRION_DATA_ROOT', env) || DEFAULT_DATA_ROOT;
 }
 
-function configuredPath(name: string): string | undefined {
-  const value = process.env[name]?.trim();
+function configuredPath(name: string, env: NodeJS.ProcessEnv): string | undefined {
+  const value = env[name]?.trim();
   if (!value) return;
   if (value === '~') return homedir();
   if (/^~[\\/]/.test(value)) return resolve(homedir(), value.slice(2));
   return resolve(REPO_ROOT, value);
 }
 
-export function cliDataDir(): string | null {
-  const root = cliConfigRoot();
-  if (!root) return null;
-  return (!cliExperiment() && configuredPath('DATA_DIR')) || resolve(root, 'host/data');
+export function cliResourceDir(env = cliEnvironment()): string {
+  if (cliExperiment()) {
+    return process.env.ASTRION_RUST_RESOURCE_ROOT ||
+      resolve(REPO_ROOT, 'desktop-electron/.cache/rust-experiment/resources');
+  }
+  return configuredPath('ASTRION_RUST_RESOURCE_ROOT', env) ||
+    configuredPath('ASTRION_RESOURCE_ROOT', env) ||
+    REPO_ROOT;
 }
 
-export function cliDeployDir(): string | null {
-  const root = cliConfigRoot();
+export function cliDataDir(env = cliEnvironment()): string | null {
+  const root = cliConfigRoot(env);
   if (!root) return null;
-  return (!cliExperiment() && configuredPath('DEPLOY_CONFIG_DIR')) || resolve(root, 'config');
+  return (!cliExperiment() && configuredPath('DATA_DIR', env)) || resolve(root, 'host/data');
+}
+
+export function cliDeployDir(env = cliEnvironment()): string | null {
+  const root = cliConfigRoot(env);
+  if (!root) return null;
+  return (!cliExperiment() && configuredPath('DEPLOY_CONFIG_DIR', env)) || resolve(root, 'config');
 }
 
 function rustExperimentRoot(): string {
@@ -83,13 +99,15 @@ function containsPath(root: string, candidate: string): boolean {
   return part === '' || (!isAbsolute(part) && part !== '..' && !part.startsWith(`..${sep}`));
 }
 
-function rustResourceRoot(dataRoot: string): string {
-  const configured = process.env.ASTRION_RUST_RESOURCE_ROOT || resolve(REPO_ROOT, 'desktop-electron/.cache/rust-experiment/resources');
+function rustResourceRoot(dataRoot: string, experimental: boolean, env: NodeJS.ProcessEnv): string {
+  const configured = cliResourceDir(env);
   if (!isAbsolute(configured) || !existsSync(resolve(configured, 'config/providers_catalog.json'))) {
-    throw new GatewayError('Prepare the Rust resources with node desktop/scripts/prepare_rust_backend.mjs, or set ASTRION_RUST_RESOURCE_ROOT');
+    throw new GatewayError(experimental
+      ? 'Prepare the Rust resources with node desktop/scripts/prepare_rust_backend.mjs, or set ASTRION_RUST_RESOURCE_ROOT'
+      : 'Astrion source resources not found. Set ASTRION_RUST_RESOURCE_ROOT to the resource directory.');
   }
   const root = realpathSync(configured);
-  if (containsPath(dataRoot, root) || existsSync(resolve(root, 'config/custom_models.json'))) {
+  if (experimental && (containsPath(dataRoot, root) || existsSync(resolve(root, 'config/custom_models.json')))) {
     throw new GatewayError('Use staged Rust product resources, separate from experiment data');
   }
   return root;
@@ -129,6 +147,7 @@ export class GatewayClient {
   private token = '';
   private tokenPath: string | null;
   private readonly paired = pairedGateway();
+  private readonly environment: NodeJS.ProcessEnv;
   private readonly port: number;
   private readonly explicitToken = process.env.ASTRION_HOST_TOKEN_FILE;
   /** cwd 绑定的工作区 id（boot 确定后写入，后续请求自动携带） */
@@ -138,10 +157,11 @@ export class GatewayClient {
     if (process.env.ASTRION_CLI_BACKEND && process.env.ASTRION_CLI_BACKEND !== 'rust') {
       throw new GatewayError('Astrion CLI requires the Rust backend');
     }
-    const defaultPort = cliExperiment() ? RUST_PORT : process.env.WEB_SERVER_PORT || DEFAULT_PORT;
-    this.port = Number(process.env.ASTRION_API_PORT || defaultPort);
+    const env = this.environment = { ...cliEnvironment() };
+    const defaultPort = cliExperiment() ? RUST_PORT : env.WEB_SERVER_PORT || DEFAULT_PORT;
+    this.port = Number(env.ASTRION_API_PORT || defaultPort);
     this.baseUrl = process.env.ASTRION_API_BASE || `http://127.0.0.1:${this.port}`;
-    this.tokenPath = !this.paired ? null : (this.explicitToken || resolve(cliDataDir() || resolve(DEFAULT_DATA_ROOT, 'host/data'), 'host_api_token'));
+    this.tokenPath = !this.paired ? null : (this.explicitToken || resolve(cliDataDir(env) || resolve(DEFAULT_DATA_ROOT, 'host/data'), 'host_api_token'));
   }
 
   /** 读取 host Bearer token；文件不存在 = 服务未启动或非 host 模式 */
@@ -210,28 +230,29 @@ export class GatewayClient {
   private async ensureRustRunning(cwd: string, onPhase?: (phase: 'starting') => void): Promise<void> {
     if (!Number.isInteger(this.port) || this.port < 1024 || this.port > 65535) throw new GatewayError('Invalid ASTRION_API_PORT');
     const experimental = cliExperiment();
-    const root = experimental ? rustExperimentRoot() : cliConfigRoot()!;
-    const dataDir = experimental ? resolve(root, 'host/data') : cliDataDir()!;
+    const selectedEnv = this.environment;
+    const root = experimental ? rustExperimentRoot() : cliConfigRoot(selectedEnv)!;
+    const dataDir = experimental ? resolve(root, 'host/data') : cliDataDir(selectedEnv)!;
     this.tokenPath = resolve(dataDir, 'host_api_token');
     if (await this.probeRust() !== null) return this.connectRust();
 
-    const endpoint = process.env.ASTRION_RUST_MODEL_ENDPOINT;
-    const model = process.env.ASTRION_RUST_MODEL;
+    const endpoint = selectedEnv.ASTRION_RUST_MODEL_ENDPOINT;
+    const model = selectedEnv.ASTRION_RUST_MODEL;
     if (Boolean(endpoint) !== Boolean(model)) throw new GatewayError('Set ASTRION_RUST_MODEL_ENDPOINT and ASTRION_RUST_MODEL together');
     const executable = process.platform === 'win32' ? 'astrion-headless.exe' : 'astrion-headless';
-    const binary = process.env.ASTRION_RUST_BACKEND_BIN ||
+    const binary = selectedEnv.ASTRION_RUST_BACKEND_BIN ||
       ['release', 'debug'].map(profile => resolve(REPO_ROOT, 'backend-rust/target', profile, executable))
         .find(existsSync);
     if (!binary || !isAbsolute(binary) || !existsSync(binary))
       throw new GatewayError('Build the Rust backend with cargo build --release, or set ASTRION_RUST_BACKEND_BIN to its absolute path');
-    const resourceRoot = rustResourceRoot(root);
-    const logDir = (experimental ? undefined : configuredPath('LOGS_DIR')) || resolve(root, 'host/logs');
-    const deployDir = experimental ? resolve(root, 'config') : cliDeployDir()!;
-    const registry = (experimental ? undefined : configuredPath('HOST_WORKSPACES_FILE')) || resolve(deployDir, 'host_workspaces.json');
+    const resourceRoot = rustResourceRoot(root, experimental, selectedEnv);
+    const logDir = (experimental ? undefined : configuredPath('LOGS_DIR', selectedEnv)) || resolve(root, 'host/logs');
+    const deployDir = experimental ? resolve(root, 'config') : cliDeployDir(selectedEnv)!;
+    const registry = (experimental ? undefined : configuredPath('HOST_WORKSPACES_FILE', selectedEnv)) || resolve(deployDir, 'host_workspaces.json');
     const logPath = resolve(logDir, 'cli_spawned_server.log');
     const args = ['--workspace', cwd, '--data-dir', dataDir, '--port', String(this.port)];
     if (endpoint && model) args.push('--endpoint', endpoint, '--model', model);
-    const env = { ...process.env };
+    const env = { ...selectedEnv };
     if (experimental) {
       for (const key of Object.keys(env)) if (/^(ASTRION_|AGENT_|WEB_)/i.test(key)) delete env[key];
       Object.assign(env, {
