@@ -32,16 +32,20 @@ fn definitions() -> [Value; 2] {
     ]
 }
 
+pub(super) fn schemas(metadata: &Value) -> Vec<Value> {
+    if metadata["git_worktree_enabled"] == true {
+        Vec::from(definitions())
+    } else {
+        Vec::new()
+    }
+}
+
 impl Runtime {
     pub(super) fn worktree_tools(&self, task_id: &str) -> Result<Vec<Value>, String> {
         let store = self.store().map_err(|error| error.message)?;
         let task = store.tasks.get(task_id).ok_or("Task is not available")?;
         let (header, _) = store.header(&task.workspace_id, &task.conversation_id).map_err(|error| error.message)?;
-        Ok(if header["metadata"]["git_worktree_enabled"] == true {
-            Vec::from(definitions())
-        } else {
-            Vec::new()
-        })
+        Ok(schemas(&header["metadata"]))
     }
 
     pub(super) async fn execute_worktree_tool(

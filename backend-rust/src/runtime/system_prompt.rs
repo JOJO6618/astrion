@@ -5,13 +5,13 @@ mod sections;
 /// 运行期模式切换通知复用同一份段落渲染，避免与首次冻结的系统提示词规则漂移。
 pub(super) use sections::{execution_section, permission_section, work_section};
 
-use std::path::Path;
+use std::{collections::HashSet, path::Path};
 
 use serde_json::{Map, Value, json};
 
 use crate::knowledge::{Knowledge, prompt::workspace_name};
 
-use super::{ModelConfig, RuntimeError, store::Store};
+use super::{ModelConfig, Runtime, RuntimeError, TaskApprovalSettings, store::Store};
 
 const KEY: &str = "frozen_system_prompt";
 const LEGACY_KEYS: [&str; 18] = [
@@ -38,9 +38,16 @@ macro_rules! dynamic {
     ($name:literal) => { include_str!(concat!("../../../prompts/main_agent/dynamic/", $name, ".txt")) };
 }
 
-/// Call while holding the same store lock as the turn commit. Used only on admission.
+pub(super) struct ToolContext<'a> {
+    pub(super) workflow: bool,
+    pub(super) writer: bool,
+    pub(super) approval: Option<&'a TaskApprovalSettings>,
+}
+
+/// Call while holding the same store lock as the turn commit.
 pub(super) fn freeze(
-    store: &Store, workspace_id: &str, document: &mut Value, model: &ModelConfig, writer: bool,
+    runtime: &Runtime, store: &Store, workspace_id: &str, document: &mut Value,
+    model: &ModelConfig, tools: ToolContext<'_>,
 ) -> Result<(), RuntimeError> {
     let created_at = document["created_at"].as_str().unwrap_or_default().to_owned();
     let conversation_id = document["id"].as_str().unwrap_or_default().to_owned();
@@ -54,7 +61,42 @@ pub(super) fn freeze(
             .filter(|prefs| prefs.as_object().is_some_and(|fields| !fields.is_empty()))
             .cloned().unwrap_or_else(|| knowledge.prompt_preferences());
         let recent = sections::recent_conversations(store, workspace_id, &conversation_id, &preferences);
-        let input = Inputs { root, created_at: &created_at, knowledge: &knowledge, preferences: &preferences, model, writer, recent, browser: store.native_browser.is_some() && writer };
+        let settings = Value::Object(metadata.clone());
+        let can_write = tools.writer && tools.approval.is_some();
+        let mut modes = crate::web_status::effective_modes(&store.data_dir, &settings);
+        // No approved task scope (e.g. a fixed read-only Git review) must
+        // never be described as a writable or direct execution environment.
+        if !can_write {
+            modes[1].1 = "readonly";
+            modes[2].1 = "sandbox";
+        }
+        let (catalog, disabled) = if tools.workflow {
+            let overrides = &settings["runtime_tool_category_overrides"];
+            let (blocked, notice) = super::tool_categories::prompt_states(&store.data_dir, overrides)
+                .map_err(RuntimeError::storage)?;
+            let mut available: HashSet<_> = super::agent::tool_menu::workflow_schemas(
+                runtime, super::worktree::schemas(&settings), can_write,
+            ).iter().filter_map(|tool| tool["function"]["name"].as_str().map(str::to_owned)).collect();
+            if tools.approval.is_some_and(|approval| approval.principal.username() == "host")
+                && crate::mcp::main_has_servers(&store.data_dir, workspace_id, overrides)
+            {
+                available.insert(crate::mcp::LIST_TOOL.into());
+            }
+            available.retain(|tool| !blocked.contains(tool));
+            let catalog = super::tool_loading::catalog(&settings["tool_loading"], &available);
+            let disabled = if preferences["silent_tool_disable"] == false {
+                sections::disabled_tools(&notice)
+            } else {
+                None
+            };
+            (catalog, disabled)
+        } else {
+            (String::new(), None)
+        };
+        let input = Inputs {
+            root, created_at: &created_at, knowledge: &knowledge, preferences: &preferences, model,
+            modes, recent, browser: store.native_browser.is_some() && can_write, catalog, disabled,
+        };
         build(metadata, input)
     })
 }
@@ -113,13 +155,15 @@ struct Inputs<'a> {
     knowledge: &'a Knowledge,
     preferences: &'a Value,
     model: &'a ModelConfig,
-    writer: bool,
+    modes: [(&'static str, &'static str); 4],
     browser: bool,
     recent: String,
+    catalog: String,
+    disabled: Option<String>,
 }
 
 fn build(metadata: &mut Map<String, Value>, input: Inputs<'_>) -> Result<String, RuntimeError> {
-    let Inputs { root, created_at, knowledge, preferences, model, writer, recent, browser } = input;
+    let Inputs { root, created_at, knowledge, preferences, model, modes, recent, browser, catalog, disabled } = input;
     let mut parts = vec![STATIC.trim().to_owned()];
     parts.extend(sections::personalization(preferences));
     for (name, enabled) in [("AGENTS.md", "agents_md_auto_inject"), ("CLAUDE.md", "claude_md_auto_inject")] {
@@ -130,12 +174,6 @@ fn build(metadata: &mut Map<String, Value>, input: Inputs<'_>) -> Result<String,
     let skills = knowledge.skill_list_lines().unwrap_or_default();
     let skills = if skills.is_empty() { "暂无可用的skills".into() } else { skills.join("\n") };
     parts.push(render(dynamic!("skills"), &[("skills_list", &skills)]));
-    if let Some(state) = metadata.get("tool_loading") {
-        let catalog = super::tool_loading::catalog(state);
-        if !catalog.is_empty() {
-            parts.push(render(dynamic!("tool_loading"), &[("tool_catalog", &catalog)]));
-        }
-    }
     parts.push(sections::memory(knowledge, preferences));
     if metadata.get("workspace_memory_enabled") == Some(&Value::Bool(true)) {
         let memory = knowledge.prompt_workspace_memory().map_err(RuntimeError::storage)?;
@@ -157,10 +195,19 @@ fn build(metadata: &mut Map<String, Value>, input: Inputs<'_>) -> Result<String,
         "image" => dynamic!("vision_image"),
         _ => dynamic!("vision_text"),
     }.trim().into());
-    parts.extend(sections::modes(metadata, preferences, writer));
+    parts.extend(sections::modes(modes));
     let browser_state = if !browser { "不可用" }
         else if metadata.get("browser_tools_enabled") == Some(&Value::Bool(true)) { "开启" } else { "关闭" };
     parts.push(render(dynamic!("features"), &[("preview_state", "可用"), ("browser_state", browser_state)]));
+    if let Some(worktree) = sections::worktree(metadata, root) {
+        parts.push(worktree);
+    }
+    if !catalog.is_empty() {
+        parts.push(render(dynamic!("tool_loading"), &[("tool_catalog", &catalog)]));
+    }
+    if let Some(disabled) = disabled {
+        parts.push(render(dynamic!("disabled_tools"), &[("disabled_notice", &disabled)]));
+    }
     if !recent.is_empty() {
         parts.push(render(dynamic!("recent_conversations"), &[("recent_conversations", &recent)]));
     }

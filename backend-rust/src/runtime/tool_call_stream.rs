@@ -30,8 +30,8 @@ pub(crate) enum ToolStreamEvent {
     },
 }
 
-#[derive(Default)]
 pub(crate) struct ToolCallStream {
+    intent_enabled: bool,
     tools: BTreeMap<u64, StreamTool>,
 }
 
@@ -43,7 +43,17 @@ struct StreamTool {
     complete: bool,
 }
 
+impl Default for ToolCallStream {
+    fn default() -> Self {
+        Self::with_intent(true)
+    }
+}
+
 impl ToolCallStream {
+    pub(super) fn with_intent(intent_enabled: bool) -> Self {
+        Self { intent_enabled, tools: BTreeMap::new() }
+    }
+
     /// Feed one accumulated tool call fragment and return the events to publish.
     pub(crate) fn push(&mut self, delta: ToolCallDelta<'_>) -> Vec<ToolStreamEvent> {
         let mut events = Vec::new();
@@ -55,7 +65,11 @@ impl ToolCallStream {
         if !delta.name.is_empty() {
             tool.name = delta.name.to_owned();
         }
-        let (intent, complete) = detect_intent(delta.arguments);
+        let (intent, complete) = if self.intent_enabled {
+            detect_intent(delta.arguments)
+        } else {
+            (None, false)
+        };
         if fresh {
             if let Some(intent) = &intent {
                 tool.intent = Some(intent.clone());
@@ -132,3 +146,7 @@ pub(crate) fn publish(
     };
     emit(kind, data)
 }
+
+#[cfg(test)]
+#[path = "../../../test/2026-11-27_RustAgent设置生效/tool_intent_stream_contract.rs"]
+mod preference_contract;

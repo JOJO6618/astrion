@@ -39,19 +39,21 @@ impl State {
         self.deferred.iter().any(|name| name == tool) && !self.loaded.iter().any(|name| name == tool)
     }
 
-    pub(super) fn active(&self) -> bool {
-        !self.deferred.is_empty()
+    fn available_in(&self, complete: &[Value]) -> bool {
+        complete.iter().filter_map(name).any(|tool| self.deferred.iter().any(|deferred| deferred == tool))
     }
 
-    pub(super) fn schemas(&self, complete: &[Value]) -> Vec<Value> {
+    pub(super) fn schemas(&self, complete: &[Value], intent_enabled: bool) -> Vec<Value> {
         let mut schemas: Vec<_> = complete.iter().map(|spec| {
             match name(spec) {
                 Some(tool) if self.deferred.iter().any(|item| item == tool) => stub(tool, spec),
                 _ => spec.clone(),
             }
         }).collect();
-        if self.active() {
-            schemas.push(schema());
+        if self.available_in(complete) {
+            let mut loader = schema();
+            super::tool_intent::configure_schema(&mut loader, intent_enabled);
+            schemas.push(loader);
         }
         schemas
     }
@@ -102,7 +104,7 @@ impl Runtime {
         let Some(mut state) = db.field(&id, "metadata", "tool_loading")?.as_ref().and_then(State::parse) else {
             return Ok(None);
         };
-        if state.active() && state.exposed.is_empty() {
+        if state.available_in(complete) && state.exposed.is_empty() {
             state.exposed = complete.iter().filter_map(name)
                 .filter(|name| !state.deferred.iter().any(|value| value == name)).map(str::to_owned).collect();
             state.exposed.push(NAME.into());
@@ -133,11 +135,11 @@ pub(super) fn checkpoint(document: &Value, batch: &[Value]) -> Option<Value> {
     (prior != state.loaded.len()).then(|| state.value())
 }
 
-pub(super) fn catalog(raw: &Value) -> String {
+pub(super) fn catalog(raw: &Value, available: &HashSet<String>) -> String {
     let Some(state) = State::parse(raw) else { return String::new(); };
     deferred_registry().iter().filter_map(|group| {
         let tools: Vec<_> = group["tools"].as_array()?.iter().filter_map(Value::as_str)
-            .filter(|name| state.deferred.iter().any(|value| value == name)).collect();
+            .filter(|name| available.contains(*name) && state.deferred.iter().any(|value| value == name)).collect();
         if tools.is_empty() { return None; }
         let (label, hint) = match group["key"].as_str()? {
             "schedules" => ("定时任务", "管理定时 Agent 计划"),

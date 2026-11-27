@@ -86,7 +86,7 @@ async fn run_inner(
                 messages.push(json!({"role": "user", "content": notice["content"].clone()}));
             }
         }
-        let tool_menu::ToolMenu {complete_schemas, round_schemas, browser_names, interaction_names, process_names, disabled, mcp, mcp_snapshot, mut deferred} =
+        let tool_menu::ToolMenu {complete_schemas, round_schemas, browser_names, interaction_names, process_names, disabled, intent_enabled, mcp, mcp_snapshot, mut deferred} =
             tool_menu::for_round(runtime, task_id, tools, &model).await?;
         let workflow_prompt = if workflow {
             messages.extend(runtime.drain_sub_agent_notices(task_id, None)?);
@@ -122,7 +122,7 @@ async fn run_inner(
                 model_key: model.key(), model_id: &model.model, identity: &model.price_identity, responses,
             }).await;
             runtime.emit(task_id, "api_request_start", retry.start_event())?;
-            let (result, bill, stream) = stream_completion(runtime, task_id, &model, &request, &round_schemas, &mut budget, bill, workflow, thinking).await?;
+            let (result, bill, stream) = stream_completion(runtime, task_id, &model, &request, &round_schemas, &mut budget, bill, workflow, intent_enabled, thinking).await?;
             match result {
                 Ok(completion) => break (completion, bill, stream),
                 Err(error) if retry.should_retry(&error) => {
@@ -503,7 +503,7 @@ struct StreamProgress {
 
 async fn stream_completion(
     runtime: &Runtime, task_id: &str, model: &ModelConfig, request: &[Value], schemas: &[Value],
-    budget: &mut RoundBudget, mut bill: RequestBilling, track_preview: bool, work: Option<&super::thinking_auxiliary::ThinkingWork>,
+    budget: &mut RoundBudget, mut bill: RequestBilling, track_preview: bool, intent_enabled: bool, work: Option<&super::thinking_auxiliary::ThinkingWork>,
 ) -> Result<(Result<Completion, String>, RequestBilling, StreamProgress), String> {
     use crate::model::StreamDelta;
 
@@ -512,7 +512,7 @@ async fn stream_completion(
     let mut thinking = super::thinking::ThinkingStream::new(runtime, task_id, &response_id, work);
     let mut preview = track_preview.then(super::preview_tracking::ModelText::default);
     let mut proposed_targets = Vec::new();
-    let mut tool_stream = super::tool_call_stream::ToolCallStream::default();
+    let mut tool_stream = super::tool_call_stream::ToolCallStream::with_intent(intent_enabled);
     let mut tool_started = false;
     let (abort, failed) = oneshot::channel();
     let mut abort = Some(abort);

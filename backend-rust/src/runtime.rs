@@ -41,6 +41,7 @@ pub(crate) mod thinking;
 pub(crate) mod thinking_auxiliary;
 mod tool_loading;
 mod tool_intent;
+mod skill_hints;
 pub(crate) mod tool_call_stream;
 mod knowledge_tools;
 mod schedule_tools;
@@ -690,7 +691,9 @@ impl Runtime {
                 settings.apply_conversation_modes(&document["metadata"]);
             }
             task.approval = approval;
-            system_prompt::freeze(store, workspace_id, &mut document, model, tools.writer().is_some())?;
+            system_prompt::freeze(self, store, workspace_id, &mut document, model, system_prompt::ToolContext {
+                writer: tools.writer().is_some(), workflow: tools.allows_workflow(), approval: task.approval.as_ref(),
+            })?;
             // 空闲期切换的模式在下一条消息前补发一次；新对话在这里静默对齐基线。
             let mode_notices = document["metadata"].as_object_mut()
                 .map(|metadata| {
@@ -738,6 +741,12 @@ impl Runtime {
             for skill in skill_messages {
                 model_input.push(json!({"role":"user","content":skill["content"]}));
                 durable.push(skill);
+            }
+            if tools.allows_workflow() && matches!(origin, Origin::User)
+                && let Some(hint) = skill_hints::for_message(&store.data_dir, message)
+            {
+                model_input.push(json!({"role":"system","content":hint["content"]}));
+                durable.push(hint);
             }
             if let Some(notice) = hidden_user_notice {
                 let model_notice = json!({"role":"user","content":notice});
