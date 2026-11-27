@@ -19,18 +19,15 @@ use crate::{
     approval::{
         Approval, ApprovalError, ApprovalPrincipal, ApprovalType, ExecutionMode, PermissionMode,
         Status, TaskScope, ToolRequest, exempt_workspace_write,
-        review::{self, ReviewSnapshot, retryable},
+        review::{self, ReviewSnapshot},
     },
     catalog::CatalogSource,
+    model::retry::Attempt,
     tools::write_file::{EDIT_NAME, WRITE_NAME, WorkspaceFileWriter},
 };
 
 const APPROVAL_WAIT: Duration = Duration::from_secs(3600);
 const POLL_INTERVAL: Duration = Duration::from_millis(100);
-/// 审核模型请求的尝试次数与间隔，与目标审核、工作流审核及 Python 版
-/// `modules/retry_policy.py` 同口径：1 次原始 + 4 次重试，固定 10s。
-const REVIEW_ATTEMPTS: u16 = 5;
-const REVIEW_RETRY_DELAY: Duration = Duration::from_secs(10);
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum WorkMode {
@@ -565,8 +562,10 @@ impl Runtime {
                             json!({"stage":"model_call", "round":round}),
                         )?;
                         audit.messages(&messages[start..],round).map_err(|e|e.to_string())?;
-                        let mut attempt = 1u16;
+                        let mut attempt = 0;
                         loop {
+                            attempt += 1;
+                            let retry = Attempt::new(attempt, true);
                             let mut billing = runtime
                                 .billing
                                 .begin(
@@ -597,9 +596,8 @@ impl Runtime {
                                         .map_err(|_| "Could not persist review model usage".to_owned())?;
                                     break Ok(completion);
                                 }
-                                Err(error) if attempt < REVIEW_ATTEMPTS && retryable(&error) => {
-                                    attempt += 1;
-                                    tokio::time::sleep(REVIEW_RETRY_DELAY).await;
+                                Err(error) if retry.should_retry(&error) => {
+                                    retry.wait().await;
                                 }
                                 Err(error) => break Err(error),
                             }

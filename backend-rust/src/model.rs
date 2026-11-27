@@ -12,6 +12,7 @@ use crate::responses::{
 };
 
 mod budget;
+pub(crate) mod retry;
 pub mod codex;
 
 pub use crate::chat::RequestOptions;

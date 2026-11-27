@@ -237,7 +237,7 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 
 ### 10.5 审核智能体
 
-- 设置页「审核智能体」→ `personalization.json` 的 `review_agents`；三个：`auto_approval`／`goal_review`／`workflow_review`，字段只有 `model`（留空=自动规则）与 `max_rounds`（默认 10）。**思考固定开启、推理强度走默认、无设置项**；**无产品层超时**（流式 300s 无块即断流重试）；**取证命令超时固定 60s**。统一经 `modules/review_model_caller.py`，失败按 `modules/retry_policy.py` 分类重试（最多 5 次、固定 10s），每次请求计入账本（§22）；旧的独立 json 与 `sub_agent_models.json` **已废除，无兼容**。
+- 设置页「审核智能体」→ `personalization.json` 的 `review_agents`；三个：`auto_approval`／`goal_review`／`workflow_review`，字段只有 `model`（留空=自动规则）与 `max_rounds`（默认 10）。**思考固定开启、推理强度走默认、无设置项**；**无产品层超时**（流式 300s 无块即断流重试）；**取证命令超时固定 60s**。模型请求复用 `backend-rust/src/model/retry.rs`（首次加最多 9 次重试，固定间隔 10 秒），用量记入账本（§22）。旧的独立 json 与 `sub_agent_models.json` **已废除，无兼容**。
 - **送审上下文**：user 为紧凑纯文本；直接输入/运行引导/ask 问答合计最近 5 条、普通调用＋结果最近 5 个，固定附已批准计划/当前目标并去重；工具须按结果配对（不能用执行前的 `_recent_tool_actions`）；历史补查用本次冻结快照。审核失败独立 error、不执行且不转人工；新引导/条件变化使旧审核失效。契约 `docs/auto_approval_review.md`。
 
 ### 10.6) 运行模式（work_mode）系统

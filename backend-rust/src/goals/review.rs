@@ -6,6 +6,7 @@ use uuid::Uuid;
 use crate::{
     catalog::CatalogSource,
     chat::Completion,
+    model::retry::Attempt,
     runtime::ModelConfig,
     usage::{Actor, Ledger, PriceRefresh, RequestTiming, calculate_cost},
     workflows::ReviewEvidence,
@@ -18,7 +19,6 @@ const ACTIVE_START: &str = "{{ACTIVE_REVIEW_ONLY}}";
 const ACTIVE_END: &str = "{{/ACTIVE_REVIEW_ONLY}}";
 const REPORT: &str = "report_goal_status";
 const COMMAND: &str = "run_command";
-const ATTEMPTS: u16 = 5;
 
 #[derive(Clone)]
 pub struct GoalReviewer {
@@ -178,7 +178,10 @@ impl GoalReviewer {
         &self, conversation_id: &str, model: &ModelConfig,
         messages: &[Value], tools: &[Value],
     ) -> Result<Completion, GoalFailure> {
-        for attempt in 1..=ATTEMPTS {
+        let mut attempt = 0;
+        loop {
+            attempt += 1;
+            let retry = Attempt::new(attempt, true);
             let request_id = Uuid::new_v4().to_string();
             let price = self.pricing.capture(model.key(), model.model_id(), model.price_identity()).await;
             let began = Instant::now();
@@ -202,14 +205,10 @@ impl GoalReviewer {
             }
             match result {
                 Ok(completion) => return Ok(completion),
-                Err(message) => {
-                    let failure = GoalFailure::from_message(message);
-                    if failure.reason() != "retryable" || attempt == ATTEMPTS { return Err(failure); }
-                    tokio::time::sleep(Duration::from_secs(10)).await;
-                }
+                Err(message) if retry.should_retry(&message) => retry.wait().await,
+                Err(message) => return Err(GoalFailure::from_message(message)),
             }
         }
-        unreachable!("final reviewer attempt returns a terminal result")
     }
 }
 
