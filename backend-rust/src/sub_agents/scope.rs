@@ -178,7 +178,9 @@ impl ChildScope {
 
     pub(super) fn path(&self, raw: &Value) -> Result<String, String> {
         let raw = raw.as_str().filter(|path| !path.trim().is_empty()).ok_or("缺少文件路径参数。")?;
-        let path = if let Some(path) = raw.strip_prefix("/workspace/") {
+        let path = if Path::new(raw).starts_with(&self.workspace) {
+            PathBuf::from(raw)
+        } else if let Some(path) = raw.strip_prefix("/workspace/") {
             self.workspace.join(path)
         } else {
             self.execution.join(raw)

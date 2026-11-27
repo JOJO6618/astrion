@@ -149,7 +149,17 @@ pub(super) fn read_database_page(
     let entries = rows
         .into_iter()
         .filter_map(|row| row.2)
-        .map(|event| serde_json::from_str(&event))
+        .map(|event| {
+            let mut event: Value = serde_json::from_str(&event)?;
+            // Early Rust activity persisted a different key; keep old offsets
+            // and payloads intact while projecting the original UI contract.
+            if event["type"] == "progress" && event["tool"].is_string() && event["args"].is_null()
+                && event["arguments"].is_object()
+            {
+                event["args"] = event["arguments"].clone();
+            }
+            Ok(event)
+        })
         .collect::<serde_json::Result<Vec<_>>>()?;
     Ok(ActivityPage {
         entries,

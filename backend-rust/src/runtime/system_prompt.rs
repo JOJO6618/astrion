@@ -54,7 +54,9 @@ pub(super) fn freeze(
             .filter(|prefs| prefs.as_object().is_some_and(|fields| !fields.is_empty()))
             .cloned().unwrap_or_else(|| knowledge.prompt_preferences());
         let recent = sections::recent_conversations(store, workspace_id, &conversation_id, &preferences);
-        let input = Inputs { root, created_at: &created_at, knowledge: &knowledge, preferences: &preferences, model, writer, recent, browser: store.native_browser.is_some() && writer };
+        let project_name = store.workspace_labels.get(workspace_id).map(String::as_str)
+            .filter(|label| !label.trim().is_empty()).unwrap_or_else(|| workspace_name(root));
+        let input = Inputs { root, project_name, created_at: &created_at, knowledge: &knowledge, preferences: &preferences, model, writer, recent, browser: store.native_browser.is_some() && writer };
         build(metadata, input)
     })
 }
@@ -109,6 +111,7 @@ pub(super) fn invalidate_after_compression(metadata: &mut Map<String, Value>) {
 
 struct Inputs<'a> {
     root: &'a Path,
+    project_name: &'a str,
     created_at: &'a str,
     knowledge: &'a Knowledge,
     preferences: &'a Value,
@@ -119,7 +122,7 @@ struct Inputs<'a> {
 }
 
 fn build(metadata: &mut Map<String, Value>, input: Inputs<'_>) -> Result<String, RuntimeError> {
-    let Inputs { root, created_at, knowledge, preferences, model, writer, recent, browser } = input;
+    let Inputs { root, project_name, created_at, knowledge, preferences, model, writer, recent, browser } = input;
     let mut parts = vec![STATIC.trim().to_owned()];
     parts.extend(sections::personalization(preferences));
     for (name, enabled) in [("AGENTS.md", "agents_md_auto_inject"), ("CLAUDE.md", "claude_md_auto_inject")] {
@@ -168,10 +171,11 @@ fn build(metadata: &mut Map<String, Value>, input: Inputs<'_>) -> Result<String,
     let tree = format!("（以下为工作区根目录的部分文件和文件夹）\n{}", knowledge.prompt_tree());
     let limits = format!("工作区：{}。可用能力由当前对话的工具及审批配置确定。", root.display());
     let environment = format!("{} / {}，Astrion Host", std::env::consts::OS, std::env::consts::ARCH);
+    let recent_uploads = knowledge.prompt_recent_uploads();
     parts.push(render(include_str!("../../../prompts/workspace_system.txt"), &[
-        ("project_name", workspace_name(root)), ("runtime_environment", &environment),
+        ("project_name", project_name), ("runtime_environment", &environment),
         ("resource_limit", &limits), ("conversation_start_time", &started),
-        ("file_tree", &tree), ("recent_uploads", ""),
+        ("file_tree", &tree), ("recent_uploads", &recent_uploads),
     ]));
     Ok(parts.join("\n\n"))
 }

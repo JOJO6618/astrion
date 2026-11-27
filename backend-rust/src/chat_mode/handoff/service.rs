@@ -533,7 +533,7 @@ fn target(mode: &ChatMode, config: &Target) -> Result<RegisteredWorkspace, ChatE
     let tools = ToolSet::for_workspace(&workspace.path, &mode.preferences_dir)?;
     let registry = config.registry.clone();
     mode.runtime
-        .bind_registered_workspace(&workspace.id, &workspace.path, tools, || {
+        .bind_named_workspace(&workspace, tools, || {
             let current = registry
                 .load()
                 .map_err(crate::runtime::RuntimeError::storage)?;

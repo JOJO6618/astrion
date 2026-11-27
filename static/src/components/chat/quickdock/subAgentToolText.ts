@@ -8,6 +8,7 @@ import { t } from '@/locales';
 export interface SubAgentToolEntry {
   tool?: string;
   args?: Record<string, any> | null;
+  arguments?: Record<string, any> | null;
 }
 
 export interface SubAgentToolParts {
@@ -63,7 +64,7 @@ function readFileDetail(args: Record<string, any>): { label: string; detail: str
 
 export function buildSubAgentToolParts(entry: SubAgentToolEntry): SubAgentToolParts {
   const tool = entry.tool || '';
-  const args = entry.args || {};
+  const args = entry.args ?? entry.arguments ?? {};
   switch (tool) {
     case 'read_file':
       return readFileDetail(args);
@@ -133,4 +134,48 @@ export function buildSubAgentToolParts(entry: SubAgentToolEntry): SubAgentToolPa
 export function buildSubAgentToolText(entry: SubAgentToolEntry): string {
   const { label, detail } = buildSubAgentToolParts(entry);
   return detail ? `${label} ${detail}` : label;
+}
+
+/** Backend variants share the same grouping and presentation semantics. */
+export function normalizeSubAgentToolStatus(status?: string) {
+  switch (typeof status === 'string' ? status.trim().toLowerCase() : '') {
+    case 'calling':
+      return 'calling';
+    case 'completed':
+    case 'done':
+    case 'success':
+      return 'completed';
+    case 'failed':
+    case 'error':
+    case 'timeout':
+      return 'failed';
+    case 'cancelled':
+    case 'canceled':
+    case 'terminated':
+    case 'stopped':
+    case 'interrupted':
+      return 'cancelled';
+    default:
+      return 'running';
+  }
+}
+
+export function isSubAgentToolTerminal(status?: string): boolean {
+  const state = normalizeSubAgentToolStatus(status);
+  return state !== 'running' && state !== 'calling';
+}
+
+export function subAgentToolStatusLabel(state: ReturnType<typeof normalizeSubAgentToolStatus>) {
+  switch (state) {
+    case 'completed':
+      return t('overlay.stateCompleted');
+    case 'failed':
+      return t('common.failed');
+    case 'cancelled':
+      return t('overlay.stateCancelled');
+    case 'calling':
+      return t('overlay.stateCalling');
+    case 'running':
+      return t('overlay.stateInProgress');
+  }
 }

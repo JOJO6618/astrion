@@ -70,6 +70,8 @@
 
 输入栏显示“X 个子智能体”，与容量限制同样只排除terminated；点击展开QuickDock并仅滚动其内部栈到子智能体卡片，移动端打开对应悬浮层，不弹批量停止确认框。异步定位受对话session／epoch与请求代数约束。形象的后台子智能体计数只接受running，idle或failed不触发工作状态；后台命令继续沿用自己的状态规则。
 
+子智能体工具时间线在普通弹窗与 QuickDock 使用同一状态映射：完成、失败和取消都结束工具步骤，不挪到最终回复之后。参数只显示已知工具的对应字段（兼容旧活动记录的 `arguments`），不会展开任意参数。软停止在该轮末尾持久化可续接的说明，不额外回显主代发通知。
+
 协作消息继续使用 `auto_message_type=multi_agent_*`、`metadata.visibility="chat"`、`starts_work=false`，这些是消息协议，不能因删除对话类型而一起删掉。持久化消息与事件使用同一 message_id；显示恢复仍走单一快照／游标链路。
 
 - 主 formatter：`utils/tool_result_formatter/agent_context.py`，在 dispatch.py 注册。

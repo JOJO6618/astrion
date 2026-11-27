@@ -115,7 +115,7 @@ impl RuntimeScheduleAdapter {
         let tools = ToolSet::for_workspace(&entry.path, self.catalog.host_data_dir())
             .map_err(ScheduleError::storage)?;
         self.runtime
-            .bind_registered_workspace(&entry.id, &entry.path, tools, || {
+            .bind_named_workspace(entry, tools, || {
                 let current = self.workspaces().map_err(|error| RuntimeError {
                     status: error.status,
                     message: error.to_string(),

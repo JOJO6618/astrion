@@ -55,12 +55,19 @@
               <span v-if="item.detail" class="tool-param" :title="item.detail">{{
                 item.detail
               }}</span>
-              <span class="tool-status" :class="{ 'is-error': item.state === 'failed' }">
+              <span
+                class="tool-status"
+                :class="{ 'is-error': item.state === 'failed' }"
+                :title="subAgentToolStatusLabel(item.state)"
+                :aria-label="subAgentToolStatusLabel(item.state)"
+              >
                 <span
                   v-if="item.state === 'running' || item.state === 'calling'"
                   class="qd-tool-spinner"
                 ></span>
-                <span v-else class="qd-tool-done">{{ item.state === 'failed' ? '✕' : '✓' }}</span>
+                <span v-else class="qd-tool-done">{{
+                  item.state === 'completed' ? '✓' : item.state === 'cancelled' ? '–' : '✕'
+                }}</span>
               </span>
             </template>
             <template v-else-if="item.kind === 'compression'">
@@ -121,7 +128,12 @@ import { useBackgroundCommandStore } from '@/stores/backgroundCommand';
 import { useUiStore } from '@/stores/ui';
 import CloseButton from '@/components/common/CloseButton.vue';
 import { useSubAgentActivityScroll } from '@/composables/useSubAgentActivityScroll';
-import { buildSubAgentToolParts } from './subAgentToolText';
+import {
+  buildSubAgentToolParts,
+  isSubAgentToolTerminal,
+  normalizeSubAgentToolStatus,
+  subAgentToolStatusLabel
+} from './subAgentToolText';
 
 /**
  * 详情面板（fixed 浮在快捷窗口列左侧）
@@ -361,32 +373,10 @@ const tokensTitle = computed(() => {
 
 /* ---------------- 子智能体时间线（逻辑借鉴 SubAgentActivityDialog） ---------------- */
 
-function normalizeStatus(status?: string) {
-  if (status === 'running' || status === 'in_progress') return 'running';
-  if (status === 'calling') return 'calling';
-  if (status === 'completed' || status === 'done' || status === 'success') return 'completed';
-  if (status === 'failed' || status === 'error') return 'failed';
-  return status || 'running';
-}
-
-function isEntryTerminal(status?: string) {
-  const normalized = (status || '').toString().toLowerCase();
-  return [
-    'completed',
-    'failed',
-    'timeout',
-    'terminated',
-    'cancelled',
-    'done',
-    'success',
-    'error'
-  ].includes(normalized);
-}
-
 interface ToolTimelineItem {
   kind: 'tool';
   key: string;
-  state: string;
+  state: ReturnType<typeof normalizeSubAgentToolStatus>;
   label: string;
   detail: string;
 }
@@ -439,7 +429,7 @@ const timelineItems = computed<(ToolTimelineItem | OutputTimelineItem | Compress
         let cut = rawItems.length;
         while (cut > 0) {
           const tail = rawItems[cut - 1];
-          if (tail.kind === 'tool' && !isEntryTerminal(tail.entry?.status)) {
+          if (tail.kind === 'tool' && !isSubAgentToolTerminal(tail.entry?.status)) {
             cut -= 1;
           } else {
             break;
@@ -468,7 +458,7 @@ const timelineItems = computed<(ToolTimelineItem | OutputTimelineItem | Compress
       if (
         currentToolGroup &&
         (currentToolGroup.entry.id === entry.id || currentToolGroup.key === baseKey) &&
-        !isEntryTerminal(currentToolGroup.entry.status)
+        !isSubAgentToolTerminal(currentToolGroup.entry.status)
       ) {
         currentToolGroup.entry = { ...currentToolGroup.entry, ...entry };
         return;
@@ -481,7 +471,7 @@ const timelineItems = computed<(ToolTimelineItem | OutputTimelineItem | Compress
           (item) =>
             item.kind === 'tool' &&
             item.entry.id === entry.id &&
-            !isEntryTerminal(item.entry.status)
+            !isSubAgentToolTerminal(item.entry.status)
         );
         if (prior && prior.kind === 'tool') {
           prior.entry = { ...prior.entry, ...entry };
@@ -505,7 +495,7 @@ const timelineItems = computed<(ToolTimelineItem | OutputTimelineItem | Compress
       if (item.kind === 'output' || item.kind === 'compression') {
         return item;
       }
-      const state = normalizeStatus(item.entry.status);
+      const state = normalizeSubAgentToolStatus(item.entry.status);
       return {
         kind: 'tool' as const,
         key: item.key,

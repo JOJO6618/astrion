@@ -1,6 +1,7 @@
 use std::{collections::HashMap, io, ops::{Deref, DerefMut}, path::{Path, PathBuf}, sync::{Arc, Mutex, MutexGuard}, time::{Duration, SystemTime, UNIX_EPOCH}};
 
 use serde_json::{Map, Value, json};
+use jiff::{Timestamp, tz::TimeZone};
 use tokio::{runtime::Handle, sync::{oneshot, watch}, time::Instant};
 
 use crate::{catalog::CatalogSource, runtime::ModelConfig, workspace_catalog::RegisteredWorkspace};
@@ -44,6 +45,7 @@ impl DerefMut for LiveGuard<'_> {
 pub(super) struct Question {
     pub(super) child: String,
     pub(super) target: Option<String>,
+    pub(super) generation: String,
     pub(super) answer: oneshot::Sender<String>,
 }
 
@@ -87,6 +89,42 @@ pub(crate) struct Create<'a> {
 
 pub(super) fn storage(error: impl std::fmt::Display) -> String { format!("子智能体存储不可用：{error}") }
 
+const SYSTEM_TEMPLATE: &str = include_str!("../../../prompts/sub_agent/system.txt");
+
+fn system_base(root: &Path, access: Access, created_at: f64) -> String {
+    let direct = matches!(access, Access::Full);
+    let (environment, shell) = match (std::env::consts::OS, direct) {
+        ("windows", true) => ("Windows 宿主机直接执行", "Windows cmd（dir、type、findstr）"),
+        ("windows", false) => ("Windows 上的 WSL2 Linux 沙箱", "Linux bash；工作区内命令使用相对路径"),
+        (_, true) => ("宿主机直接执行", "bash"),
+        (_, false) => ("宿主机操作系统沙箱", "bash"),
+    };
+    let section = format!("## 执行环境\n\n- 运行环境：{environment}\n- 命令解释器：{shell}");
+    let system = format!("{} ({})", std::env::consts::OS, std::env::consts::ARCH);
+    let time = Timestamp::from_second(created_at.floor() as i64)
+        .unwrap_or(Timestamp::UNIX_EPOCH).to_zoned(TimeZone::system())
+        .strftime("%Y-%m-%d %H:%M:%S %:z").to_string();
+    SYSTEM_TEMPLATE.replace("{execution_env_section}", &section)
+        .replace("{system_info}", &system)
+        .replace("{current_time}", &time)
+        .replace("{workspace_path}", &root.display().to_string())
+}
+
+fn repair_legacy_template(context: &mut Context, root: &Path, record: &Value) {
+    let prompt = &mut context.document["messages"][0]["content"];
+    // Only replace the exact unrendered Rust template, not imported Python
+    // prompts or dynamically saved memory, directory and later worktree notices.
+    let Some(suffix) = prompt.as_str().and_then(|text| text.strip_prefix(SYSTEM_TEMPLATE)) else { return; };
+    let (Ok(access), Some(created_at)) = (Access::parse(&record["access_level"]), record["created_at"].as_f64())
+        else { return; };
+    *prompt = json!(system_base(root, access, created_at) + suffix);
+    context.rewrite_history = true;
+}
+
+#[cfg(test)]
+#[path = "../../../test/2026-11-27_Rust子智能体环境/child_prompt_contract.rs"]
+mod prompt_tests;
+
 impl SubAgents {
     pub fn with_catalog(mut self, catalog: CatalogSource, fixed_model: Option<ModelConfig>) -> Self {
         self.execution = std::sync::Arc::new(Execution { catalog: Some(catalog), fixed_model, ..Execution::default() });
@@ -106,7 +144,8 @@ impl SubAgents {
         let task = protocol::text(args, "task")?;
         let intelligence = protocol::text(args, "intelligence")?;
         let deadline = protocol::timeout(args)?;
-        Access::parse(&args["access_level"])?.check_parent(access)?;
+        let fixed_access = Access::parse(&args["access_level"])?;
+        fixed_access.check_parent(access)?;
         let prefs = self.preferences()?;
         let model = match intelligence {
             "same" => model.clone(),
@@ -135,11 +174,11 @@ impl SubAgents {
         let execution = execution_root.unwrap_or(&working);
         let task_id = message_id("sub");
         let access = args["access_level"].clone();
+        let time = now();
         let prompt = format!("{}\n\n你的名称：{name}\n默认工作目录：{}\n当前执行目录：{}\n\n[固定执行权限]\n{}。主智能体后续切换权限或执行环境不会改变你的档位。",
-            include_str!("../../../prompts/sub_agent/system.txt"), working.display(), execution.display(), access.as_str().unwrap_or_default());
+            system_base(&parent.root, fixed_access, time), working.display(), execution.display(), access.as_str().unwrap_or_default());
         let user = format!("任务：{summary}\n\n{task}\n\n默认工作目录：{}", working.display());
         let prompt = super::compression::refresh_memory(&prompt,&parent.root,self.registry.data_dir()).map_err(storage)?;
-        let time = now();
         let worktree_revision = self.parent_worktree(parent)?["revision"].as_u64().unwrap_or_default();
         let mut record = json!({"task_id":task_id,"agent_id":agent_id,"name":name,"display_name":name,
             "summary":summary,"task":task,"conversation_id":parent.conversation_id,
@@ -330,6 +369,7 @@ impl SubAgents {
             Some(scope) => scope,
             None => ChildScope::bind(fields, &parent.workspace_id, &parent.root, self.registry.data_dir())?,
         };
+        repair_legacy_template(&mut context, &parent.root, &record);
         let model = self.model(live, id, &record)?.with_session(id, false);
         let timeout = consume_work(&mut doc["tasks"][id], &mut context, true)?;
         sync_instance(doc, &parent.conversation_id, id)?;
@@ -445,11 +485,24 @@ impl SubAgents {
         let mut doc = self.registry.document().map_err(storage)?;
         let Some(worker) = live.workers.get(id) else { return Ok(()); };
         let stop = *worker.borrow();
+        let natural_answer = match &result {
+            worker::End::Completed(text) if stop == Stop::Continue && !text.trim().is_empty() => {
+                context.pending_answer_question.as_ref().filter(|(key, generation)| {
+                    live.questions.get(key).is_some_and(|question| {
+                        question.target.as_deref() == Some(id) && question.generation == *generation
+                    })
+                }).map(|(key, _)| (key.clone(), text.trim().to_owned()))
+            }
+            _ => None,
+        };
         let record = &mut doc["tasks"][id];
         let name = record["name"].as_str().unwrap_or_default().to_owned();
         let terminated = record["status"] == "terminated" || stop == Stop::Terminate;
         let (reason, content, notify) = match (stop, result) {
-            (Stop::Continue, worker::End::Completed(text)) => ("completed", Some(text), true),
+            (Stop::Continue, worker::End::Completed(text)) => {
+                let text = if text.trim().is_empty() { "本轮已结束，模型未返回正文。".into() } else { text };
+                ("completed", Some(text), true)
+            }
             (Stop::Continue, worker::End::Timeout) => ("timeout", Some("本轮时间预算已到期。".into()), true),
             (Stop::Continue, worker::End::Failed(error)) => ("error", Some(error), true),
             (Stop::Terminate, _) => ("terminated", None, false),
@@ -463,7 +516,10 @@ impl SubAgents {
         record["status"] = json!(status);
         record["end_reason"] = json!(reason);
         record["updated_at"] = json!(now());
-        let output = content.as_deref().map(|text| context.final_output(text));
+        let stopped_output = (reason == "stopped").then(|| {
+            format!("{}，本轮已停止；保留上下文，可发送消息继续。", stop.tool_result())
+        });
+        let output = content.as_deref().or(stopped_output.as_deref()).map(|text| context.final_output(text));
         if let Some(text) = content.as_deref() {
             record["final_result"] = json!(text);
             if notify && !text.trim().is_empty() {
@@ -474,6 +530,11 @@ impl SubAgents {
         self.registry.store_checkpoint(
             &doc, Some(context), output.as_ref().map(|(event, output)| (event, output)),
         ).map_err(storage)?;
+        if let Some((key, text)) = natural_answer
+            && let Some(question) = live.questions.remove(&key)
+        {
+            let _ = question.answer.send(text);
+        }
         live.workers.remove(id);
         live.questions.retain(|_, question| question.child != id && (!terminated || question.target.as_deref() != Some(id)));
         if !terminated { self.launch_locked(&mut live, &mut doc, parent, id)?; }
@@ -506,12 +567,12 @@ pub(super) fn find_name<'a>(records: &'a Records, name: &str) -> Option<&'a str>
     records.iter().find(|(_, record)| string(record, "name").is_some_and(|candidate| protocol::casefold(candidate) == folded)).map(|(id, _)| id.as_str())
 }
 
-pub(super) fn queue(record: &mut Value, message: &str, timeout: Option<u64>) -> Result<(), String> {
+pub(super) fn queue<'a>(record: &'a mut Value, message: &str, timeout: Option<u64>) -> Result<&'a mut Value, String> {
     if record["pending_work"].is_null() { record["pending_work"] = json!([]); }
-    record["pending_work"].as_array_mut().ok_or("无效的待处理子智能体消息。")?
-        .push(json!({"message":message,"timeout":timeout,"rust_work_id":message_id("child_work")}));
     record["work_paused"] = json!(false);
-    Ok(())
+    let pending = record["pending_work"].as_array_mut().ok_or("无效的待处理子智能体消息。")?;
+    pending.push(json!({"message":message,"timeout":timeout,"rust_work_id":message_id("child_work")}));
+    Ok(pending.last_mut().expect("queued child work"))
 }
 
 fn consume_work(record: &mut Value, context: &mut Context, new_round: bool) -> Result<Option<Instant>, String> {

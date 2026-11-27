@@ -74,6 +74,21 @@ impl Database {
         .map(|s|serde_json::from_str(&s)).transpose().map_err(error)
     }
 
+    /// Bounded excerpt for the opt-in recent-conversations prompt. Runtime
+    /// notices and attached media are not a user's first message.
+    pub(crate) fn first_prompt_user_excerpt(&self, id: &str) -> Result<Option<String>, String> {
+        self.conn.query_row(
+            "SELECT substr(trim(json_extract(body,'$.content')),1,100)
+             FROM messages WHERE conversation=?1 AND role='user'
+             AND json_type(body,'$.content')='text'
+             AND trim(json_extract(body,'$.content'))<>''
+             AND COALESCE(json_extract(body,'$.metadata.hidden'),0)=0
+             AND COALESCE(json_extract(body,'$.metadata.visibility'),'') NOT IN ('hidden','compact')
+             AND COALESCE(json_extract(body,'$.metadata.starts_work'),1)<>0
+             ORDER BY seq LIMIT 1",
+            [id], |row| row.get::<_, String>(0),
+        ).optional().map_err(error)
+    }
     pub fn field(&self, id: &str, scope: &str, key: &str) -> Result<Option<Value>, String> {
         self.conn.query_row("SELECT value FROM fields WHERE conversation=? AND scope=? AND key=?",
             params![id, scope, key], |row| row.get::<_, String>(0)).optional().map_err(error)?

@@ -78,7 +78,12 @@ import { t, currentLocale } from '@/locales';
 import CloseButton from '@/components/common/CloseButton.vue';
 import { useSubAgentActivityScroll } from '@/composables/useSubAgentActivityScroll';
 import { useSubAgentStore } from '@/stores/subAgent';
-import { buildSubAgentToolText } from '@/components/chat/quickdock/subAgentToolText';
+import {
+  buildSubAgentToolText,
+  isSubAgentToolTerminal,
+  normalizeSubAgentToolStatus,
+  subAgentToolStatusLabel
+} from '@/components/chat/quickdock/subAgentToolText';
 
 type ActivityEntry = {
   activityKey: string;
@@ -86,6 +91,7 @@ type ActivityEntry = {
   id?: string;
   tool?: string;
   status?: string;
+  arguments?: Record<string, any>;
   args?: Record<string, any>;
   ts?: number;
   subtype?: string;
@@ -105,17 +111,9 @@ const close = () => {
   subAgentStore.closeSubAgent();
 };
 
-const normalizeStatus = (status?: string) => {
-  if (status === 'running' || status === 'in_progress') return 'running';
-  if (status === 'calling') return 'calling';
-  if (status === 'completed' || status === 'done' || status === 'success') return 'completed';
-  if (status === 'failed' || status === 'error') return 'failed';
-  return status || 'running';
-};
-
 const canStop = computed(() => {
   if (!activeAgent.value?.task_id) return false;
-  return !isTerminalStatus(activeAgent.value.status);
+  return !isSubAgentToolTerminal(activeAgent.value.status);
 });
 
 const stopLoading = computed(() => {
@@ -132,11 +130,6 @@ const handleStop = async () => {
   if (!result?.success) {
     stopError.value = result?.error || t('overlay.stopFailed');
   }
-};
-
-const isTerminalStatus = (status?: string) => {
-  const normalized = (status || '').toString().toLowerCase();
-  return ['completed', 'failed', 'timeout', 'terminated', 'cancelled'].includes(normalized);
 };
 
 const toggleOutput = (key: string) => {
@@ -189,7 +182,7 @@ const timelineItems = computed(() => {
       let cut = rawItems.length;
       while (cut > 0) {
         const tail = rawItems[cut - 1];
-        if (tail.kind === 'tool' && !isTerminalStatus(tail.entry?.status)) {
+        if (tail.kind === 'tool' && !isSubAgentToolTerminal(tail.entry?.status)) {
           cut -= 1;
         } else {
           break;
@@ -205,7 +198,7 @@ const timelineItems = computed(() => {
     if (
       currentToolGroup &&
       (currentToolGroup.entry.id === entry.id || currentToolGroup.key === baseKey) &&
-      !isTerminalStatus(currentToolGroup.entry.status)
+      !isSubAgentToolTerminal(currentToolGroup.entry.status)
     ) {
       currentToolGroup.entry = { ...currentToolGroup.entry, ...entry };
       return;
@@ -216,7 +209,9 @@ const timelineItems = computed(() => {
     if (entry.id) {
       const prior = rawItems.find(
         (item) =>
-          item.kind === 'tool' && item.entry.id === entry.id && !isTerminalStatus(item.entry.status)
+          item.kind === 'tool' &&
+          item.entry.id === entry.id &&
+          !isSubAgentToolTerminal(item.entry.status)
       );
       if (prior && prior.kind === 'tool') {
         prior.entry = { ...prior.entry, ...entry };
@@ -238,19 +233,12 @@ const timelineItems = computed(() => {
 
   return rawItems.map((item) => {
     if (item.kind === 'output') return item;
-    const state = normalizeStatus(item.entry.status);
+    const state = normalizeSubAgentToolStatus(item.entry.status);
     return {
       kind: 'tool' as const,
       key: item.key,
       state,
-      stateLabel:
-        state === 'completed'
-          ? t('overlay.stateCompleted')
-          : state === 'failed'
-            ? t('common.failed')
-            : state === 'calling'
-              ? t('overlay.stateCalling')
-              : t('overlay.stateInProgress'),
+      stateLabel: subAgentToolStatusLabel(state),
       text: buildSubAgentToolText(item.entry)
     };
   });
