@@ -314,14 +314,48 @@ async fn status(
         let meta = &document["metadata"];
         let prefs = Personalization::load(&app.data_dir);
         let catalog = app.catalog.load();
+        // A selected conversation reports the configuration used for its next
+        // normal turn, not the defaults that apply to a new conversation.
+        let model_key = if let Some(id) = current.as_deref() {
+            let saved = meta["model_key"].as_str().filter(|key| !key.is_empty());
+            match saved {
+                Some(key) => Some(key.to_owned()),
+                None => app.runtime.session_model_key(&app.workspace_id, id)?
+                    .filter(|key| !key.is_empty())
+                    .or_else(|| catalog.default_key().map(str::to_owned)),
+            }
+        } else {
+            prefs.model_key(&catalog).map(str::to_owned)
+        };
+        let configured_run = if current.is_some() {
+            meta["thinking_mode"].as_bool().map_or_else(
+                || run_mode(&meta["run_mode"], "fast"),
+                |thinking| if thinking { "thinking" } else { "fast" },
+            )
+        } else { prefs.run_mode };
+        let run = if current.is_some() {
+            preferences::model_run_mode(&catalog, model_key.as_deref().unwrap_or_default(), configured_run)
+        } else { configured_run };
+        let effort = if current.is_some() {
+            preferences::reasoning_effort(&meta["reasoning_effort"])
+        } else { prefs.reasoning_effort };
+        let context_tokens = document["token_statistics"]["current_context_tokens"].as_u64();
+        let context_limit = model_key.as_deref().and_then(|key| catalog.status_context_window(key));
+        let context_usage = context_tokens.zip(context_limit).map(|(used, limit)| used as f64 / limit as f64 * 100.0);
         let modes = prefs.modes(meta);
         let policy = admin_policy(&app.data_dir, &catalog)
             .map_err(|_| WebError(StatusCode::SERVICE_UNAVAILABLE, "Host administrator policy is unavailable"))?;
         let terminals = app.command_terminals(current.as_deref())?;
         let mut status = json!({
-            "thinking_mode": prefs.run_mode == "thinking", "run_mode": prefs.run_mode,
-            "thinking_status": if prefs.run_mode == "thinking" { "思考模式" } else { "快速模式" },
-            "model_key": prefs.model_key(&catalog), "reasoning_effort": prefs.reasoning_effort,
+            "thinking_mode": run == "thinking", "run_mode": run,
+            "thinking_status": if run == "thinking" { "思考模式" } else { "快速模式" },
+            "model_key": model_key, "reasoning_effort": effort,
+            "context": {"current_tokens": context_tokens, "limit_tokens": context_limit,
+                "usage_percent": context_usage, "total_size": null, "conversation_count": message_count},
+            // Host deliberately disables the project-tree scan. Keep the
+            // diagnostic section, but do not report unavailable counts as zero.
+            "project": {"available": false, "total_files": null, "total_size": null,
+                "limit_bytes": null, "limit_label": null, "usage_percent": null},
             "pending_runtime_modes": pending_modes(meta),
             "execution_mode_enabled": app.runtime.host_direct_execution_available(),
             "network_permission_enabled": app.runtime.host_network_permissions_available(),

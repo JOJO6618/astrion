@@ -305,6 +305,10 @@ impl Catalog {
         })
     }
 
+    pub(crate) fn status_context_window(&self, key: &str) -> Option<u64> {
+        self.profile(key)?.public.context_window.as_u64().filter(|limit| *limit > 0)
+    }
+
     fn profile(&self, key: &str) -> Option<&Profile> {
         self.indexes.get(key).map(|index| &self.entries[*index])
     }
