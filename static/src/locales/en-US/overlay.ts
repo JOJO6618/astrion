@@ -106,6 +106,7 @@ export default {
   noActivity: 'No activity records',
   stateCompleted: 'Completed',
   stateCalling: 'Calling',
+  stateCancelled: 'Cancelled',
   stateInProgress: 'In progress',
 
   // ── TutorialOverlay ──

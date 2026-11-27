@@ -105,6 +105,7 @@ export default {
   noActivity: '暂无活动记录',
   stateCompleted: '完成',
   stateCalling: '调用中',
+  stateCancelled: '已取消',
   stateInProgress: '进行中',
 
   // ── TutorialOverlay：新手教程浮层 ──

@@ -516,7 +516,10 @@ impl SubAgents {
         record["status"] = json!(status);
         record["end_reason"] = json!(reason);
         record["updated_at"] = json!(now());
-        let output = content.as_deref().map(|text| context.final_output(text));
+        let stopped_output = (reason == "stopped").then(|| {
+            format!("{}，本轮已停止；保留上下文，可发送消息继续。", stop.tool_result())
+        });
+        let output = content.as_deref().or(stopped_output.as_deref()).map(|text| context.final_output(text));
         if let Some(text) = content.as_deref() {
             record["final_result"] = json!(text);
             if notify && !text.trim().is_empty() {
