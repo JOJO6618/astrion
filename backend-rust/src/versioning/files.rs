@@ -6,7 +6,7 @@ use cap_std::fs::{Dir, OpenOptions};
 use serde::{Serialize, de::DeserializeOwned};
 use uuid::Uuid;
 
-pub(super) fn child(parent: &Dir, name: &str, create: bool) -> io::Result<Option<Dir>> {
+pub(in crate::runtime) fn child(parent: &Dir, name: &str, create: bool) -> io::Result<Option<Dir>> {
     match parent.open_dir_nofollow(name) {
         Err(error) if error.kind() == io::ErrorKind::NotFound && create => {
             match parent.create_dir(name) {
@@ -62,7 +62,7 @@ pub(super) fn lock(parent: &Dir) -> io::Result<std::fs::File> {
     Ok(file)
 }
 
-pub(super) fn write(parent: &Dir, name: &str, bytes: &[u8]) -> io::Result<()> {
+pub(in crate::runtime) fn write(parent: &Dir, name: &str, bytes: &[u8]) -> io::Result<()> {
     write_mode(parent, name, bytes, None)
 }
 

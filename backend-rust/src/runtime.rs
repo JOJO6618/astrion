@@ -19,6 +19,7 @@ mod goals;
 pub mod guidance;
 pub mod host_policy;
 mod host_modes;
+mod modify_history;
 mod mode_notice;
 mod host_policy_setup;
 mod navigation;

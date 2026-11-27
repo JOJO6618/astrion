@@ -73,6 +73,37 @@ pub fn edit_file_tool() -> Value {
     })
 }
 
+/// Successful workspace mutations return an internal receipt for lossless text history.
+pub(crate) struct RecordedWrite {
+    pub path: std::path::PathBuf,
+    pub before: FileText,
+    pub after: FileText,
+}
+
+#[derive(PartialEq, Eq)]
+pub(crate) enum FileText {
+    Missing,
+    Text(String),
+    Unavailable { lines: usize },
+}
+
+impl FileText {
+    pub(crate) const LIMIT: usize = 400_000;
+
+    fn capture(bytes: Option<&[u8]>) -> Self {
+        let Some(bytes) = bytes else { return Self::Missing };
+        if bytes.len() <= Self::LIMIT && !bytes.contains(&0)
+            && let Ok(s) = std::str::from_utf8(bytes)
+        {
+            return Self::Text(s.into());
+        }
+        Self::Unavailable {
+            lines: bytes.iter().filter(|&&b| b == b'\n').count()
+                + usize::from(bytes.last().is_some_and(|&b| b != b'\n')),
+        }
+    }
+}
+
 /// Keep one shared writer per startup workspace to serialize mutations.
 pub struct WorkspaceFileWriter {
     reader: Arc<ReadFile>,
@@ -115,14 +146,28 @@ impl WorkspaceFileWriter {
                 Ok(reader) => reader,
                 Err(error) => return failure(error.to_string()),
             };
-            let mut result = self.mutate(&reader.0, &scope.call().tool_name, &scope.call().arguments, messages, injected_memory)
+            let mut result = self.mutate(&reader.0, &scope.call().tool_name, &scope.call().arguments, messages, injected_memory, None)
                 .unwrap_or_else(failure);
             if matches!(root, super::read_file::HostFileRoot::ProjectMemory { .. }) && result["success"] == true {
                 result["path"] = scope.call().arguments["file_path"].clone();
             }
             return result;
         }
-        self.execute_call(scope.task(), scope.call(), conversation_id, messages)
+        self.execute_call(scope.task(), scope.call(), conversation_id, messages, None)
+    }
+
+    pub(crate) fn execute_recorded(
+        &self,
+        scope: ExecutionScope,
+        conversation_id: &str,
+        messages: &[Value],
+    ) -> (Value, Option<RecordedWrite>) {
+        if !matches!(scope.access(), ExecutionAccess::SandboxWrite | ExecutionAccess::Direct) {
+            return (failure(NO_AUTHORITY), None);
+        }
+        let mut receipt = None;
+        let result = self.execute_call(scope.task(), scope.call(), conversation_id, messages, Some(&mut receipt));
+        (result, receipt)
     }
 
     fn execute_call(
@@ -131,6 +176,7 @@ impl WorkspaceFileWriter {
         call: &ToolRequest,
         conversation_id: &str,
         messages: &[Value],
+        receipt: Option<&mut Option<RecordedWrite>>,
     ) -> Value {
         let workspace = &self.reader.0;
         if task.conversation_id() != conversation_id
@@ -138,7 +184,7 @@ impl WorkspaceFileWriter {
         {
             return failure(NO_AUTHORITY);
         }
-        self.mutate(workspace, &call.tool_name, &call.arguments, messages, false)
+        self.mutate(workspace, &call.tool_name, &call.arguments, messages, false, receipt)
             .unwrap_or_else(failure)
     }
 
@@ -153,6 +199,7 @@ impl WorkspaceFileWriter {
         args: &Map<String, Value>,
         messages: &[Value],
         injected_memory: bool,
+        receipt: Option<&mut Option<RecordedWrite>>,
     ) -> Result<Value, String> {
         let operation = Operation::parse(tool, args)?;
         let raw = args
@@ -193,6 +240,13 @@ impl WorkspaceFileWriter {
                     encoded
                 };
                 destination.commit(workspace, &path, &output)?;
+                if let Some(receipt) = receipt {
+                    *receipt = Some(RecordedWrite {
+                        path: path.clone(),
+                        before: FileText::capture(before.as_deref()),
+                        after: FileText::capture(Some(&output)),
+                    });
+                }
                 let after = decoded(output.into_owned()).unwrap_or_else(|| content.to_owned());
                 Ok(write_result(
                     &path_display,
@@ -203,7 +257,9 @@ impl WorkspaceFileWriter {
                 ))
             }
             Operation::Edit(replacements) => {
-                let original = decoded(before.ok_or("文件不存在")?)
+                let before = before.ok_or("文件不存在")?;
+                let original_bytes = receipt.is_some().then(|| FileText::capture(Some(&before)));
+                let original = decoded(before)
                     .ok_or("文件不是 UTF-8 文本，无法直接读取。")?;
                 let edited = match edit::apply(&path_display, &original, replacements) {
                     Ok(edited) => edited,
@@ -211,6 +267,13 @@ impl WorkspaceFileWriter {
                 };
                 let bytes = native_bytes(&edited.content);
                 destination.commit(workspace, &path, &bytes)?;
+                if let Some((receipt, original_bytes)) = receipt.zip(original_bytes) {
+                    *receipt = Some(RecordedWrite {
+                        path: path.clone(),
+                        before: original_bytes,
+                        after: FileText::capture(Some(&bytes)),
+                    });
+                }
                 let after = decoded(bytes.into_owned()).expect("UTF-8 text written by edit_file");
                 let mut result =
                     write_result(&path_display, &edited.content, "w", Some(original), after);

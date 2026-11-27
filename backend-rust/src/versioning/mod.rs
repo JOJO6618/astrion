@@ -2,7 +2,7 @@
 
 mod deep;
 mod diff;
-mod files;
+pub(super) mod files;
 #[path = "../runtime/versioning.rs"]
 mod integration;
 mod mutations;
@@ -287,7 +287,7 @@ fn normalize_id(id: &str) -> String {
     }
 }
 
-fn open_data_directory(path: &FilePath) -> io::Result<Dir> {
+pub(super) fn open_data_directory(path: &FilePath) -> io::Result<Dir> {
     if !path.is_absolute() {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
