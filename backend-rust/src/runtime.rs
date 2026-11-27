@@ -709,7 +709,8 @@ impl Runtime {
             } else {
                 (vec![durable_user], vec![user])
             };
-            let mut submitted_count = submitted.len();
+            let prior_count = document.raw()["messages"].as_array().unwrap().len();
+            let input_index = prior_count + durable.len();
             durable.extend(submitted);
             let mut model_input = model_input;
             if let Some(notice) = hidden_user_notice {
@@ -719,17 +720,24 @@ impl Runtime {
                     "message_source":"runtime_notice","starts_work":false});
                 durable.push(durable_notice);
                 model_input.push(model_notice);
-                submitted_count += 1;
             }
-            let prior_count = document.raw()["messages"].as_array().unwrap().len();
             let document = append_document(document, durable, created_at, None, Some(&model.key))?;
             let title_input = (prior_count == 0 && matches!(origin, Origin::User)
                 && !message.trim().is_empty())
                 .then(|| automatic_title::eligible(document.raw())).flatten()
                 .map(|title| (title.to_owned(), message.to_owned()));
-            task.version_message_id = document.raw()["messages"].as_array()
-                .and_then(|rows| rows.len().checked_sub(submitted_count).and_then(|index| rows.get(index)))
-                .and_then(|message| message["message_id"].as_str()).map(str::to_owned);
+            let input = &document.raw()["messages"][input_index];
+            task.version_message_id = input["message_id"].as_str().map(str::to_owned);
+            let input_event = message_metadata.is_some().then(|| {
+                let mut event = user_message_event(message, input["metadata"].clone());
+                event["is_task_input"] = json!(true);
+                for field in ["message_id", "timestamp", "media_refs", "images", "videos"] {
+                    if let Some(value) = input.get(field) {
+                        event[field] = value.clone();
+                    }
+                }
+                event
+            });
             if create {
                 store.persist(workspace_id,document,true)?;
                 if let Err(error) = versioning::set_enabled_on_create(store, workspace_id, &conversation_id) {
@@ -738,8 +746,8 @@ impl Runtime {
             } else {
                 store.persist_admission(workspace_id,document,prior_count)?;
             }
-            if let Some(metadata) = message_metadata {
-                emit_user_message(&mut task, message, metadata);
+            if let Some(event) = input_event {
+                task.emit("user_message", event);
             }
             messages.extend(model_input);
             if let Some(assignment) = assignment {
@@ -1010,12 +1018,16 @@ impl ApprovalBackend for Runtime {
     }
 }
 
-fn emit_user_message(task: &mut Task, message: &str, metadata: Value) {
+fn user_message_event(message: &str, metadata: Value) -> Value {
     let mut event = metadata.as_object().cloned().unwrap_or_default();
     event.insert("message".into(), json!(message));
     event.insert("content".into(), json!(message));
     event.insert("metadata".into(), metadata);
-    task.emit("user_message", Value::Object(event));
+    Value::Object(event)
+}
+
+fn emit_user_message(task: &mut Task, message: &str, metadata: Value) {
+    task.emit("user_message", user_message_event(message, metadata));
 }
 
 fn verify_workspace_binding(store: &Store, workspace_id: &str, expected: Option<&Path>) -> Result<(), RuntimeError> {

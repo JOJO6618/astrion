@@ -259,6 +259,22 @@ async function send(runtime, path, message) {
   })()`), 15000);
 }
 
+async function assertUserBubbles(runtime, path, databasePath, id, message, expected) {
+  const ui = await runtime.view(path, `({
+    count: [...document.querySelectorAll('.user-message .bubble-text')]
+      .filter(el => el.textContent.trim() === ${JSON.stringify(message)}).length
+  })`);
+  const db = new DatabaseSync(databasePath, { readOnly: true });
+  try {
+    const { count } = db.prepare(`SELECT count(*) AS count FROM messages
+      WHERE conversation=? AND role='user' AND json_extract(body,'$.content')=?`).get(id, message);
+    assert.equal(count, expected, 'number of saved user messages');
+    assert.equal(ui?.count, count, `visible user bubbles for ${count} saved message(s)`);
+  } finally {
+    db.close();
+  }
+}
+
 const root = await mkdtemp(join(tmpdir(), 'astrion-desktop-1.0-'));
 const data = join(root, 'data');
 const profile = join(root, 'profile');
@@ -397,12 +413,21 @@ try {
     if (mock.errors.length) throw new Error(mock.errors.join('\n'));
     return runtime.view(conversationPath, accepted);
   }, 30000);
+  const databasePath = join(source, '..', 'conversations.sqlite3');
+  await assertUserBubbles(runtime, conversationPath, databasePath, id, first, 1);
   await send(runtime, conversationPath, next);
   await waitFor('follow-up assistant answer', async () => {
     if (mock.errors.length) throw new Error(mock.errors.join('\n'));
     return runtime.view(conversationPath, persisted);
   }, 30000);
   assert.deepEqual(mock.calls, ['initial', 'tool-result', 'next']);
+  await assertUserBubbles(runtime, conversationPath, databasePath, id, next, 1);
+  await send(runtime, conversationPath, next);
+  await waitFor('both identical follow-ups answered', () => runtime.view(conversationPath,
+    `[...document.querySelectorAll('.assistant-message')].filter(el =>
+      el.innerText.includes(${JSON.stringify(nextReply)})).length === 2`), 30000);
+  assert.deepEqual(mock.calls, ['initial', 'tool-result', 'next', 'next']);
+  await assertUserBubbles(runtime, conversationPath, databasePath, id, next, 2);
   console.info('Real read_file, streamed reply and follow-up verified.');
 
   assert.equal(await runtime.stop(), 0);
@@ -410,6 +435,7 @@ try {
   assert.notEqual(runtime.status.pid, initialPid);
   await waitFor('reopened conversation after restart', () => runtime.view(conversationPath,
     `${persisted} && !document.querySelector('.migration-required')`), 20000);
+  await assertUserBubbles(runtime, conversationPath, databasePath, id, next, 2);
   assert.equal(await runtime.stop(), 0);
   console.info(JSON.stringify({ build: app, firstPid: initialPid, restartedPid: runtime.status.pid,
     migration: true, tool: 'read_file', upstreamCalls: mock.calls, restoredAfterRestart: true,
