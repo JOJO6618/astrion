@@ -53,10 +53,6 @@ pub(crate) fn title_preferences(data: &Path) -> io::Result<(bool, String)> {
     Store::open(data)?.title_preferences()
 }
 
-pub(crate) fn external_session_enabled(data: &Path) -> bool {
-    Store::open(data).and_then(|store| store.external_session_enabled()).unwrap_or(false)
-}
-
 fn tool_loading_snapshot(config: &Object) -> Option<Value> {
     if config.get("tool_loading_enabled") != Some(&Value::Bool(true)) {
         return None;

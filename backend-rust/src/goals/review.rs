@@ -85,7 +85,17 @@ impl GoalReviewer {
             Ok(settings) => settings,
             Err(message) => return Ok(Ok(Verdict::Blocked { reason: "configuration", message })),
         };
-        let model = model.with_session(&Uuid::new_v4().to_string(), false);
+        // OpenCode endpoints reject requests without the session header. A goal review
+        // targets the same conversation, so it reuses that conversation's identity.
+        let session = crate::runtime::automatic_title::external_session_id(
+            self.goals.store.data_dir(),
+            "",
+            request.conversation_id,
+        )
+        .ok();
+        let model = model
+            .with_opencode_headers(session.as_deref(), false)
+            .with_session(&Uuid::new_v4().to_string(), false);
         let mut tools = vec![report_tool()];
         if active { tools.insert(0, command_tool()); }
         let mut messages = vec![

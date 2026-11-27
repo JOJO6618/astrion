@@ -33,7 +33,6 @@
     "sub_agent_model_high": "",
     "sub_agent_model_medium": "",
     "sub_agent_model_low": "",
-    "external_session_header": true,
     "recent_conversations_prompt_enabled": false,
     "recent_conversations_prompt_limit": 10,
     "project_memory_inject_limit": 20,

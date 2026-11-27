@@ -319,6 +319,44 @@ pub(crate) async fn run(
     Err(ReviewFault::LIMIT)
 }
 
+/// 审核模型请求是否值得重试：口径与 Python 版 `modules/retry_policy.py` 一致，
+/// 只放行网络/超时/429/5xx 这类暂时性故障；额度、认证、配置类错误重试不会恢复。
+/// 自动审批与工作流审核共用这一份，避免两边分类漂移。
+pub(crate) fn retryable(error: &str) -> bool {
+    let error = error.to_ascii_lowercase();
+    if [
+        "insufficient_quota",
+        "usage_limit",
+        "subscription usage limit",
+        "quota_exceeded",
+        "billing_hard_limit",
+        "insufficient balance",
+        "invalid_api_key",
+    ]
+    .iter()
+    .any(|marker| error.contains(marker))
+    {
+        return false;
+    }
+    if let Some(status) = error
+        .split_once(" http ")
+        .and_then(|(_, suffix)| suffix.split_whitespace().next())
+        .and_then(|code| code.parse::<u16>().ok())
+    {
+        return matches!(status, 408 | 409 | 425 | 429 | 500..=599);
+    }
+    [
+        "rate_limit",
+        "timed out",
+        "timeout",
+        "connection",
+        "stream read failed",
+        "stream ended before",
+    ]
+    .iter()
+    .any(|marker| error.contains(marker))
+}
+
 #[cfg(test)]
 #[path = "../../../test/2026-11-24_Rust后端/approval_review_contract.rs"]
 mod tests;

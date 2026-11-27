@@ -220,8 +220,7 @@ impl Worker<'_> {
             let mut schemas = base_schemas.clone();
             schemas.extend_from_slice(mcp_snapshot.schemas());
             schemas.extend(self.app.process_tools(scope));
-            let opencode = self.model.is_opencode_endpoint()
-                && crate::web_assets::personalization::external_session_enabled(data);
+            let opencode = self.model.is_opencode_endpoint();
             if opencode && context.document["external_session_id"].as_str().is_none_or(|id|id.trim().is_empty()) {
                 context.document["external_session_id"] = json!(uuid::Uuid::new_v4().simple().to_string());
                 // Preserve this actor's provider identity even when the first request fails.

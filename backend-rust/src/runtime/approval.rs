@@ -19,7 +19,7 @@ use crate::{
     approval::{
         Approval, ApprovalError, ApprovalPrincipal, ApprovalType, ExecutionMode, PermissionMode,
         Status, TaskScope, ToolRequest, exempt_workspace_write,
-        review::{self, ReviewSnapshot},
+        review::{self, ReviewSnapshot, retryable},
     },
     catalog::CatalogSource,
     tools::write_file::{EDIT_NAME, WRITE_NAME, WorkspaceFileWriter},
@@ -27,6 +27,10 @@ use crate::{
 
 const APPROVAL_WAIT: Duration = Duration::from_secs(3600);
 const POLL_INTERVAL: Duration = Duration::from_millis(100);
+/// 审核模型请求的尝试次数与间隔，与目标审核、工作流审核及 Python 版
+/// `modules/retry_policy.py` 同口径：1 次原始 + 4 次重试，固定 10s。
+const REVIEW_ATTEMPTS: u16 = 5;
+const REVIEW_RETRY_DELAY: Duration = Duration::from_secs(10);
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum WorkMode {
@@ -536,7 +540,13 @@ impl Runtime {
                 return Ok(());
             };
             self.emit_review_progress(item, json!({"stage":"start"}))?;
-            let reviewer = Arc::new(reviewer);
+            // OpenCode endpoints reject requests without the session header, so the
+            // reviewer must carry the same per-conversation identity as the main agent.
+            let session = self.opencode_session(
+                item.scope().principal().workspace_id(),
+                item.scope().conversation_id(),
+            );
+            let reviewer = Arc::new(reviewer.with_opencode_headers(session.as_deref(), false));
             let item_ref = Arc::new(item.clone());
             let mut seen = 0;
             let reviewing = review::run(
@@ -555,33 +565,45 @@ impl Runtime {
                             json!({"stage":"model_call", "round":round}),
                         )?;
                         audit.messages(&messages[start..],round).map_err(|e|e.to_string())?;
-                        let mut billing = runtime
-                            .billing
-                            .begin(
-                                BillingScope::review(item.scope().conversation_id().to_owned()),
-                                ModelPrice {
-                                    model_key: &reviewer.key,
-                                    model_id: &reviewer.model,
-                                    identity: &reviewer.price_identity,
-                                    responses: reviewer
-                                        .endpoint
-                                        .trim_end_matches('/')
-                                        .ends_with("/responses"),
-                                },
-                            )
-                            .await;
-                        let completion = reviewer
-                            .complete(messages, tools, |delta| billing.observe_text(delta))
-                            .await?;
-                        audit.messages(std::slice::from_ref(&completion.message),round).map_err(|e|e.to_string())?;
-                        billing
-                            .settle_success(
-                                completion.usage.as_ref(),
-                                completion.responses_duration_ms,
-                            )
-                            .await
-                            .map_err(|_| "Could not persist review model usage".to_owned())?;
-                        Ok(completion)
+                        let mut attempt = 1u16;
+                        loop {
+                            let mut billing = runtime
+                                .billing
+                                .begin(
+                                    BillingScope::review(item.scope().conversation_id().to_owned()),
+                                    ModelPrice {
+                                        model_key: &reviewer.key,
+                                        model_id: &reviewer.model,
+                                        identity: &reviewer.price_identity,
+                                        responses: reviewer
+                                            .endpoint
+                                            .trim_end_matches('/')
+                                            .ends_with("/responses"),
+                                    },
+                                )
+                                .await;
+                            match reviewer
+                                .complete(messages, tools, |delta| billing.observe_text(delta))
+                                .await
+                            {
+                                Ok(completion) => {
+                                    audit.messages(std::slice::from_ref(&completion.message),round).map_err(|e|e.to_string())?;
+                                    billing
+                                        .settle_success(
+                                            completion.usage.as_ref(),
+                                            completion.responses_duration_ms,
+                                        )
+                                        .await
+                                        .map_err(|_| "Could not persist review model usage".to_owned())?;
+                                    break Ok(completion);
+                                }
+                                Err(error) if attempt < REVIEW_ATTEMPTS && retryable(&error) => {
+                                    attempt += 1;
+                                    tokio::time::sleep(REVIEW_RETRY_DELAY).await;
+                                }
+                                Err(error) => break Err(error),
+                            }
+                        }
                     })
                 },
             );

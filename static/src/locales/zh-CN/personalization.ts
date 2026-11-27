@@ -525,8 +525,6 @@ export default {
   thinkingSummaryModelRequired: '请选择模型',
   thinkingSummaryIntervalTitle: '摘要生成间隔（秒）',
   thinkingSummaryIntervalDesc: '思考摘要多久更新一次',
-  externalSessionHeaderTitle: '外部会话标识',
-  externalSessionHeaderDesc: '让 OpenCode 服务识别同一对话的连续请求',
   titleDefaultModelDesc: '注册表第一个可用模型；仅 Codex 模型时选 -luna 快速款',
   maxRoundsTitle: '最大审核轮次',
   maxRoundsDesc: '审核智能体最多进行的判断轮次',

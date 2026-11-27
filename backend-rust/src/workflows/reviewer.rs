@@ -1,5 +1,5 @@
 use super::{Result, ReviewDecision, ReviewMode, ReviewRequest, WorkflowError};
-use crate::{catalog::SelectedModel, runtime::ModelConfig};
+use crate::{approval::review::retryable, catalog::SelectedModel, runtime::ModelConfig};
 use serde_json::{Value, json};
 use std::{future::Future, path::Path, pin::Pin, time::Duration};
 use uuid::Uuid;
@@ -25,6 +25,7 @@ pub trait ReviewEvidence: Send + Sync + 'static {
 pub async fn run_model_review<Bill, Begin, Settle>(
     request: &ReviewRequest,
     model: &SelectedModel,
+    session: Option<&str>,
     max_rounds: usize,
     workspace: &Path,
     evidence: Option<&dyn ReviewEvidence>,
@@ -39,12 +40,13 @@ where
     Settle: Future<Output = Result<()>> + Send,
     Bill: Send,
 {
-    run_recorded_review(request,model,max_rounds,workspace,evidence,progress,billing,|_,_| Ok(())).await
+    run_recorded_review(request,model,session,max_rounds,workspace,evidence,progress,billing,|_,_| Ok(())).await
 }
 
 pub(crate) async fn run_recorded_review<Bill, Begin, Settle>(
     request: &ReviewRequest,
     model: &SelectedModel,
+    session: Option<&str>,
     max_rounds: usize,
     workspace: &Path,
     evidence: Option<&dyn ReviewEvidence>,
@@ -67,7 +69,9 @@ where
         ));
     }
     let model = match ModelConfig::from_catalog(model.clone()) {
-        Ok(model) => model.with_session(&Uuid::new_v4().to_string(), false),
+        Ok(model) => model
+            .with_session(&Uuid::new_v4().to_string(), false)
+            .with_opencode_headers(session, false),
         Err(error) => return Ok(ReviewDecision::Unavailable(error)),
     };
     let active = request.mode == ReviewMode::Active;
@@ -161,41 +165,6 @@ where
     Ok(ReviewDecision::Unavailable(
         "审核达到轮次上限，未产出有效结论。".into(),
     ))
-}
-
-fn retryable(error: &str) -> bool {
-    let error = error.to_ascii_lowercase();
-    if [
-        "insufficient_quota",
-        "usage_limit",
-        "subscription usage limit",
-        "quota_exceeded",
-        "billing_hard_limit",
-        "insufficient balance",
-        "invalid_api_key",
-    ]
-    .iter()
-    .any(|marker| error.contains(marker))
-    {
-        return false;
-    }
-    if let Some(status) = error
-        .split_once(" http ")
-        .and_then(|(_, suffix)| suffix.split_whitespace().next())
-        .and_then(|code| code.parse::<u16>().ok())
-    {
-        return matches!(status, 408 | 409 | 425 | 429 | 500..=599);
-    }
-    [
-        "rate_limit",
-        "timed out",
-        "timeout",
-        "connection",
-        "stream read failed",
-        "stream ended before",
-    ]
-    .iter()
-    .any(|marker| error.contains(marker))
 }
 
 fn verdict(arguments: &Value) -> ReviewDecision {
