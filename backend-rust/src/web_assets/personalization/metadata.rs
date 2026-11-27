@@ -97,7 +97,8 @@ impl Policy {
             let enabled = locked.unwrap_or_else(|| category.get("default_enabled").is_none_or(truthy) && !disabled.contains(&id.as_str()));
             let tools: Vec<_> = category["tools"].as_array().into_iter().flatten().filter_map(Value::as_str).collect();
             json!({"id": id, "label": category["label"].as_str().filter(|label| !label.is_empty()).unwrap_or(&id),
-                "tools": tools, "enabled": enabled, "locked": locked.is_some(), "locked_state": locked})
+                "tools": tools, "enabled": enabled, "locked": locked.is_some(), "locked_state": locked,
+                "silent_when_disabled": category["silent_when_disabled"] == true})
         }).collect()
     }
 }

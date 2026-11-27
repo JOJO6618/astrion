@@ -551,7 +551,7 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 - **文本同源**：通知正文由 `system_prompt/sections.rs` 的 `permission_section` / `execution_section` / `work_section` 渲染，与冻结提示词共用模板，**禁止另写一份规则文案**。
 - **归一化复用** `web_status::preferences::effective_modes`（含 plan→readonly、readonly→sandbox 联动），**禁止在通知模块重复实现**。
 - **消息形态**：`visibility: compact` + `starts_work: false` + `runtime_mode_notice: true`，`source` 仍按 kind 分 `permission_change` / `execution_change` / `network_change` / `work_mode_change`；前端靠 `visibility` 与 `runtime_mode_notice` 识别，无需改动。
-- **已知边界**：Chat 模式（`allows_workflow()==false`）只在 admission 补发，运行中排队切换不注入；系统提示词 execution 段仍固定渲染 `sandbox`，direct 只在切换通知里表达。
+- **首次冻结**：权限、执行环境、网络和运行模式与运行期通知共用模式归一化；没有任务审批作用域的固定只读运行不描述为可写或 direct。已冻结快照不回写。 Chat 模式（`allows_workflow()==false`）仍只在 admission 补发。
 - 回归 `test/2026-11-27_运行期模式通知/mode_notice_contract.rs`（经 `#[path]` 挂进 `mode_notice` 模块）。
 
 ---

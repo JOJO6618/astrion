@@ -17,6 +17,34 @@ pub(super) fn category_tools(data: &std::path::Path, category: &str, metadata: &
         .and_then(|row|row["tools"].as_array()).into_iter().flatten().filter_map(|tool|tool.as_str().map(str::to_owned)).collect())
 }
 
+fn effective_rows(data: &std::path::Path, overrides: &Value) -> Result<Vec<Value>, String> {
+    let (mut rows, _) = runtime_categories(data).map_err(|error| error.to_string())?;
+    apply_overrides(&mut rows, overrides);
+    Ok(rows)
+}
+
+fn non_mcp_disabled(rows: &[Value]) -> impl Iterator<Item = &Value> {
+    rows.iter().filter(|row| row["enabled"] == false
+        && !row["id"].as_str().is_some_and(|id| id == "mcp" || id.starts_with("mcp_server__")))
+}
+
+pub(super) fn prompt_states(
+    data: &std::path::Path, overrides: &Value,
+) -> Result<(HashSet<String>, Vec<String>), String> {
+    let rows = effective_rows(data, overrides)?;
+    let mut blocked = HashSet::new();
+    let mut notice = std::collections::BTreeSet::new();
+    for row in non_mcp_disabled(&rows) {
+        for tool in row["tools"].as_array().into_iter().flatten().filter_map(Value::as_str) {
+            blocked.insert(tool.to_owned());
+            if row["silent_when_disabled"] != true {
+                notice.insert(tool.to_owned());
+            }
+        }
+    }
+    Ok((blocked, notice.into_iter().collect()))
+}
+
 impl Runtime {
     pub fn tool_settings(&self, ws: &RegisteredWorkspace, id: Option<&str>, patch: Option<&Value>) -> Result<Value,RuntimeError> {
         let mut store = self.store()?;
@@ -51,10 +79,8 @@ impl Runtime {
         let task = store.tasks.get(task_id).ok_or("Task not found")?;
         let path = store.conversation_path(&task.workspace_id,&task.conversation_id).map_err(|e|e.message)?;
         let overrides = Database::open(path.parent().unwrap())?.field(&task.conversation_id,"metadata","runtime_tool_category_overrides")?.unwrap_or_default();
-        let (mut rows,_) = runtime_categories(&store.data_dir).map_err(|e|e.to_string())?;
-        apply_overrides(&mut rows,&overrides);
-        Ok(rows.iter().filter(|row| row["enabled"]==false)
-            .filter(|row| !row["id"].as_str().is_some_and(|s|s=="mcp" || s.starts_with("mcp_server__")))
-            .flat_map(|row| row["tools"].as_array().into_iter().flatten()).filter_map(|v|v.as_str().map(str::to_owned)).collect())
+        let rows = effective_rows(&store.data_dir, &overrides)?;
+        Ok(non_mcp_disabled(&rows).flat_map(|row| row["tools"].as_array().into_iter().flatten())
+            .filter_map(|tool| tool.as_str().map(str::to_owned)).collect())
     }
 }

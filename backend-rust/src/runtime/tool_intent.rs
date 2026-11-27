@@ -4,6 +4,44 @@
 //! `server/chat_flow_runner_helpers.py`) so the preparing block can show the
 //! intent while the model is still streaming the remaining arguments.
 
+/// Apply the Agent display preference to first-party JSON object parameters only.
+/// MCP properties (including a genuine remote `intent` field) belong to the server.
+pub(super) fn configure_schema(schema: &mut serde_json::Value, enabled: bool) {
+    let function = &mut schema["function"];
+    if function["name"].as_str().is_none_or(|name| name.starts_with("mcp__")) {
+        return;
+    }
+    let parameters = &mut function["parameters"];
+    if parameters["type"] != "object" {
+        return;
+    }
+    let Some(properties) = parameters["properties"].as_object_mut() else {
+        return;
+    };
+    if enabled {
+        if !properties.contains_key("intent") {
+            let existing = std::mem::take(properties);
+            properties.insert("intent".into(), serde_json::json!({
+                "type":"string", "description":"用不超过 15 个字向用户说明即将执行的操作目的"
+            }));
+            properties.extend(existing);
+        }
+        if !parameters["required"].is_array() {
+            parameters["required"] = serde_json::json!([]);
+        }
+        if let Some(required) = parameters["required"].as_array_mut()
+            && !required.iter().any(|value| value == "intent")
+        {
+            required.insert(0, serde_json::json!("intent"));
+        }
+    } else {
+        properties.shift_remove("intent");
+        if let Some(required) = parameters["required"].as_array_mut() {
+            required.retain(|value| value != "intent");
+        }
+    }
+}
+
 /// Return a closed intent, or `Some("")` when the object is complete but has no intent.
 ///
 /// `None` means the arguments are still incomplete. Keys and preceding values are

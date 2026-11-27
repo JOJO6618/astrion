@@ -16,9 +16,37 @@ pub(in crate::runtime) struct ToolMenu {
     pub(super) interaction_names: HashSet<String>,
     pub(super) process_names: HashSet<String>,
     pub(super) disabled: HashSet<String>,
+    pub(super) intent_enabled: bool,
     pub(super) mcp: Option<Arc<crate::mcp::Runtime>>,
     pub(super) mcp_snapshot: crate::mcp::ToolSnapshot,
     pub(super) deferred: Option<super::super::tool_loading::State>,
+}
+
+/// Built-in definitions that may appear in the frozen deferred catalog. Keep
+/// discovery and the live menu on the same availability checks.
+pub(in crate::runtime) fn workflow_schemas(
+    runtime: &Runtime, mut worktree_schemas: Vec<Value>, can_write: bool,
+) -> Vec<Value> {
+    let mut schemas = runtime.workflow_tool_schemas();
+    schemas.append(&mut worktree_schemas);
+    schemas.extend(conversation_tools::definitions());
+    schemas.push(crate::tools::easter_egg::definition());
+    if runtime.schedules_available() {
+        schemas.extend(super::super::schedule_tools::definitions());
+    }
+    if runtime.personalization.is_some() {
+        schemas.push(crate::web_assets::personalization::model_tool());
+        if can_write {
+            schemas.push(crate::web_assets::personalization::create_skill_definition());
+        }
+    }
+    schemas.extend(runtime.sub_agent_tool_schemas());
+    schemas.extend(crate::tools::web::definitions());
+    if can_write {
+        schemas.push(crate::tools::web::save_definition());
+    }
+    schemas.extend(super::super::knowledge_tools::write_schemas());
+    schemas
 }
 
 pub(in crate::runtime) async fn for_round(
@@ -50,25 +78,7 @@ pub(in crate::runtime) async fn for_round(
         schemas.extend([write_file_tool(), edit_file_tool()]);
     }
     if workflow {
-        schemas.extend(runtime.workflow_tool_schemas());
-        schemas.extend(runtime.worktree_tools(task_id)?);
-        schemas.extend(conversation_tools::definitions());
-        schemas.push(crate::tools::easter_egg::definition());
-        if runtime.schedules_available() {
-            schemas.extend(super::super::schedule_tools::definitions());
-        }
-        if runtime.personalization.is_some() {
-            schemas.push(crate::web_assets::personalization::model_tool());
-            if can_write {
-                schemas.push(crate::web_assets::personalization::create_skill_definition());
-            }
-        }
-        schemas.extend(runtime.sub_agent_tool_schemas());
-        schemas.extend(crate::tools::web::definitions());
-        if can_write {
-            schemas.push(crate::tools::web::save_definition());
-        }
-        schemas.extend(super::super::knowledge_tools::write_schemas());
+        schemas.extend(workflow_schemas(runtime, runtime.worktree_tools(task_id)?, can_write));
         if !model.supports_images() && !model.supports_videos() {
             schemas.push(crate::tools::vlm::definition());
         }
@@ -124,6 +134,18 @@ pub(in crate::runtime) async fn for_round(
             .as_str()
             .is_some_and(|name| disabled.contains(name))
     });
+    let intent_enabled = if workflow {
+        let data_dir = runtime.store().map_err(|error| error.message)?.data_dir.clone();
+        crate::web_assets::personalization::agent_tool_intent_enabled(&data_dir)
+            .map_err(|error| error.to_string())?
+    } else {
+        true
+    };
+    if workflow {
+        for schema in &mut round_schemas {
+            super::super::tool_intent::configure_schema(schema, intent_enabled);
+        }
+    }
     let complete_schemas = round_schemas;
     let deferred = if workflow {
         runtime.deferred_tools(task_id, &complete_schemas)?
@@ -132,7 +154,7 @@ pub(in crate::runtime) async fn for_round(
     };
     let round_schemas = deferred
         .as_ref()
-        .map(|state| state.schemas(&complete_schemas))
+        .map(|state| state.schemas(&complete_schemas, intent_enabled))
         .unwrap_or_else(|| complete_schemas.clone());
     Ok(ToolMenu {
         complete_schemas,
@@ -141,6 +163,7 @@ pub(in crate::runtime) async fn for_round(
         interaction_names,
         process_names,
         disabled,
+        intent_enabled,
         mcp,
         mcp_snapshot,
         deferred,

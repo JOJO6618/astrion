@@ -216,6 +216,22 @@ pub(crate) fn require_read_before_edit(data:&Path)->io::Result<bool>{
     Ok(store::read_object(&data.join("personalization.json"))?.and_then(|cfg|cfg.get("require_read_before_edit").cloned())==Some(Value::Bool(true)))
 }
 
+pub(crate) fn agent_path_image_bounds(data: &Path) -> Option<(u32, u32)> {
+    let config = store::read_object(&data.join("personalization.json")).ok()??;
+    match config.get("image_compression")?.as_str()? {
+        "1080p" => Some((1920, 1080)),
+        "720p" => Some((1280, 720)),
+        "540p" => Some((960, 540)),
+        _ => None,
+    }
+}
+
+pub(crate) fn agent_tool_intent_enabled(data: &Path) -> io::Result<bool> {
+    Ok(store::read_object(&data.join("personalization.json"))?
+        .and_then(|config| config.get("tool_intent_enabled").and_then(Value::as_bool))
+        .unwrap_or(true))
+}
+
 pub(crate) fn shallow_options(data: &Path) -> io::Result<Option<crate::runtime::shallow::Settings>> {
     let prefs = store::read_object(&data.join("personalization.json"))?.unwrap_or_default();
     if prefs.get("auto_shallow_compress_enabled") != Some(&Value::Bool(true)) { return Ok(None); }
