@@ -26,6 +26,9 @@ use crate::{
 
 use super::{ChatMode, model::ModelResolver, store, tree};
 
+#[path = "../2026-11-27_RustChat迁移回归/contract.rs"]
+mod migration_repair;
+
 const CONVERSATION: &str = "conv_20240912_104056_001";
 
 struct DataDir(PathBuf);
@@ -702,7 +705,8 @@ async fn stale_active_turn_is_recovered_before_next_send() {
     let server = server.serve();
     let mode = mode(&data, model);
     let task = send(&mode, CONVERSATION, "after-recovery", "new question", Some("msg_stale_assistant"));
-    wait_task(&mode, task["task_id"].as_str().unwrap()).await;
+    let completed = wait_task(&mode, task["task_id"].as_str().unwrap()).await;
+    assert_eq!(completed["data"]["status"], "succeeded", "{completed}");
     server.join().unwrap();
 
     let raw = data.raw(CONVERSATION);
@@ -1405,7 +1409,7 @@ fn unknown_agent_tool_and_foreign_conversation_are_rejected() {
 
     let mut used = HashSet::new();
     let error = super::tasks::validated_calls(
-        &json!({"tool_calls":[{"id":"call_1","function":{"name":"run_command","arguments":"{}"}}]}),
+        &json!({"tool_calls":[{"id":"call_1","type":"function","function":{"name":"run_command","arguments":"{}"}}]}),
         &mut used,
     )
     .unwrap_err();

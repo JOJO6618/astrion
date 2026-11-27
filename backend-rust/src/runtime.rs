@@ -47,6 +47,7 @@ pub(crate) mod todos;
 mod tool_categories;
 mod sub_agent_execution;
 mod system_prompt;
+pub(crate) use system_prompt::personalization_prompt;
 #[path = "versioning/mod.rs"]
 pub mod versioning;
 mod web_conversations;

@@ -94,6 +94,7 @@ pub(super) struct Task {
     api_request_pending: bool,
     stream: Option<LiveText>,
     thinking_stream: Option<LiveText>,
+    chat_progress: super::chat::ChatProgress,
     tool_batches: Vec<ring::digest::Digest>,
     monitor_execution_ids: HashMap<String, String>,
     pub cancel_requested: bool,
@@ -607,6 +608,7 @@ impl Task {
             api_request_pending: false,
             stream: None,
             thinking_stream: None,
+            chat_progress: super::chat::ChatProgress::default(),
             tool_batches: Vec::new(),
             monitor_execution_ids: HashMap::new(),
             cancel_requested: false,
@@ -655,6 +657,7 @@ impl Task {
         self.committed_event_offset = self.next_offset;
         self.stream = None;
         self.thinking_stream = None;
+        self.chat_progress = super::chat::ChatProgress::default();
     }
 
     pub fn terminal(&mut self, status: Status, error: Option<String>, kind: &str, data: Value, ts: f64) {
@@ -666,6 +669,7 @@ impl Task {
         self.approval = None;
         self.stream = None;
         self.thinking_stream = None;
+        self.chat_progress = super::chat::ChatProgress::default();
     }
 
     pub fn emit(&mut self, kind: &str, data: Value) {
@@ -681,6 +685,12 @@ impl Task {
         self.crosspet_event(kind, &data);
         if matches!(kind, "goal_progress" | "goal_completed" | "goal_stopped") {
             self.goal_progress = data.clone();
+        }
+        if self.workspace_id.is_empty() {
+            self.chat_progress.apply(&self.start.id, kind, &data, self.next_offset, ts);
+            if kind == "tool_preparing" {
+                self.api_request_pending = false;
+            }
         }
         match kind {
             "api_request_start" => {
@@ -765,6 +775,12 @@ impl Task {
             "committed_event_offset":self.committed_event_offset,"api_request_pending":self.api_request_pending,
             "cancel_requested":self.cancel_requested,"stream":self.stream,"thinking_stream":self.thinking_stream
         })
+    }
+
+    pub(super) fn chat_display_snapshot(&self, from: u64) -> Value {
+        let mut activity = self.activity(from);
+        activity["chat_progress"] = self.chat_progress.display();
+        activity
     }
 }
 
