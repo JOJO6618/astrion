@@ -49,8 +49,13 @@ impl GoalFailure {
             || has(&["invalid_request", "context_overflow", "no_model", "not configured", "profile incomplete"]) {
             "configuration"
         } else if matches!(self.status_code, Some(408 | 409 | 425 | 429 | 500..=599))
-            || has(&["rate_limit", "rate limit", "http 429", "timeout", "timed out", "connection",
-                "connecterror", "readerror", "writeerror", "protocolerror", "network", "disconnect", "断流", "超时", "连接", "网络"]) {
+            || (self.status_code.is_none() && has(&[
+                "rate_limit", "rate limit", "timeout", "timed out", "connection", "connecterror",
+                "readerror", "writeerror", "protocolerror", "network", "disconnect", "断流", "超时", "连接", "网络",
+                "request_error: connect:", "tls handshake eof", "stream read failed:", "stream ended before [done]",
+                "responses stream error (stream_incomplete):", " request failed: connect:",
+                " request failed: body:", " request failed: transport:",
+            ])) {
             "retryable"
         } else {
             "unknown_error"

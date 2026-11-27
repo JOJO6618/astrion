@@ -1,5 +1,5 @@
 use super::{Result, ReviewDecision, ReviewMode, ReviewRequest, WorkflowError};
-use crate::{approval::review::retryable, catalog::SelectedModel, runtime::ModelConfig};
+use crate::{catalog::SelectedModel, model::retry::Attempt, runtime::ModelConfig};
 use serde_json::{Value, json};
 use std::{future::Future, path::Path, pin::Pin, time::Duration};
 use uuid::Uuid;
@@ -92,17 +92,18 @@ where
                 "stage":"model_call", "round":round, "message":format!("审核模型调用第 {round} 轮"),
             }),
         ))?;
-        let mut attempt = 1;
+        let mut attempt = 0;
         let completion = loop {
+            attempt += 1;
+            let retry = Attempt::new(attempt, true);
             let billing = begin().await;
             match model.complete(&messages, &tools, |_| {}).await {
                 Ok(completion) => {
                     settle(billing, completion.usage, completion.responses_duration_ms).await?;
                     break completion.message;
                 }
-                Err(error) if attempt < 5 && retryable(&error) => {
-                    attempt += 1;
-                    tokio::time::sleep(Duration::from_secs(10)).await;
+                Err(error) if retry.should_retry(&error) => {
+                    retry.wait().await;
                 }
                 Err(error) => return Ok(ReviewDecision::Unavailable(error)),
             }

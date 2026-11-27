@@ -1,11 +1,11 @@
-use std::{collections::HashSet, path::Path, time::Duration};
+use std::{collections::HashSet, path::Path};
 
 use serde_json::{Value, json};
 use tokio::{sync::watch, time::Instant};
 
 use crate::{
-    conversation_db::Database, goals::GoalFailure,
-    knowledge::{self, Knowledge, KnowledgeAccess}, model::RoundBudget,
+    conversation_db::Database,
+    knowledge::{self, Knowledge, KnowledgeAccess}, model::{RoundBudget, retry::{Attempt, RETRY_DELAY}},
     runtime::{ModelConfig, todos::operations as todos},
     tools::{media, read_file, web, write_file::{EDIT_NAME, WRITE_NAME}},
 };
@@ -237,6 +237,7 @@ impl Worker<'_> {
                     if self.timeout.is_some_and(|deadline| Instant::now() >= deadline) { return Ok(End::Timeout); }
                     if stop.borrow().cancelled() { return Ok(End::Failed("子智能体已停止。".into())); }
                     attempt += 1;
+                    let retry = Attempt::new(attempt, true);
                     let mut billing = tokio::select! {
                         biased;
                         _ = stop.changed() => return Ok(End::Failed("子智能体已停止。".into())),
@@ -251,9 +252,9 @@ impl Worker<'_> {
                     };
                     match response {
                         Ok(completion) => break (completion,billing),
-                        Err(error) if attempt < 5 && GoalFailure::from_message(&error).reason() == "retryable" => {
-                            let retry = Instant::now() + Duration::from_secs(10);
-                            let wake = self.timeout.map_or(retry, |deadline| deadline.min(retry));
+                        Err(error) if retry.should_retry(&error) => {
+                            let next_attempt = Instant::now() + RETRY_DELAY;
+                            let wake = self.timeout.map_or(next_attempt, |deadline| deadline.min(next_attempt));
                             tokio::select! {
                                 biased;
                                 _ = stop.changed() => return Ok(End::Failed("子智能体已停止。".into())),
