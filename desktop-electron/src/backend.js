@@ -63,8 +63,7 @@ export function isPortAvailable(port) {
 }
 
 /** 优先复用上次端口；不可用则随机。 */
-export async function resolveBackendPort() {
-  const preferred = loadPreferredPort();
+export async function resolveBackendPort(preferred = loadPreferredPort()) {
   if (preferred && (await isPortAvailable(preferred))) return preferred;
   return pickFreePort();
 }

@@ -4,12 +4,15 @@
 import { app, dialog } from 'electron';
 import { randomBytes } from 'node:crypto';
 import {
+  loadPreferredPort,
+  pickFreePort,
   resolveBackendPort,
   savePreferredPort,
   shutdownBackend,
   spawnRustBackend,
   waitBackendReady
 } from './backend.js';
+import { startDesktopPort } from './backend-startup.js';
 import { primeDesktopSession } from './session-priming.js';
 import { startBridge } from './bridge.js';
 import {
@@ -33,17 +36,15 @@ import { productionRustPaths } from './rust-backend.js';
 export { shutdownBackend };
 
 async function startRustDesktop(runtime) {
-  const port = await resolveBackendPort();
-  const child = spawnRustBackend(runtime, { port, version: app.getVersion(), browserToken: runtime.browserToken });
-  try {
-    await waitBackendReady(port, child);
-    if (!await primeDesktopSession(port)) throw new Error('Rust desktop session unavailable');
-  } catch (error) {
-    await shutdownBackend();
-    throw error;
-  }
-  savePreferredPort(port);
-  return port;
+  return startDesktopPort({
+    preferredPort: loadPreferredPort(),
+    resolveBackendPort, pickFreePort, waitBackendReady, shutdownBackend,
+    primeDesktopSession, savePreferredPort,
+    spawnBackend: port => spawnRustBackend(runtime, {
+      port, version: app.getVersion(), browserToken: runtime.browserToken,
+    }),
+    warn: (message, error) => console.warn(`[astrion-desktop] ${message}:`, error?.message || error),
+  });
 }
 
 export async function startBackendAndCreateWindow(rust) {
