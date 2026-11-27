@@ -12,7 +12,8 @@ pub(super) fn build(
 ) -> Value {
     let WebConversationSnapshot {
         mut document, activity, goal_progress, compression, pending_user_questions,
-        pending_plan_approvals, pending_tool_approvals, has_running_background_commands, has_running_multi_agent,
+        pending_plan_approvals, pending_tool_approvals, resolved_tool_approval_ids, approval_review_records,
+        has_running_background_commands, has_running_multi_agent,
     } = snapshot;
     let activity = activity.as_ref();
     let goal_progress = goal_progress.as_ref();
@@ -65,8 +66,8 @@ pub(super) fn build(
             "messages": live.messages, "task": task, "next_event_idx": cursor,
             "state": { "streaming": live.streaming, "api_request_pending": live.pending,
                 "goal_progress": goal_progress, "goal_running": goal_running, "summary_tool_batch_id": null, "summary_tool_batch_sequence": 0,
-                "pending_tool_approvals": pending_tool_approvals, "resolved_tool_approval_ids": [], "pending_user_questions": pending_user_questions,
-                "pending_plan_approvals": pending_plan_approvals, "approval_review_records": [],
+                "pending_tool_approvals": pending_tool_approvals, "resolved_tool_approval_ids": resolved_tool_approval_ids, "pending_user_questions": pending_user_questions,
+                "pending_plan_approvals": pending_plan_approvals, "approval_review_records": approval_review_records,
                 "compression": if compression["in_progress"] == true { &compression } else { &Value::Null } } },
         "running": {
             "is_main_running": running,
