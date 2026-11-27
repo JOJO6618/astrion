@@ -3,12 +3,8 @@
 // 边界：本模块只读；写操作（保存模型/增删路径授权）必须走 Gateway API，不在此列。
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import type { EffortLevel, ModelOption, PathAuth } from './data';
-import { cliDataDir, cliDeployDir, cliExperiment } from './gateway';
-
-/** 源码树（cli/src → 项目根；fileURLToPath 正确解码中文路径） */
-const REPO_ROOT = resolve(fileURLToPath(new URL('../..', import.meta.url)));
+import { cliDataDir, cliDeployDir, cliExperiment, cliResourceDir } from './gateway';
 
 function readJson(path: string): any | null {
   try {
@@ -25,7 +21,7 @@ function resolveDeployConfig(name: string): any | null {
   const deployPath = resolve(directory, name);
   if (existsSync(deployPath)) return readJson(deployPath);
   if (cliExperiment()) return null;
-  const repoPath = resolve(REPO_ROOT, 'config', name);
+  const repoPath = resolve(cliResourceDir(), 'config', name);
   if (existsSync(repoPath)) return readJson(repoPath);
   return null;
 }

@@ -28,7 +28,7 @@
 - 开发启动：`bun cli/src/main.tsx`（或 `npm --prefix cli run dev`）
 - 类型检查：`cd cli && ./node_modules/.bin/tsc --noEmit`
 - 可执行命令名：`astrion`（已装到 `/opt/homebrew/bin/astrion` → `cli/bin/astrion` symlink，bun wrapper 支持 symlink 解析；`--version`/`--help` 快速退出不启 TUI；后续 `bun build --compile` 单文件分发）
-- CLI 自启动默认使用 Rust。源码安装先运行 `cargo build --locked --release --manifest-path backend-rust/Cargo.toml` 和 `node desktop/scripts/prepare_rust_backend.mjs`。部署可通过绝对路径 `ASTRION_RUST_BACKEND_BIN` 与 `ASTRION_RUST_RESOURCE_ROOT` 提供二进制和资源。
+- CLI 自启动默认使用 Rust。源码安装先运行 `cargo build --locked --release --manifest-path backend-rust/Cargo.toml`；CLI 与 Host Web 共享源码 `.env`、部署设置和环境变量的解析规则，默认使用源码资源。可通过 `ASTRION_RUST_BACKEND_BIN` 和 `ASTRION_RUST_RESOURCE_ROOT` 指定二进制和资源。显式连接已有 Gateway 不加载源码 `.env`；Rust 实验模式仍使用隔离数据目录和经 `node desktop/scripts/prepare_rust_backend.mjs` 准备的 staging 资源。
 - 依赖安装：沙箱网络受限时不跑 npm/bun install，从 `cli-redesign-demo/node_modules` 铺平（版本以 `cli/package.json` 为准）
 
 ### Desktop（`desktop-electron/`，macOS 与 Windows 共用 Electron/Chromium）
