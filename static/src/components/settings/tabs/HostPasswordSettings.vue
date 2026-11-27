@@ -11,7 +11,7 @@ const busy = ref(false);
 const error = ref('');
 const controller = new AbortController();
 let disposed = false;
-const command = "python3 scripts/host_password.py --password 'YOUR_PASSWORD'";
+const command = "./backend-rust/target/release/astrion-headless host-password --password 'YOUR_PASSWORD'";
 
 onBeforeUnmount(() => {
   disposed = true;

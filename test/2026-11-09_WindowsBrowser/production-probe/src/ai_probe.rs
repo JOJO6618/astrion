@@ -63,11 +63,11 @@ impl Harness {
 }
 pub fn run() {
     let root=PathBuf::from(std::env::var_os("ASTRION_BROWSER_PRODUCTION_PROBE_ROOT").expect("isolated root"));std::fs::create_dir_all(&root).unwrap();
-    let fixture=fixture::start("ai",0);let origin=fixture.origin.clone();let python=PathBuf::from(std::env::var_os("ASTRION_BROWSER_PROBE_PYTHON").unwrap());
+    let fixture=fixture::start("ai",0);let origin=fixture.origin.clone();
     let report=Arc::new(Mutex::new(json!({"ok":false})));
     tauri::Builder::default().setup(move|app|{
         WebviewWindowBuilder::new(app,"main",WebviewUrl::External(format!("{origin}/new").parse()?)).data_directory(root.join("main-webview2")).initialization_script(browser::BRIDGE_SCRIPT).title("Astrion AI tool native regression").inner_size(1000.,700.).build()?;
-        browser::initialize(app.handle(),origin.clone(),root.clone(),python,PathBuf::new()).map_err(std::io::Error::other)?;
+        browser::initialize(app.handle(),origin.clone(),root.clone()).map_err(std::io::Error::other)?;
         let (port,token)=browser::start_ai_service(app.handle()).map_err(std::io::Error::other)?;
         let handle=app.handle().clone();let state=fixture.state.clone();let done=fixture.done.clone();let report=report.clone();
         std::thread::spawn(move||{

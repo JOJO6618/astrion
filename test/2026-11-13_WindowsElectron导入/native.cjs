@@ -40,7 +40,7 @@ let manager, window, server, result;
   manager = new NativeBrowser(window, view, origin);
   const resources = process.env.ASTRION_IMPORT_RESOURCES;
   const readerOptions = { env: { ...process.env, LOCALAPPDATA: path.join(output, 'localapp') },
-    ...(resources ? { runtime: { python: path.join(resources, 'runtime/python/astrion-backend.exe'), worker: path.join(resources, 'chrome-import/windows-worker.py') } } : {}) };
+    ...(resources ? { resolveHelper: () => path.join(resources, 'astrion-windows-helper.exe') } : {}) };
   const read = (request, options) => readWindowsChrome(request, { ...readerOptions, ...options });
   manager.credentials.importer.dependencies.windowsRequest = read;
   const run = code => view.webContents.executeJavaScript(code);
@@ -48,27 +48,39 @@ let manager, window, server, result;
   const lease = connected.lease;
   const command = payload => run(`window.astrionBrowser.credentials(${JSON.stringify({ ...payload, lease })})`);
   const vault = manager.credentials.vault(manager.main.profile);
-  check('Windows renderer preserves file import and follow-AI capabilities', await run('window.astrionBrowser.credentialFileImport === true && window.astrionBrowser.followAi === true'));
+  check('Windows renderer exposes file and history import and follow-AI capabilities', await run('window.astrionBrowser.credentialFileImport === true && window.astrionBrowser.credentialHistoryOnly === true && window.astrionBrowser.followAi === true'));
   if (verify) {
     check('DPAPI password vault survives a new Electron process', vault.find('https://csv.example.test', 'csv-user')?.password === 'synthetic-second\nline');
-    check('Windows database passwords survive a new process', vault.find('https://db.example.test', 'db-user')?.password === 'synthetic-db-password');
+    check('history survives a new Electron process', manager.main.profile.data.history.some(row => row.url === 'https://history.example.test/'));
     const store = new ImportCookieStore(manager.main.profile);
     const cookies = await store.open(); store.close();
     check('persistent domain cookie survives restart', cookies.some(row => row.name === 'json-domain' && row.domain === '.example.test' && row.value === 'synthetic-json-domain'));
     const chips = cookies.filter(row => row.name === 'json-shared' && row.partitionKey);
     check('both partition keys and ancestor flags survive restart', chips.length === 2 && chips.some(row => row.partitionKey.hasCrossSiteAncestor === true) && chips.some(row => row.partitionKey.hasCrossSiteAncestor === false));
-    check('persistent Windows database partition cookies survive restart', cookies.filter(row => row.name.startsWith('db-chips-')).length === 2);
   } else {
     const sources = await command({ action: 'sources' });
     check('sources use synthetic Windows LOCALAPPDATA, not macOS paths', sources.sources.length === 1 && sources.sources[0].name === 'Synthetic import source');
-    const selected = { passwords: true, cookies: true, history: true };
+    const requests = [];
+    manager.credentials.importer.dependencies.windowsRequest = (request, options) => {
+      requests.push(request);
+      return read(request, options);
+    };
+    for (const selected of [
+      { passwords: true, cookies: false, history: true },
+      { passwords: false, cookies: true, history: true },
+    ]) {
+      check('direct credential selection fails before reading the source', await command({ action: 'preview', value: { source: 'Default', selected } }).then(() => false, () => requests.length === 0));
+    }
+    const selected = { passwords: false, cookies: false, history: true };
     const preview = (await command({ action: 'preview', value: { source: 'Default', selected } })).preview;
-    check('real DPAPI and Windows AES-GCM records are eligible', preview.stats.passwords.ready === 2 && preview.stats.passwords.reasons.unsupported_encryption === 1);
-    check('Windows database partition cookies are retained and v20 is reported', preview.stats.cookies.ready === 3 && preview.stats.cookies.reasons.unsupported_encryption === 1 && !preview.stats.cookies.reasons.keychain_denied);
-    check('database preview never returns decrypted secrets', !JSON.stringify(preview).includes('synthetic-db-password') && !JSON.stringify(preview).includes('synthetic-db-plain'));
+    check('history preview reads only history data', requests.length === 1 && requests[0].action === 'preview-history'
+      && preview.stats.passwords.read === 0 && preview.stats.cookies.read === 0 && preview.stats.history.ready === 1
+      && !JSON.stringify(preview).includes('https://history.example.test/'));
+    manager.credentials.importer.dependencies.windowsRequest = read;
     const report = (await command({ action: 'import', value: { id: preview.id, choices: {}, replaceCookies: false } })).report;
-    check('Windows database credentials and cookies commit', report.stats.passwords.imported === 2 && report.stats.cookies.imported === 3);
-    check('history keeps valid web visits and counts non-web exclusions', report.stats.history.imported === 1 && report.stats.history.reasons.history_non_web_url === 1);
+    check('history keeps valid web visits and gives specific skip reasons', report.stats.history.imported === 1
+      && report.stats.history.reasons.history_non_web_url === 1 && report.stats.history.reasons.history_invalid_url === 1
+      && report.stats.history.reasons.history_invalid_time === 1);
     await command({ action: 'save', value: { origin: 'https://csv.example.test', username: 'csv-user', password: 'synthetic-existing' } });
     const csvValue = { format: 'password-csv', content: '\ufeff' + csv([
       ['https://csv.example.test/login', 'csv-user', 'synthetic-existing'],
@@ -122,7 +134,7 @@ let manager, window, server, result;
     const invalid = await command({ action: 'preview-file', value: { format: 'cookie-json', content: '[]' } }).then(() => false, () => true);
     check('unversioned cookie input is rejected', invalid);
     const aborted = new AbortController(); aborted.abort();
-    check('private worker cancellation terminates its own child', await readWindowsChrome({ action: 'sources' }, { ...readerOptions, signal: aborted.signal }).then(() => false, error => error.message === 'import_cancelled'));
+    check('a cancelled request does not start the native helper', await readWindowsChrome({ action: 'sources' }, { ...readerOptions, signal: aborted.signal, resolveHelper: () => { throw new Error('helper resolution should be skipped'); } }).then(() => false, error => error.message === 'import_cancelled'));
     let waiting = false;
     manager.credentials.importer.dependencies.windowsRequest = (_request, { signal }) => new Promise((_, reject) => { waiting = true; signal.addEventListener('abort', () => reject(new Error('import_cancelled')), { once: true }); });
     const pending = command({ action: 'preview-file', value: csvValue }).catch(() => null);
@@ -152,7 +164,7 @@ let manager, window, server, result;
     const popup = manager.popouts.get(owner); popup.window.hide();
     await until(() => !popup.view.webContents.isLoading());
     const popupRun = code => popup.view.webContents.executeJavaScript(code);
-    check('independent browser window preserves file import and follow-AI', await popupRun('window.astrionBrowser.credentialFileImport === true && window.astrionBrowser.followAi === true'));
+    check('independent browser window exposes file and history import and follow-AI', await popupRun('window.astrionBrowser.credentialFileImport === true && window.astrionBrowser.credentialHistoryOnly === true && window.astrionBrowser.followAi === true'));
     const popupConnection = await popupRun('window.astrionBrowser.connect({})');
     const popupPreview = await popupRun(`window.astrionBrowser.credentials(${JSON.stringify({ lease: popupConnection.lease, action: 'preview-file', value: { format: 'password-csv', content: csv([['https://popup.example.test', 'popup-user', 'synthetic-popup']]) } })})`);
     check('independent window uses the same file preview service without secrets', popupPreview.preview.stats.passwords.ready === 1 && !JSON.stringify(popupPreview).includes('synthetic-popup'));

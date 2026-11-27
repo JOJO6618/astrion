@@ -61,20 +61,9 @@
     // The native harness measures the real Win32 region and WGC marker pixels here.
     await fetch('/measure');await sleep(1000);
     check('passwordPersisted',(await credentials('list')).records.some(r=>r.id===row.id));
-    const sources=await credentials('sources');check('syntheticImportSource',sources.sources.some(s=>s.id==='Default'));
-    const selection={source:'Default',selected:{passwords:true,cookies:true,history:true}};
-    const cancelled=await credentials('preview',selection);await credentials('cancel-import');
-    let refused=false;try{await credentials('import',{id:cancelled.preview.id,choices:{},replaceCookies:false});}catch{refused=true;}check('cancelledPreviewRejected',refused);
-    const preview=(await credentials('preview',selection)).preview;
-    check('importPreviewNoSecrets',!JSON.stringify(preview).includes('imported-password'));
-    check('unsupportedEncryptionCounted',preview.stats.passwords.reasons.unsupported_encryption===1);
-    const choices=Object.fromEntries(preview.conflicts.map(group=>[group.id,group.candidates[0].id]));
-    const imported=(await credentials('import',{id:preview.id,choices,replaceCookies:true})).report;
-    check('nativeImportCommit',imported.stats.passwords.imported===1 && imported.stats.cookies.imported===1);
-    check('importedPasswordAvailable',(await credentials('list')).records.some(r=>r.origin==='https://import.example.test' && r.username==='imported-user'));
+    check('retiredImportCapabilityHidden', bridge.credentialImport === false);
+    check('retiredImportEndpointRejected', await credentials('sources').then(() => false, () => true));
     const phase=await (await fetch('/phase')).text();
-    const { runMigration } = await import('/migration-suite.js');
-    await runMigration(credentials, check, phase);
     const localConfig = await (await fetch('/local-config')).json();
     await command('new', localConfig.url);
     const localId = state.activeId;

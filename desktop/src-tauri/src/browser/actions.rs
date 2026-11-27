@@ -333,9 +333,6 @@ impl Browser {
         {
             return Err("invalid_browser_clear_options".into());
         }
-        if self.imports.running() {
-            return Err("browser_import_busy".into());
-        }
         let mut kinds = COREWEBVIEW2_BROWSING_DATA_KINDS(0);
         if value["cookies"] == true {
             kinds = COREWEBVIEW2_BROWSING_DATA_KINDS(
@@ -401,7 +398,6 @@ impl Browser {
             }
             if options["cookies"] == true {
                 self.credentials.reset();
-                self.imports.cancel();
                 self.cancel_permissions();
                 self.grants
                     .retain(|key| !key.starts_with(&format!("{}:", self.profile)));

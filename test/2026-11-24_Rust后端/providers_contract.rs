@@ -3262,6 +3262,8 @@ fn codex_accounts_public_payload_matches_python_store_and_flask() {
     let script = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../test/2026-11-24_Rust后端/codex_accounts_fixture.py");
     let output = std::process::Command::new(python)
+        .arg("-B")
+        .arg(script.with_file_name("with_legacy_source.py"))
         .arg(script)
         .arg("--data-dir")
         .arg(&fixture.data)

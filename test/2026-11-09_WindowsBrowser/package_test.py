@@ -1,9 +1,8 @@
-"""Build and verify a portable Windows validation app without publishing or installing."""
+"""Smoke-test an already built Windows Tauri validation package."""
 from __future__ import annotations
 
 import ctypes
 from ctypes import wintypes
-import hashlib
 import json
 import os
 from pathlib import Path
@@ -12,89 +11,10 @@ import subprocess
 import sys
 import time
 import urllib.request
-import zipfile
 
 ROOT = Path(__file__).resolve().parents[2]
-TEST = Path(__file__).resolve().parent
 ARTIFACTS = ROOT / '_experiments/windows-browser-20261109'
 PACKAGE = ROOT / 'output/Astrion-Windows-Browser-Test-20261109-r3'
-CARGO = Path.home() / '.cargo/bin/cargo.exe'
-RUNTIME = ROOT / 'desktop/src-tauri/runtime'
-
-
-def run(command, name, cwd=ROOT):
-    env = os.environ.copy()
-    env['PATH'] = str(CARGO.parent) + os.pathsep + env.get('PATH', '')
-    log = ARTIFACTS / name
-    with log.open('w', encoding='utf-8') as stream:
-        result = subprocess.run([str(item) for item in command], cwd=cwd, env=env, stdout=stream, stderr=subprocess.STDOUT)
-    print(log.read_text(encoding='utf-8', errors='replace')[-5000:])
-    if result.returncode:
-        raise SystemExit(result.returncode)
-
-
-def build():
-    run([sys.executable, ROOT / 'desktop/scripts/prepare_backend.py'], 'package-stage.log')
-    compile_native()
-
-
-def build_inputs():
-    paths = list((ROOT / 'desktop/src-tauri/src').rglob('*.rs'))
-    paths += list((ROOT / 'desktop/src-tauri/src/browser').glob('*.js'))
-    paths += list((ROOT / 'desktop/src-tauri/src/browser').glob('*.py'))
-    paths += list((ROOT / 'desktop/browser-migration-extension').glob('*.*'))
-    paths += [ROOT / 'desktop-electron/src/browser/passwords/page-preload.cjs']
-    paths += list((ROOT / 'desktop-electron/src/browser/ai').rglob('*.js'))
-    paths += [ROOT / 'modules/native_browser/executor.py']
-    paths += [ROOT / 'desktop/src-tauri/Cargo.toml', ROOT / 'desktop/src-tauri/Cargo.lock', TEST / 'windows-test.conf.json', ROOT / 'static/dist/.vite/manifest.json']
-    return {str(path.relative_to(ROOT)): hashlib.sha256(path.read_bytes()).hexdigest() for path in sorted(paths)}
-
-
-def compile_native():
-    inputs = build_inputs()
-    run(['node', ROOT / 'desktop/node_modules/@tauri-apps/cli/tauri.js', 'build', '--debug', '--no-bundle', '--features', 'browser-test', '--config', TEST / 'windows-test.conf.json'], 'package-build.log', ROOT / 'desktop')
-    executable = ROOT / 'desktop/src-tauri/target/debug/astrion-desktop.exe'
-    assert inputs == build_inputs(), 'Build inputs changed during compilation'
-    receipt = {'inputs': inputs, 'exe_sha256': hashlib.sha256(executable.read_bytes()).hexdigest(), 'completed_at': time.time()}
-    (ARTIFACTS / 'package-build-success.json').write_text(json.dumps(receipt, indent=2), encoding='utf-8')
-
-
-def assemble():
-    if PACKAGE.exists():
-        raise RuntimeError('Refusing to overwrite an existing portable package')
-    executable = ROOT / 'desktop/src-tauri/target/debug/astrion-desktop.exe'
-    receipt = json.loads((ARTIFACTS / 'package-build-success.json').read_text(encoding='utf-8'))
-    assert receipt['inputs'] == build_inputs(), 'Source changed since successful package build'
-    assert receipt['exe_sha256'] == hashlib.sha256(executable.read_bytes()).hexdigest(), 'Executable does not match successful build'
-    PACKAGE.mkdir(parents=True)
-    shutil.copy2(executable, PACKAGE / 'AstrionBrowserTest.exe')
-    for name in ('python', 'backend'):
-        shutil.copytree(RUNTIME / name, PACKAGE / 'runtime' / name)
-    for directory in (PACKAGE / 'runtime/backend',):
-        forbidden = [path for path in directory.rglob('*') if path.is_file() and path.name in ('.env', 'secrets.json', 'providers.json', 'host_api_token', 'passwords.dpapi')]
-        if forbidden:
-            raise RuntimeError('Runtime staging contains private configuration')
-    launcher = '@echo off\r\nsetlocal\r\ncd /d "%~dp0"\r\nset "ASTRION_DESKTOP_DATA_ROOT=%~dp0validation-profile"\r\nset "ASTRION_DESKTOP_SETTINGS_FILE=%~dp0validation-profile\\rundata_settings.json"\r\nset "ASTRION_DESKTOP_INITIAL_WORKSPACE=%~dp0validation-profile\\workspace"\r\nset "ASTRION_DESKTOP_REPO="\r\nif not exist "%ASTRION_DESKTOP_INITIAL_WORKSPACE%" mkdir "%ASTRION_DESKTOP_INITIAL_WORKSPACE%"\r\nstart "" "%~dp0AstrionBrowserTest.exe"\r\nendlocal\r\n'
-    launcher = launcher.replace('set "ASTRION_DESKTOP_REPO="', 'set "ASTRION_QUICK_SETTINGS_FILE=%~dp0validation-profile\\quick-entry-windows.json"\r\nset "ASTRION_DESKTOP_REPO="')
-    launcher = launcher.replace('%~dp0validation-profile', '%~dp0..\\Astrion-Windows-Browser-Test-20261109\\validation-profile')
-    (PACKAGE / 'Start-Browser-Test.cmd').write_bytes(launcher.encode('ascii'))
-    (PACKAGE / '启动说明.txt').write_text('r3 包含 AI file:// 导航与快照修改。\n双击 Start-Browser-Test.cmd 启动，复用同级第一次测试包内的 validation-profile。\n启动前请退出旧测试版，避免多个版本同时写入同一份资料。\n本次仅编译和打包，未运行回归测试或应用启动验证。\n', encoding='utf-8')
-    shutil.copytree(ROOT / 'desktop/browser-migration-extension', PACKAGE / 'chrome-cookie-migration')
-    evidence = PACKAGE / 'verification'
-    evidence.mkdir()
-    shutil.copy2(ARTIFACTS / 'package-build-success.json', evidence / 'build.json')
-    notices = PACKAGE / 'third-party'
-    notices.mkdir()
-    for name in ('PLAYWRIGHT_LICENSE', 'PLAYWRIGHT_NOTICE'):
-        shutil.copy2(ROOT / 'desktop-electron/src/browser/ai/vendor' / name, notices / name)
-    manifest = json.loads((PACKAGE / 'runtime/backend/static/dist/.vite/manifest.json').read_text(encoding='utf-8'))
-    missing = [entry['file'] for entry in manifest.values() if not (PACKAGE / 'runtime/backend/static/dist' / entry['file']).is_file()]
-    if missing:
-        raise RuntimeError('Missing packaged frontend resources')
-    assert (PACKAGE / 'runtime/backend/modules/native_browser/executor.py').read_bytes() == (ROOT / 'modules/native_browser/executor.py').read_bytes(), 'Packaged browser executor is stale'
-    result = {'identifier': 'com.astrion.desktop.browser-test-20261109-r3', 'validation': 'not_run_for_this_build', 'executable_sha256': hashlib.sha256((PACKAGE / 'AstrionBrowserTest.exe').read_bytes()).hexdigest(), 'manifest_entries': len(manifest), 'frontend_manifest_sha256': hashlib.sha256((PACKAGE / 'runtime/backend/static/dist/.vite/manifest.json').read_bytes()).hexdigest(), 'private_files_found': 0}
-    (evidence / 'package.json').write_text(json.dumps(result, indent=2), encoding='utf-8')
-    print(json.dumps(result, indent=2))
 
 
 def visible_windows(pid):
@@ -235,26 +155,8 @@ def smoke():
     print(json.dumps(report, indent=2))
 
 
-def archive():
-    target = PACKAGE.with_suffix('.zip')
-    if target.exists():
-        raise RuntimeError('Refusing to overwrite an existing archive')
-    assert not (PACKAGE / 'validation-profile').exists(), 'Do not distribute any test user data'
-    with zipfile.ZipFile(target, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=5) as output:
-        for path in PACKAGE.rglob('*'):
-            if path.is_file():
-                output.write(path, Path(PACKAGE.name) / path.relative_to(PACKAGE))
-    with zipfile.ZipFile(target) as archive:
-        assert archive.testzip() is None, 'Archive CRC failure'
-        names = archive.namelist()
-        assert not any('/validation-profile/' in name for name in names)
-        assert any(name.endswith('/AstrionBrowserTest.exe') for name in names)
-        assert any(name.endswith('/runtime/python/astrion-backend.exe') for name in names)
-    digest = hashlib.sha256(target.read_bytes()).hexdigest()
-    target.with_suffix('.zip.sha256.txt').write_text(digest + '  ' + target.name + '\n', encoding='ascii')
-    print(json.dumps({'file': str(target), 'bytes': target.stat().st_size, 'sha256': digest}, indent=2))
-
-
-if __name__ == '__main__':
+if __name__ == "__main__":
+    if len(sys.argv) < 2 or sys.argv[1] != "smoke":
+        raise SystemExit("Tauri packaging is retired. Use the current desktop-electron build.")
     ARTIFACTS.mkdir(parents=True, exist_ok=True)
-    {'build': build, 'compile': compile_native, 'assemble': assemble, 'smoke': smoke, 'archive': archive}[sys.argv[1]]()
+    smoke()

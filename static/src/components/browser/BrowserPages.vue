@@ -52,7 +52,11 @@
           @update:model-value="(value) => store.command('search-engine', value)"
         />
       </div>
-      <button class="nb-setting nb-setting-link" @click="store.showSection('import')">
+      <button
+        v-if="importSupported"
+        class="nb-setting nb-setting-link"
+        @click="store.showSection('import')"
+      >
         <span>{{ $t('browser.importTitle') }}</span
         ><BrowserIcon name="chevronDown" />
       </button>
@@ -107,8 +111,9 @@ import BrowserSiteIcon from './BrowserSiteIcon.vue';
 import BrowserDownloadList from './BrowserDownloadList.vue';
 import BrowserImport from './BrowserImport.vue';
 import BrowserPasswords from './BrowserPasswords.vue';
-import type { BrowserSearchEngine } from './types';
+import { browserBridge, type BrowserSearchEngine } from './types';
 const store = useNativeBrowserStore();
+const importSupported = browserBridge()?.credentialImport !== false;
 const query = ref('');
 const heading = computed(() =>
   t(`browser.${store.section === 'import' ? 'importTitle' : store.section}`)

@@ -88,7 +88,6 @@ export default {
   shortcutRemove: 'Remove',
   shortcutSave: 'Done',
   revealWindows: 'Show in File Explorer',
-  importWindowsDecryptFailed: 'This record cannot be decrypted by the current Windows user',
   credentialsChanged: 'The browser profile has changed. Please try again.',
   offerSave: 'Offer to save passwords',
   autoFill: 'Autofill usernames and passwords',
@@ -115,17 +114,19 @@ export default {
   notNow: 'Not now',
   chromeImportHint:
     'Reads local Google Chrome profiles without changing them. If history is locked, quit Chrome completely and read again.',
+  chromeHistoryImportHint:
+    'Choose a Chrome profile to read its browsing history. If the file is busy, quit Chrome and try again.',
   chromeProfile: 'Chrome profile',
   noChromeProfiles: 'No Chrome profiles found',
   importExportedFile: 'Import an export file',
-  importChromeDatabase: 'History / legacy data',
+  importChromeHistory: 'Import Chrome history',
   fileImportHint:
-    'For current Chrome passwords and cookies, export them explicitly. Preview the selected file before confirming the import.',
+    'Choose an exported password or cookie file and review the preview before confirming the import.',
   passwordCsvHelp:
     'Passwords: Chrome → Google Password Manager → Settings → Export passwords. Download the CSV file.',
   choosePasswordCsv: 'Choose password CSV',
   cookieMigrationHelp:
-    'Cookies: load the extension using the chrome-cookie-migration instructions in the test package. Authorize specific sites, export, then select the migration file. Other sites are not read automatically.',
+    'Cookies: load the Astrion extension from resources/browser-migration-extension in the installation folder. Authorize specific sites, export, then select the JSON file.',
   chooseCookieExport: 'Choose cookie migration file',
   exportFileSensitive:
     'Export files contain passwords or site login credentials. Keep them private and delete them after migration. Maximum 4 MiB and 10,000 records per file.',
@@ -133,6 +134,7 @@ export default {
     'Invalid file format. Choose a UTF-8 password CSV exported by Chrome, or cookie JSON exported by the Astrion extension.',
   importFileTooLarge: 'The file exceeds 4 MiB. Split it before importing.',
   importFileTooManyRecords: 'The file exceeds 10,000 records. Split it before importing.',
+  invalidImportSelection: 'Select Chrome browsing history to import.',
   importPartialTimeout:
     'Import timed out. Some records may already have been written. Preview again and check before retrying.',
   importHistoryNonWeb: 'Non-HTTP/HTTPS URL (internal pages, local files, etc.)',
@@ -163,6 +165,7 @@ export default {
   waitingKeychain:
     'Waiting for macOS Keychain authorization. Respond to the system dialog, or cancel this read.',
   checkingImport: 'Decrypting and checking records…',
+  checkingExportFile: 'Checking the export file…',
   importingRecords: 'Importing records…',
   importDatabaseBusy: 'Database is busy. Quit Chrome and read again',
   importDatabaseUnavailable: 'Database could not be read',

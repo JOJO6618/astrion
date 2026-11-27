@@ -22,8 +22,6 @@ const COLOR_PROPS =
 const BASELINE_EXEMPT = [
   'static/src/admin/AdminDashboardApp.vue',
   'static/src/admin/ApiAdminApp.vue',
-  'static/src/admin/CustomToolsApp.vue',
-  'static/src/admin/CustomToolsGuideApp.vue',
   'static/src/admin/PolicyApp.vue',
 ];
 

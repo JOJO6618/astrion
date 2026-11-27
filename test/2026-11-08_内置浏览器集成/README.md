@@ -52,10 +52,4 @@ node test/2026-11-08_内置浏览器集成/packaged-startup.cjs
 
 已逐字比对 app.asar 中五个 browser 模块、preload、window、lifecycle，和源码一致；包内 manifest 及其 567 个前端资源引用与本次 dist 一致。
 
-本地目录包的复现命令（先完成根前端构建、`python3 desktop/scripts/prepare_backend.py`，在 desktop-electron 下执行）：
-
-```bash
-./node_modules/.bin/electron-builder --dir --mac --arm64 --publish never --config.directories.output=../_experiments/macos-browser-20261108 --config.electronDist=node_modules/electron/dist --config.mac.identity=null
-```
-
-这是未签名/未公证、本地 ARM64 验证包，不是发布命令。真实站点登录、输入法、系统媒体权限、打印、长时间运行和界面视觉仍需用户验收。
+以上为当时的未公证 ARM64 验证包记录。当前 macOS 本地目录包构建命令是 `npm --prefix desktop-electron run build:rust:app`。真实站点登录、输入法、系统媒体权限、打印、长时间运行和界面视觉仍需用户验收。

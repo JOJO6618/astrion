@@ -38,7 +38,7 @@
   }, { once: true });
   Object.defineProperty(window, 'astrionBrowser', { configurable: false, writable: false, value: Object.freeze({
     surfaceMode: 'regions',
-    credentialFileImport: true,
+    credentialImport: false,
     connect: (scope, labels) => call('connect', { scope, labels }),
     theme: value => call('theme', value, false),
     command: value => call('command', value),

@@ -68,10 +68,9 @@
 
 ## 1) 当前项目结构（按代码现状）
 
-- **入口**：`main.py`、`server/app.py`（推荐 Host Web）和兼容脚本 `web_server.py` 默认启动 Rust。CLI 默认自启 Rust headless，由同一个 `backend-rust/src/main.rs` 按启动形态挂载路由。显式 `--backend python` 可启动旧 Flask Web，`server/headless_app.py` 保留旧 Python headless 对照入口。
-- **后端**：`backend-rust/` 为 1.0 主线。`server/` 保留 Flask 实现，`server/runtime/` 是旧版 RuntimeContext + RuntimeService（契约 `docs/runtime_contract.md`）。**REST 任务轮询是唯一实时通道**。
-- **`core/`**：终端与工具编排（`main_terminal_parts/` 按 base + mixin 拆分）；**`modules/`**：可复用能力模块，其中 `execution_plane/` 是公共执行边界，**已绑定后端失败不得回退控制端**（契约 `docs/execution_contract.md`）
-- **`config/`**：配置拆分（api/limits/terminal/paths…），`config/__init__.py` 聚合 + 加载 `.env`；**`utils/`**：api_client、日志、上下文与对话工具
+- **入口**：Host Web 使用 `./start.sh` 或 `start.bat`；Web、CLI headless 和 Electron 都使用 `backend-rust/src/main.rs`。
+- **后端**：`backend-rust/src/runtime/`、`process_runtime/`、`tools/` 维护任务与执行边界。REST 任务轮询为唯一实时通道。下文旧 Python 文件指针可查迁移快照 `fb0a27032`。已绑定后端失败不得回退控制端（`docs/execution_contract.md`）。
+- **产品资源与维护工具**：`config/` 提供配置种子。宿主机技能和开发测试可以使用 Python，官网维护脚本独立部署。
 - **前端**：`static/src/`（Vue 3 + TS）；`cli/src/`（opentui + React 19，旧 Ink 存档 `cli/legacy-ink-src/`）
 - **子项目**：`desktop-electron/`（macOS + Windows 共用 Electron）、`desktop/`（旧 Tauri 壳，仅供新壳复用 Windows staging/图标/原生模块）、`easyagent/`（已弃用）、`_experiments/`（不入 git，见 §7）
 - 完整目录职责与监控动画核心文件见 `AD/project_structure.md`
@@ -91,8 +90,8 @@
 
 | 用途 | 命令 |
 |------|------|
-| 依赖 | `pip install -r requirements.txt` ／ `npm install` |
-| Host Web（Rust） | `./start.sh` 或 `python3 -m server.app`（可加 `--path ./project --port 8091 --thinking-mode`）；Python 对照加 `--backend python` |
+| 依赖 | `npm install`、Rust 工具链 |
+| Host Web（Rust） | `./start.sh` 或 `start.bat`（可加 `--path ./project --port 8091 --thinking-mode`） |
 | Rust 后端构建 | `cargo build --locked --release --manifest-path backend-rust/Cargo.toml`（CLI 默认自启 Rust headless） |
 | 前端构建 / lint | `npm run build --silent 2>&1 \| tail -n 5` ／ `npm run lint` |
 | CLI 开发 | `bun cli/src/main.tsx`（bun ≥1.3）；类型检查 `cd cli && ./node_modules/.bin/tsc --noEmit` |
@@ -438,21 +437,21 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 
 ## 20) Linux host 沙箱
 
-- **安装入口**：`sudo bash scripts/setup-linux-sandbox.sh`（默认授权 `SUDO_USER`；root 直接装须 `--user <普通账户>`），支持 `--dry-run`/`--status`/`--no-install-dependencies`；**不依赖 CLI、不启动后端**。
+- **安装入口**：普通账户构建 `astrion-linux-sandbox`，再执行 `sudo bash scripts/setup-linux-sandbox.sh`（默认授权 `SUDO_USER`；root 直接装须 `--user <普通账户>`）。支持 `--dry-run`/`--status`/`--no-install-dependencies`，不依赖 CLI，不启动后端。
 - **首批环境**：Ubuntu 24.04 / kernel 6.8 / systemd 255 / cgroup v2 / AppArmor / libseccomp，**其它发行版不自动放行**；可装系统依赖，但**不得靠关闭 AppArmor/userns 或降级 direct 绕过失败**；全局安装与 sudo/polkit 仍待实机验收。
-- **可信助手**：`/usr/local/libexec/astrion-sandbox` + `/etc/astrion-sandbox/helper.json` + `astrion-sandbox.service`；代码、配置、C 入口与 BPF 必须 root-owned；**运行时不从用户源码树导入 root Python 模块**；升级保留备份。
-- **身份**：SEQPACKET socket 传严格 JSON + 三个 stdio FD，SO_PEERCRED/SO_PEERSEC/pidfd 核验，拒绝 UID0 与递归调用；**UID、groups、助手路径与 unit 属性不能来自模型参数**；特权阶段仅挂载，用户命令只能在 C 入口降到真实 UID/GID、清能力、开 NNP 后执行。
-- **文件根**：唯一来源 `modules/linux_sandbox/constants.py`，主/子/只读/后台/持久终端统一走 `plans.py`；源在普通用户 fork 中逐组件 no-follow 打开并固定 FD，cwd 降权后再验 inode；**`/proc`、`/dev`、`/sys` 与内部 runtime 禁止作为宿主挂载授权**。
+- **可信助手**：`/usr/local/libexec/astrion-sandbox/astrion-linux-sandbox` + `/etc/astrion-sandbox/helper.json` + `astrion-sandbox.service`。二进制、配置与 BPF 必须 root-owned 且不可由普通用户写入，升级保留备份。安装、客户端与特权服务共用独立 Rust crate。
+- **身份**：SEQPACKET socket 传严格 JSON 和三个 stdio FD。核验 SO_PEERCRED、SO_PEERSEC 和 peer pidfd，拒绝 UID0 与递归调用。UID、groups、助手路径与 unit 属性只能取自内核和可信配置。用户命令只能在 Rust 入口降到真实 UID/GID、清除能力、开启 NNP 后执行。
+- **文件根**：系统挂载路径由 `backend-rust/linux-sandbox/src/protocol.rs` 定义，主/子/只读/后台/持久终端共用 Rust 命令计划。源在普通用户 fork 中逐组件 no-follow 打开并固定 FD，cwd 降权后再验 inode。**`/proc`、`/dev`、`/sys` 与内部 runtime 禁止作为宿主挂载授权**。
 - **网络与回收**：共享 host 网络，每任务独立 transient unit（restricted = deny any + allow localhost）；runner 检查 enforcing 标签与实际 BPF，缺失即拒绝；断开/退出/取消均回收 unit。
-- **证据**：`test/2026-10-08_Linux_host沙箱实验|助手|适配/`，属**有限验证**，不等同跨发行版认证或生产安装验收。安装脚本**不设置或存储网页密码**（与 §21 分离）。
+- **证据**：`test/2026-11-27_Linux_Rust沙箱/` 覆盖 Rust 协议与非特权传输，`test/2026-10-08_Linux_host沙箱实验|助手|适配/` 是迁移前的隔离记录。生产安装与跨发行版支持须分别实机验收。安装脚本**不设置或存储网页密码**（与 §21 分离）。
 
 ## 21) Host 网页可选密码保护
 
 - **默认免登录**：未运行脚本、缺配置时沿用回环免登录；**禁止**按监听地址或推测公网状态强制初始化；存在但损坏的配置**必须报错，不能静默降为免登录**。
-- **唯一开关入口**：`python3 scripts/host_password.py --password 'YOUR_PASSWORD'`（8–1024 字符，保留空白，可加 `--data-dir`）；每次执行开启保护并撤销旧登录会话，**不打印密码**。
-- **存储唯一权威** `modules/host_auth.py` → `<DATA_DIR>/host_auth.json`（版本、enabled、scrypt 哈希、generation），0600 原子写，脚本与网页共用跨进程锁；**缺文件只读不创建**，**不写穿符号链接**。
-- **scrypt 兼容**：`modules/host_auth_hash.py` 用现有 `cryptography` 的 Scrypt（n=32768/r=8/p=1/64 字节，保留 Werkzeug 格式与随机盐，恒定时间比较）；**生成与校验都不依赖 `hashlib.scrypt`**（本机 Apple Python 3.9 缺该属性），**不能只修脚本漏掉登录校验**。
-- **网页认证**：`server/host_password.py` 管策略，`/host-login` 在 `server/auth.py`；nonce 与 generation 共同校验，开启/重设/关闭令旧 session 失效；**启用时隐藏并拒绝普通账户登录/注册**；设置→通用只提供「验证当前密码后关闭」，**无网页开启/重设接口**。
+- **开启与重设**：`./backend-rust/target/release/astrion-headless host-password --password 'YOUR_PASSWORD'`（8–1024 字符，保留空白，可加 `--data-dir`）。每次重置撤销旧登录会话，命令不打印密码。
+- **存储**：`backend-rust/src/web_auth/credentials.rs` 管理 `<DATA_DIR>/host_auth.json`（版本、enabled、scrypt 哈希、generation）。Unix 文件权限为 0600，命令与网页共用跨进程锁和原子写入。读取缺文件不创建，写入拒绝符号链接。
+- **scrypt 兼容**：沿用 Werkzeug 哈希格式，n=32768、r=8、p=1、64 字节，使用随机盐和恒定时间校验。
+- **网页认证**：`backend-rust/src/web_auth/` 处理 `/host-login`，按 nonce 和 generation 校验会话。开启、重设、关闭均使旧会话失效。开启后拒绝普通账户登录和注册。网页设置只提供验证当前密码后关闭保护。
 - **桌面豁免**：以壳注入的 `ASTRION_DESKTOP_VERSION` 判断，**不能相信网页 JS、HTTP 头或 query 标记**。`gateway_auth` 只注入请求内身份，不发行浏览器 nonce/Cookie，**无效 Bearer 不回退 Cookie**。
 - **运行任务保持**：密码变更不走 logout、不清理终端/任务。回归 `test/2026-10-08_Host密码保护/run_regressions.py`（临时目录与合成凭证，禁读真实 `.env`）。
 

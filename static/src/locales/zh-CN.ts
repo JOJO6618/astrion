@@ -12,7 +12,6 @@ import monitor from './zh-CN/monitor';
 import workflow from './zh-CN/workflow';
 import adminPolicy from './zh-CN/adminPolicy';
 import adminApi from './zh-CN/adminApi';
-import adminCustomTools from './zh-CN/adminCustomTools';
 import appMessages from './zh-CN/appMessages';
 import appTasks from './zh-CN/appTasks';
 import appUi from './zh-CN/appUi';
@@ -55,7 +54,6 @@ export default {
   workflow,
   adminPolicy,
   adminApi,
-  adminCustomTools,
   appMessages,
   schedules,
   appTasks,

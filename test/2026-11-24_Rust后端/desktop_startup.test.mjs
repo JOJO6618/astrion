@@ -235,7 +235,7 @@ test('Desktop probe rejects an unrelated occupant, and isolated directories reje
   assert.throws(() => resolveDesktopBackend({ env, platform: 'darwin' }), /initially empty data directory/);
   assert.deepEqual(await readdir(f.data), ['synthetic-existing-state']);
   assert.deepEqual(await readdir(f.profile), []);
-  assert.equal(resolveDesktopBackend({ env: { ASTRION_DESKTOP_BACKEND: 'python' }, platform: 'win32' }), null);
+  assert.throws(() => resolveDesktopBackend({ env: { ASTRION_DESKTOP_BACKEND: 'python' }, platform: 'win32' }), /ASTRION_DESKTOP_BACKEND=rust/);
   for (const platform of ['darwin', 'win32']) {
     const source = resolveDesktopBackend({
       env: { ASTRION_RUST_BACKEND_BIN: binary, ASTRION_RUST_STATIC_ROOT: staticRoot, ASTRION_RUST_RESOURCE_ROOT: resources },

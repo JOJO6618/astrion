@@ -35,7 +35,6 @@ python test\2026-11-09_WindowsBrowser\host.py run-production-probe
 python test\2026-11-09_WindowsBrowser\host.py test-ai-native
 python test\2026-11-09_WindowsBrowser\host.py test-ai-backend
 python test\2026-11-09_WindowsBrowser\host.py test-ai-startup
-python test\2026-11-09_WindowsBrowser\host.py test-import
 python test\2026-11-09_WindowsBrowser\host.py test-ui
 python test\2026-11-09_WindowsBrowser\host.py lint-ui
 python test\2026-11-09_WindowsBrowser\host.py frontend
@@ -43,13 +42,12 @@ python test\2026-11-09_WindowsBrowser\host.py frontend
 
 证据目录：`_experiments/windows-browser-20261109/`。`production-latest.json` 指向最新双进程结果，`ai-latest.json` 指向最新 AI 结果；各命令完整 stdout/stderr 保存在同目录日志。
 
+旧 WebView2 的 Chrome 导入功能已退役。当前 Windows Electron 回归入口见 [Windows Electron 手动导入回归](../2026-11-13_WindowsElectron导入/README.md)。
+
 ## 便携包
 
 ```cmd
-python test\2026-11-09_WindowsBrowser\package_test.py build
-python test\2026-11-09_WindowsBrowser\package_test.py assemble
 python test\2026-11-09_WindowsBrowser\package_test.py smoke
-python test\2026-11-09_WindowsBrowser\package_test.py archive
 ```
 
 `build` 包含后端 staging 和原生编译。若资源已装配且源码未变化，可用 `compile` 单独续编。只有编译 exit 0 才写 `package-build-success.json`；assemble 必须核对源文件、前端 manifest 和 exe SHA256，防止旧产物误交付。使用已存在目录/ZIP 时拒绝覆盖。

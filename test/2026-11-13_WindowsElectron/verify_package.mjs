@@ -11,7 +11,7 @@ function walk(directory) {
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
     const file = path.join(directory, entry.name);
     if (entry.isDirectory() && entry.name !== '__pycache__') walk(file);
-    else if (entry.isFile() && !file.endsWith('.pyc')) {
+    else if (entry.isFile() && !file.endsWith('.pyc') && !file.endsWith('.py')) {
       const relative = path.relative(desktop, file);
       try {
         if (fs.readFileSync(file).equals(asar.extractFile(archive, relative))) matched.push(relative);
@@ -23,11 +23,14 @@ function walk(directory) {
 walk(path.join(desktop, 'src'));
 const pairs = [
   ['native helper', path.join(desktop, '.cache/astrion-windows-helper.exe'), path.join(resources, 'astrion-windows-helper.exe')],
-  ['frontend manifest', path.join(root, 'static/dist/.vite/manifest.json'), path.join(resources, 'runtime/backend/static/dist/.vite/manifest.json')],
-  ['Windows import worker', path.join(root, 'desktop/src-tauri/src/browser/chrome_worker.py'), path.join(resources, 'chrome-import/windows-worker.py')]
+  ['frontend manifest', path.join(root, 'static/dist/.vite/manifest.json'), path.join(resources, 'runtime/rust/static/dist/.vite/manifest.json')],
+  ['cookie export extension manifest', path.join(root, 'desktop/browser-migration-extension/manifest.json'), path.join(resources, 'browser-migration-extension/manifest.json')]
 ];
 for (const [name, source, target] of pairs) {
   if (!fs.existsSync(target) || !fs.readFileSync(source).equals(fs.readFileSync(target))) failures.push(`different ${name}`);
+}
+for (const relative of ['runtime/backend', 'runtime/python', 'chrome-import']) {
+  if (fs.existsSync(path.join(resources, relative))) failures.push(`unexpected legacy resource: ${relative}`);
 }
 const metadata = JSON.parse(asar.extractFile(archive, 'package.json').toString());
 const release = JSON.parse(fs.readFileSync(path.join(desktop, 'windows-release.json'), 'utf8'));

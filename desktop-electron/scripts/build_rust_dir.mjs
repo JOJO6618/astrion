@@ -41,6 +41,7 @@ const extraResources = [{ from: runtime, to: 'runtime/rust' }];
 if (windows) {
   execFileSync(process.execPath, [path.join(desktop, 'scripts/build_quick_native.mjs')], { cwd: desktop, env, stdio: 'inherit', windowsHide: true });
   extraResources.push({ from: '.cache/astrion-windows-helper.exe', to: 'astrion-windows-helper.exe' });
+  extraResources.push({ from: '../desktop/browser-migration-extension', to: 'browser-migration-extension' });
 }
 
 const require = createRequire(import.meta.url);

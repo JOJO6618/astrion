@@ -73,18 +73,10 @@
                   />
                   <span>{{ tool }}</span>
                 </label>
-                <p v-if="!filteredToolOptions.length" class="muted tiny">
+                <p v-if="!filteredToolOptions(cat).length" class="muted tiny">
                   {{ $t('adminPolicy.noMatchingTool') }}
                 </p>
               </div>
-              <button
-                v-if="toolSearch.trim() && !toolOptionsSet.has(toolSearch.trim())"
-                type="button"
-                class="link small"
-                @click="addCustomTool(cat)"
-              >
-                {{ $t('adminPolicy.addCustomToolWith', { id: toolSearch.trim() }) }}
-              </button>
             </div>
           </div>
           <label class="toggle-row compact">
@@ -234,7 +226,7 @@ const toolSearch = ref('');
 
 const banner = reactive({ message: '', type: 'info' as 'info' | 'success' | 'error' });
 
-const toolOptionsSet = computed<Set<string>>(() => {
+const toolOptions = computed(() => {
   const set = new Set<string>();
   const addList = (list: any) => {
     if (!Array.isArray(list)) return;
@@ -245,11 +237,8 @@ const toolOptionsSet = computed<Set<string>>(() => {
     });
   };
   Object.values(defaults.categories || {}).forEach((cat: any) => addList(cat?.tools));
-  visibleCategories.value.forEach((cat) => addList(cat.tools));
-  return set;
+  return Array.from(set).sort();
 });
-
-const toolOptions = computed(() => Array.from(toolOptionsSet.value).sort());
 
 const toolAssignments = computed<Record<string, string[]>>(() => {
   const map: Record<string, string[]> = {};
@@ -320,20 +309,6 @@ const toggleToolInCategory = (cat: CategoryFormItem, tool: string) => {
   cat.tools = Array.from(set);
 };
 
-const addCustomTool = (cat: CategoryFormItem) => {
-  const val = toolSearch.value.trim();
-  if (!val) return;
-  const owners = toolAssignments.value[val] || [];
-  const conflict = owners.find((id) => id !== cat.id);
-  if (conflict) {
-    banner.message = t('adminPolicy.toolConflict', { tool: val, category: conflict });
-    banner.type = 'error';
-    return;
-  }
-  toggleToolInCategory(cat, val);
-  toolSearch.value = '';
-};
-
 const handleDocClick = (event: MouseEvent) => {
   const target = event.target as HTMLElement | null;
   if (!target) return;
@@ -344,16 +319,19 @@ const handleDocClick = (event: MouseEvent) => {
 
 const categoryList = computed<CategoryFormItem[]>(() => {
   const map = form.config.category_overrides || {};
-  return Object.keys(map).map((id) => ({
-    id,
-    label: map[id]?.label || id,
-    tools: Array.isArray(map[id]?.tools) ? [...map[id].tools] : [],
-    default_enabled: map[id]?.default_enabled !== false,
-    forced: form.config.forced_category_states[id] ?? null
-  }));
+  return Object.keys(map)
+    .filter((id) => id !== 'custom')
+    .map((id) => ({
+      id,
+      label: map[id]?.label || id,
+      tools: Array.isArray(map[id]?.tools) ? [...map[id].tools] : [],
+      default_enabled: map[id]?.default_enabled !== false,
+      forced: form.config.forced_category_states[id] ?? null
+    }));
 });
 
-const isNormalCategory = (id: string) => id !== 'mcp' && !id.startsWith('mcp_server__');
+const isNormalCategory = (id: string) =>
+  id !== 'custom' && id !== 'mcp' && !id.startsWith('mcp_server__');
 const visibleCategories = computed(() =>
   categoryList.value.filter((cat) => isNormalCategory(cat.id))
 );
@@ -441,6 +419,8 @@ function undoRemove(id: string) {
 
 function rebuildCategoryOverrides() {
   const map: Record<string, any> = {};
+  const legacyCategory = form.config.category_overrides?.custom;
+  if (legacyCategory) map.custom = legacyCategory;
   categoryList.value.forEach((item) => {
     if (!item.id) return;
     map[item.id] = {
@@ -1019,12 +999,6 @@ button:disabled {
 .tool-select-options input {
   position: static;
   opacity: 1;
-}
-
-.link.small {
-  font-size: 13px;
-  align-self: flex-start;
-  padding: 6px 8px;
 }
 
 .tiny {

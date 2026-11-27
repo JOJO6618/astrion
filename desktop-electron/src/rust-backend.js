@@ -55,17 +55,10 @@ function experimentPaths(env) {
 export function resolveDesktopBackend({ env = process.env, platform = process.platform, resourcesPath } = {}) {
   const embedded = resourcesPath && path.join(resourcesPath, 'runtime/rust');
   const stagedRoot = embedded && fs.existsSync(embedded) ? embedded : null;
-  const pythonPayload = resourcesPath && path.join(resourcesPath, 'runtime/backend');
-  const hasPythonBackend = pythonPayload && fs.existsSync(path.join(pythonPayload, 'server/app.py'));
-  // Python can be present solely for the separate Chrome import worker.
-  const mode = env.ASTRION_DESKTOP_BACKEND || (!resourcesPath || stagedRoot ? 'rust' : 'python');
-  if (mode === 'python') {
-    if (stagedRoot && !hasPythonBackend) {
-      throw new Error('This bundle requires ASTRION_DESKTOP_BACKEND=rust');
-    }
-    return null;
+  if (env.ASTRION_DESKTOP_BACKEND && env.ASTRION_DESKTOP_BACKEND !== 'rust') {
+    throw new Error('This bundle requires ASTRION_DESKTOP_BACKEND=rust');
   }
-  if (mode !== 'rust') throw new Error('ASTRION_DESKTOP_BACKEND must be python or rust');
+  if (resourcesPath && !stagedRoot) throw new Error('Missing packaged Rust backend');
   if (!['darwin', 'win32'].includes(platform)) throw new Error(`Rust Electron startup is unavailable on ${platform}`);
   const experimental = env.ASTRION_RUST_EXPERIMENT === '1';
   const executable = platform === 'win32' ? 'astrion-headless.exe' : 'astrion-headless';
@@ -73,9 +66,9 @@ export function resolveDesktopBackend({ env = process.env, platform = process.pl
   const release = path.join(buildTarget, 'release', executable);
   const built = fs.existsSync(release) ? release : path.join(buildTarget, 'debug', executable);
   const binary = env.ASTRION_RUST_BACKEND_BIN || (stagedRoot ? path.join(stagedRoot, executable) : built);
-  const staticRoot = env.ASTRION_RUST_STATIC_ROOT || path.join(stagedRoot || pythonPayload || repo, 'static');
+  const staticRoot = env.ASTRION_RUST_STATIC_ROOT || path.join(stagedRoot || repo, 'static');
   const developmentResources = experimental ? path.join(repo, 'desktop-electron/.cache/rust-experiment/resources') : repo;
-  const resources = env.ASTRION_RUST_RESOURCE_ROOT || stagedRoot || pythonPayload || developmentResources;
+  const resources = env.ASTRION_RUST_RESOURCE_ROOT || stagedRoot || developmentResources;
   if (![binary, staticRoot, resources].every(path.isAbsolute)) throw new Error('Rust binary, static root, and resource root must be absolute');
   fs.accessSync(binary, platform === 'win32' ? fs.constants.F_OK : fs.constants.X_OK);
   fs.accessSync(path.join(staticRoot, 'dist/.vite/manifest.json'), fs.constants.R_OK);

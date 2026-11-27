@@ -10,7 +10,6 @@ pub struct Browser {
     pub app: AppHandle,
     pub origin: String,
     pub root: PathBuf,
-    pub python: PathBuf,
     pub main: ICoreWebView2Controller,
     pub profiles: HashMap<String, Profile>,
     pub tabs: Vec<Tab>,
@@ -39,7 +38,6 @@ pub struct Browser {
         ),
     >,
     pub credentials: credentials::Credentials,
-    pub imports: imports::Imports,
     pub ai: ai::AI,
     pub retention: retention::Retention,
 }
@@ -48,8 +46,6 @@ impl Browser {
         app: AppHandle,
         origin: String,
         root: PathBuf,
-        python: PathBuf,
-        _backend: PathBuf,
         main: ICoreWebView2Controller,
     ) -> Result<Self, String> {
         std::fs::create_dir_all(root.join("browser")).map_err(|e| e.to_string())?;
@@ -57,7 +53,6 @@ impl Browser {
             app,
             origin,
             root,
-            python,
             main,
             profiles: HashMap::new(),
             tabs: vec![],
@@ -79,7 +74,6 @@ impl Browser {
             downloads: HashMap::new(),
             popups: HashMap::new(),
             credentials: credentials::Credentials::default(),
-            imports: imports::Imports::default(),
             ai: ai::AI::default(),
             retention: retention::Retention::default(),
         })
@@ -210,7 +204,6 @@ impl Browser {
         self.geometry = json!({});
         self.cancel_permissions();
         self.credentials.reset();
-        self.imports.cancel();
         self.layout();
     }
     pub fn connect(&mut self, request: &Value) -> Result<(), String> {
@@ -222,7 +215,6 @@ impl Browser {
         self.layout();
         self.cancel_permissions();
         self.credentials.reset();
-        self.imports.cancel();
         self.document = request["document"]
             .as_str()
             .ok_or("invalid_browser_document")?
@@ -421,13 +413,8 @@ impl Browser {
             Event::Tick => {
                 self.expire();
                 self.ai_poll();
-                self.expire_import();
                 self.retention_tick();
             }
-            Event::ImportCookies(id, result) => self.import_cookies(id, result),
-            Event::ImportCookieWritten(id, result) => self.import_cookie_written(id, result),
-            Event::ImportVerified(id, result) => self.import_verified(id, result),
-            Event::ImportStep => self.import_step(),
             Event::Command {
                 request,
                 lease,
@@ -474,12 +461,6 @@ impl Browser {
                     self.log(&error);
                 }
             }
-            Event::Worker {
-                request,
-                lease,
-                profile,
-                result,
-            } => self.worker_done(request, lease, profile, result),
             Event::Clear {
                 request,
                 lease,

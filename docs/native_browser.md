@@ -18,7 +18,7 @@ main 分支的 macOS 与 Windows 共用 Electron 浏览器，Windows 迁移已�
 - `static/src/components/browser/`：标签栏、导航栏、管理页、菜单、权限弹窗和原生表面同步。
 - `static/src/stores/nativeBrowser.ts`：共享界面状态、连接与布局序号。
 - `AppShell.vue` 共用挂载；`ConversationSidebar.vue` 在桌面浏览器桥存在时显示入口。
-- `desktop/src-tauri/src/browser/`：保留的旧 Windows WebView2 manager、事件、裁剪、DPAPI 与 Chrome 导入；当前 Electron 包不加载它。
+- `desktop/src-tauri/src/browser/`：保留的旧 Windows WebView2 manager、事件、裁剪与旧密码库；Chrome 导入入口已退役。
 
 macOS 与 Windows Electron 网页均使用同一 `BaseWindow` 的原生 `WebContentsView`，开启 sandbox、contextIsolation 和 webSecurity；网站不注入可信应用桥。旧 Windows 壳的 raw WebView2 实现保留作历史记录。两平台均不使用 iframe、截图或视频流替代真实网页。
 
@@ -122,25 +122,22 @@ macOS Electron 回归覆盖启动配色、三主题切换、普通网页画布�
 - geolocation、notifications、media、clipboard-read 的自定义许可交互；其他权限默认拒绝。许可只保留在本次运行，过期或归属变化时拒绝待处理请求，系统级授权仍由 macOS 决定。
 - 三主题、自定义面板宽度和当前用户浏览资料清理。
 
-密码保存、自动填充与 Chrome 密码/Cookie/历史导入已有实现。macOS 密码库使用 Electron safeStorage，Windows 使用当前用户 DPAPI；共享 DOM 适配器在各自隔离世界运行。Windows 先启用 CDP Runtime，创建顶层 frame 的隔离世界，再以返回的实际 context ID 注册绑定；不能假设按 world 名称注册在 WebView2 中等价可用。适配器转换与换行归一化有守护单测，修改 Electron 源适配器时必须同步跑 Windows 回归。Chrome 导入必须预览、明确冲突选择再提交，预览不落明文文件；Windows 不绕过 v20 应用绑定加密，不支持的记录如实计数。
+密码保存、自动填充与 Chrome 手动导入已有实现。macOS 密码库使用 Electron safeStorage，Windows 使用当前用户 DPAPI；共享 DOM 适配器在各自隔离世界运行。Windows 先启用 CDP Runtime，创建顶层 frame 的隔离世界，再以返回的实际 context ID 注册绑定；不能假设按 world 名称注册在 WebView2 中等价可用。适配器转换与换行归一化有守护单测，修改 Electron 源适配器时必须同步跑 Windows 回归。Chrome 导入必须预览、明确冲突选择再提交，预览不落明文文件。
 
-### Windows Electron Chrome 导入（0.10.3，2026-11-13）
+### Windows Electron Chrome 导入（Rust）
 
-主窗口与独立窗口均声明 `credentialFileImport`（仅 win32），共享 `BrowserImport.vue` 默认提供主动导出文件入口。凭据服务的 sources、preview、preview-file、import 统一受操作锁、取消、lease/profile/owner 检查约束。
+主窗口与独立窗口在 Windows 均声明 `credentialFileImport` 和 `credentialHistoryOnly`，共享 `BrowserImport.vue` 默认提供导出文件入口。凭据服务的 sources、preview、preview-file、import 统一受操作锁、取消、lease/profile/owner 检查约束。
 
-- `browser/chrome/windows-source.js` 只调用固定的随包 Python 与 `resources/chrome-import/windows-worker.py`，输入/输出经私有管道，大小上限32MiB、读取预算60秒，不接受 renderer 传入路径、不打印秘密。worker 与旧壳共用 `desktop/src-tauri/src/browser/chrome_worker.py` 源文件，构建按 extraResources 复制并核对哈希，不维护第二套解析器。
-- Windows 读取 `%LOCALAPPDATA%/Google/Chrome/User Data`，旧 DPAPI 与 v10/v11 AES-GCM 使用当前用户解密；v20 如实计为 unsupported_encryption，不调用 macOS 钥匙串。CSV/JSON 沿用4MiB/10,000条、BOM/严格CSV、版本化Cookie包与属性校验。
-- 数据库预览由 Electron 主进程固定增加 preservePartitionCookies=true，安全有效的分区字段被保留；旧壳未声明时仍保留原行为。CSV/数据库的账号分组、去重、冲突、5分钟内存预览、vault快照校验及提交统一在 `import-preview.js`/`importer.js`，只向renderer返回统计和不含秘密的冲突元数据。macOS仍走原路径/钥匙串/AES-CBC读取，共用后续处理。
+- `browser/chrome/windows-source.js` 固定启动包内 `astrion-windows-helper.exe chrome-import`，私有管道双向各限 32 MiB，读取预算 60 秒，可取消。协议只接收用户资料 ID 或文件内容。
+- Windows 从 `%LOCALAPPDATA%/Google/Chrome/User Data` 获取用户资料列表和浏览记录。Chrome 密码和 Cookie 按用户选中的导出文件读取。CSV/JSON 沿用 4 MiB / 10,000 条限制，处理 BOM、CSV 引号与换行、版本化 Cookie JSON 及分区属性。
+- 账号分组、去重、冲突、5 分钟内存预览、vault 快照校验及提交统一在 `import-preview.js` / `importer.js`，只向 renderer 返回统计和冲突元数据。macOS 使用原有读取入口并共用后续处理。
 - 目标密码库使用Electron safeStorage（Windows当前用户保护）。Cookie经隐藏WebContentsView的CDP写入当前profile，保留host-only/domain、session/expires、Secure/HttpOnly、SameSite及完整partitionKey；逐条写后回读匹配，校验失败不计成功，分区写入失败单独报告。提交前复查过期时间，保存失败与部分等待超时明确计数，始终关闭私有目标。
-- Windows合成原生回归见 `test/2026-11-13_WindowsElectron导入/`：真实DPAPI/AES-GCM、preload/IPC、CSV、分区Cookie、冲突/覆盖/取消、源文件不变、macOS读取替身及跨进程持久化。实际用户Chrome、扩展权限和网站登录保持仍需用户验收，不因合成测试通过宣称可解密v20或保留所有站点登录。
+- Windows 合成原生回归见 `test/2026-11-13_WindowsElectron导入/`，覆盖 preload/IPC、浏览记录、CSV、分区 Cookie、冲突/覆盖/取消和跨进程持久化。解析器的离线回归位于 `test/2026-11-27_WindowsChromeRust/`。
 
-### Windows Chrome 授权导入（2026-11-09 r2，旧 WebView2 实现）
+### Windows Chrome 导出文件
 
-- 真实用户回报密码/Cookie 全为 v20 时，旧版 DPAPI/AES-GCM 合成回归不代表这些记录可迁移。直接读库保留作历史及旧格式来源，不尝试绕过 Chrome 应用绑定加密。
-- Windows 可信桥声明 `credentialFileImport`，共享 `BrowserImportFile.vue` 让用户选择 UTF-8 密码 CSV 或版本化 Cookie JSON；仅传文件内容，不接受文件路径，不增加原生任意文件读取能力。其它壳未声明能力时保持已有来源。
-- `chrome_worker.py::file_preview` 在独立 Python 子进程解析，限制 4 MiB/10,000 条，CSV 正确处理 BOM/引号/逗号/换行。只回内存预览的计数及不含密码的冲突元数据，复用同一 preview id/lease/profile、300s TTL、vault 版本校验、冲突选择与明确提交；密码最终一次 DPAPI 原子写入。不把文件或 Cookie 值传给模型、写日志或临时明文文件。
+- Chrome 导出的 UTF-8 密码 CSV 和 Astrion 扩展导出的 Cookie JSON 由 `BrowserImportFile.vue` 交给同一预览与确认流程。
 - `desktop/browser-migration-extension/` 是用户手动加载的 Chrome MV3 扩展：在用户点击并授予指定网站权限后，通过 Chrome Cookie API 导出本地 `astrion-cookie-export` v1 JSON。包括普通与分区 Cookie，保留 hostOnly、session、SameSite、HttpOnly、过期时间、topLevelSite 和 hasCrossSiteAncestor；不连接网络、不直连 Astrion、不读密码。权限默认不全站授予，网站范围变化需重新明确同意；扩展权限可由用户撤销或移除扩展。
-- Cookie JSON 复用同一预览与提交。目标是当前用户 profile 的隐藏 storage controller；原生用 CDP `Network.getAllCookies` / `Network.setCookie` 保留分区键及 host-only，不把分区 Cookie 降成普通 Cookie。冲突身份包含 domain/name/path/partitionKey 两字段。每条写入后异步推进，结束回读核对身份、值、Secure/HttpOnly/SameSite/session 后才计成功；回调绑定本次 preview id 及租约/资料身份，旧回调不能影响新导入，超时明确提示可能部分写入。
 - 用户主动导出的 CSV/JSON 是明文敏感文件，导入后需删除。迁移不含 localStorage/IndexedDB/设备密钥，Cookie 写入成功不保证网站登录仍有效。历史读取把非 HTTP(S)、无效 URL、无效访问时间分开统计。
 
 设备模式是 Chromium 尺寸模拟，不代表真实手机、网络或传感器环境。无移动端 viewport 声明的网站可能仍使用 980px 布局视口，不得把它误判为设备屏幕参数没有生效。

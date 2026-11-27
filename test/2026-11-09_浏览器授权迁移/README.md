@@ -15,7 +15,6 @@
 ## 重跑（Windows CMD，仓库根目录）
 
 ```cmd
-python -B -m unittest discover -s test\2026-11-09_浏览器授权迁移 -p test_*.py
 node test\2026-11-09_浏览器授权迁移\file_policy_test.mjs
 set "PLAYWRIGHT_BROWSERS_PATH=E:\astrion\agent-Specialization\_experiments\windows-browser-20261109\playwright-browsers"
 node test\2026-11-09_浏览器授权迁移\extension_test.mjs
@@ -24,6 +23,8 @@ python test\2026-11-09_WindowsBrowser\host.py run-production-probe
 ```
 
 测试 Chromium 存在时直接重跑；缺失可使用 `prepare_chromium.py` 下载同一官方 Windows 测试构建。该脚本使用系统默认 TLS 信任链，未关闭验证；最初 Node 下载失败于本机证书链，换到系统信任链后成功。
+
+导出文件解析已迁入 Rust。旧 `test_exports.py` 对应历史 Python worker，当前回归入口见 [Windows Electron 手动导入回归](../2026-11-13_WindowsElectron导入/README.md)。
 
 ## 明确限制
 

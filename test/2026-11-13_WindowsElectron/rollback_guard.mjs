@@ -15,7 +15,7 @@ export async function verifyBusyRollback(root, installDir) {
   const uninstaller = fs.readdirSync(installDir).find(name => /^Uninstall .*\.exe$/i.test(name));
   const copy = path.join(output, 'rollback-guard-uninstaller.exe');
   fs.copyFileSync(path.join(installDir, uninstaller), copy);
-  const locker = spawn(path.join(root, 'desktop/src-tauri/runtime/python/python.exe'), ['-u', '-B', path.join(root, 'test/2026-11-13_WindowsElectron/rollback_locker.py'), marker], { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
+  const locker = spawn(process.env.ASTRION_TEST_PYTHON || 'python', ['-u', '-B', path.join(root, 'test/2026-11-13_WindowsElectron/rollback_locker.py'), marker], { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
   try {
     await new Promise((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error('Rollback locker startup timeout')), 10000);

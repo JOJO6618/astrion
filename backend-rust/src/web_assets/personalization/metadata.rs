@@ -57,18 +57,14 @@ impl Policy {
     pub(super) fn tool_categories(&self, data: &Path, config: &Object) -> Vec<Value> {
         let mut categories = schema().tool_categories.clone();
         let removed = self.0.get("remove_categories").unwrap_or(&Value::Null);
-        let custom_tools = custom_tools(data);
-        categories.insert(
-            "custom".into(),
-            json!({"label":"自定义工具", "tools":custom_tools, "default_enabled":true}),
-        );
         let dynamic = mcp_servers(data);
         for name in strings(removed, usize::MAX) {
             categories.shift_remove(name);
         }
         if let Some(overrides) = self.0.get("category_overrides").and_then(Value::as_object) {
             for (name, value) in overrides {
-                if value.is_object()
+                if name != "custom"
+                    && value.is_object()
                     && value
                         .get("tools")
                         .is_none_or(|tools| tools.is_array() || tools.is_null())
@@ -106,9 +102,8 @@ impl Policy {
     }
 }
 
-pub(crate) fn default_admin_tool_categories(data: &Path, custom_ids: &[String]) -> Object {
+pub(crate) fn default_admin_tool_categories(data: &Path) -> Object {
     let mut categories = schema().tool_categories.clone();
-    categories.insert("custom".into(), json!({"label":"自定义工具", "tools":custom_ids, "default_enabled":true}));
     categories.extend(mcp_servers(data));
     for category in categories.values_mut().filter_map(Value::as_object_mut) {
         category.entry("silent_when_disabled").or_insert(Value::Bool(false));
@@ -210,37 +205,6 @@ fn resource_id(value: &str) -> bool {
         && value
             .bytes()
             .all(|byte| byte.is_ascii_alphanumeric() || b"_-".contains(&byte))
-}
-
-fn custom_tools(data: &Path) -> Vec<String> {
-    let root = std::env::var_os("CUSTOM_TOOL_DIR")
-        .filter(|path| !path.is_empty())
-        .map(PathBuf::from)
-        .unwrap_or_else(|| data.join("custom_tools"));
-    if std::env::var("CUSTOM_TOOLS_ENABLED")
-        .is_ok_and(|value| matches!(value.as_str(), "0" | "false" | "False"))
-    {
-        return Vec::new();
-    }
-    child_directories(&root)
-        .into_iter()
-        .filter_map(|path| {
-            if !path.join("execution.py").is_file() {
-                return None;
-            }
-            let id = read_object(&path.join("definition.json"))
-                .ok()??
-                .get("id")
-                .and_then(Value::as_str)
-                .map(str::to_owned)
-                .or_else(|| {
-                    path.file_name()
-                        .and_then(|value| value.to_str())
-                        .map(str::to_owned)
-                })?;
-            resource_id(&id).then_some(id)
-        })
-        .collect()
 }
 
 fn mcp_servers(data: &Path) -> Vec<(String, Value)> {

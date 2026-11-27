@@ -555,8 +555,6 @@ export default {
   // ── Admin ──
   mcpConfigTitle: 'MCP server management',
   mcpConfigDesc: 'Manage MCP servers available to agents',
-  customToolsAdminTitle: 'Custom tool management',
-  customToolsAdminDesc: 'Create and edit custom tools online',
   open: 'Open',
 
   // ── Alerts & errors (script: toast/confirm/Error) ──

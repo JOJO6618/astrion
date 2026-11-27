@@ -5,12 +5,13 @@ import { createServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { closeServer, COMPLETED, createTask, listenOnLoopback } from './gateway_harness.mjs';
 
+const baseline = fileURLToPath(new URL('./with_legacy_source.py', import.meta.url));
 const fixture = fileURLToPath(new URL('./cli_python_fixture.py', import.meta.url));
 const previous = ['From Python', 'Preserved Python response'];
 const next = ['Continue in Rust', 'Reply written by Rust'];
 
 function python(...args) {
-  const output = execFileSync(process.env.ASTRION_TEST_PYTHON || 'python3.11', ['-B', fixture, ...args], {
+  const output = execFileSync(process.env.ASTRION_TEST_PYTHON || 'python3.11', ['-B', baseline, fixture, ...args], {
     encoding: 'utf8', timeout: 15_000, env: { PATH: process.env.PATH, ...(process.platform === 'win32' && { SystemRoot: process.env.SystemRoot }) }
   });
   return JSON.parse(output.trim().split('\n').at(-1));

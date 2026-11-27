@@ -122,7 +122,9 @@ export interface BrowserTheme {
 }
 export interface BrowserBridge {
   surfaceMode?: 'regions';
+  credentialImport?: boolean;
   credentialFileImport?: boolean;
+  credentialHistoryOnly?: boolean;
   /** 主窗口桥：支持把对话浏览器弹出到独立窗口。 */
   popout?: boolean;
   /** 桥能力：本壳支持「跟随智能体」（AI 操作哪个标签，用户视图就跟到哪个）。 */

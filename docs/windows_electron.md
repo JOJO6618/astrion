@@ -14,7 +14,7 @@ Windows Electron 当前线上正式版为 **0.10.3**（2026-11-15 发布，安�
 
 ## 构建
 
-使用 Windows x64 原生 Node 与 Rust MSVC 工具链。Chrome 导入需要 `desktop/src-tauri/runtime/python/python.exe` 和随解释器安装的 `cryptography`。
+使用 Windows x64 原生 Node 与 Rust MSVC 工具链。Windows native helper 的最低 Rust 版本为 1.88。
 
 ```cmd
 set "ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/"
@@ -22,7 +22,7 @@ npm ci --prefix desktop-electron --no-audit --no-fund
 node desktop-electron\scripts\build_windows.mjs
 ```
 
-构建先生成共享前端与 Windows native helper，再用 `x86_64-pc-windows-msvc` 构建 Rust 后端，并将 `astrion-headless.exe`、Web 静态资源及 WSL2 安装脚本打入 `resources/runtime/rust`。`resources/runtime/python` 的解释器供私有 Chrome 导入 worker 使用。Host 服务启动由包内 Rust sidecar 和 Windows Job guardian 负责。已有本次前端与 helper 时可用 `--skip-frontend --skip-native`，已有本次 Rust 二进制或 Web 静态目录时可指定 `ASTRION_RUST_BACKEND_BIN` 或 `ASTRION_RUST_STATIC_ROOT`。仅目录包加 `--dir`，构建固定 `--publish never`。
+构建先生成共享前端与 Windows native helper，再用 `x86_64-pc-windows-msvc` 构建 Rust 后端，并将 `astrion-headless.exe`、Web 静态资源及 WSL2 安装脚本打入 `resources/runtime/rust`。Host 服务启动由包内 Rust sidecar 和 Windows Job guardian 负责，Chrome 资料列表、浏览记录与导出文件读取由同一个 Windows native helper 处理。已有本次前端与 helper 时可用 `--skip-frontend --skip-native`，已有本次 Rust 二进制或 Web 静态目录时可指定 `ASTRION_RUST_BACKEND_BIN` 或 `ASTRION_RUST_STATIC_ROOT`。仅目录包加 `--dir`，构建固定 `--publish never`。
 
 - Windows 版本及说明：`desktop-electron/windows-release.json`，由 builder 的 `extraMetadata.version` 注入。
 - macOS 版本：`desktop-electron/package.json`，独立维护。
@@ -38,7 +38,7 @@ Windows 普通用户可能无法解压 winCodeSign 归档中的 macOS 符号链�
 
 1. `node desktop-electron/scripts/build_windows.mjs`，产物 `output/windows-electron/build/Astrion-<ver>-windows-x64-setup.exe`。
 2. 跑 `node test\2026-11-13_WindowsElectron\packaged_smoke.mjs`，`success=true` 才继续。
-3. 补签：`cd desktop` 后 `npx tauri signer sign -f "%USERPROFILE%\.astrion-desktop-keys\updater.key" -p "" <setup.exe>`；`keynum`（base64 解码 `[2:10]`）必须等于 `desktop/src-tauri/tauri.conf.json` 的 `plugins.updater.pubkey`。不带 `--app-version` 可发布，但清单不能启用 `requireSignedVersion`。
+3. 补签使用 `npm --prefix desktop run sign:updater -- -f "%USERPROFILE%\.astrion-desktop-keys\updater.key" -p "" <setup.exe>`。`keynum`（base64 解码 `[2:10]`）必须等于 `desktop/src-tauri/tauri.conf.json` 的 `plugins.updater.pubkey`。未带 `--app-version` 的清单需关闭 `requireSignedVersion`。
 4. 安装器按 Tauri 命名复制一份（签名同名复制），并**把 `latest.yml` 的 `url`/`path` 改写成该 Tauri 文件名**。字节没变，sha512 仍匹配，electron-updater 与旧 Tauri 共用同一份文件，服务器上只存一份。
 5. 上传 exe / `.sig` / `latest.yml` / `release-notes-windows.txt`，再执行 `python3 /var/www/astrion/downloads/regen_manifest.py`。说明由 `windows-release.json` 的 notes 逐条加 `- ` 生成。
 6. 公网核对：`latest.yml` 版本、`latest-windows-x86_64.json` 版本与签名、`downloads.json` windows-x64 版本/字节数、exe HEAD 200 且长度一致、notes UTF-8（cmd 显示 GBK 乱码不算错）。
@@ -65,7 +65,7 @@ Windows 普通用户可能无法解压 winCodeSign 归档中的 macOS 符号链�
 
 不自动迁移旧 WebView2 或 Chrome 浏览器资料。旧 `<desktopDataRoot>/browser/` 保留；Windows Electron 元数据、密码库位于 `<desktopDataRoot>/electron/browser/`，网站 Cookie/cache 位于 Electron sessionData 下。macOS 原路径不变。
 
-Windows 0.10.3 按用户要求补齐**手动 Chrome 导入**：主/独立窗口均启用密码 CSV 和授权 Cookie JSON 入口，同时支持当前用户的旧 DPAPI / v10-v11 AES-GCM 数据库读取；v20 如实报告不支持。共享 `chrome_worker.py` 按 extraResources 打包为 `chrome-import/windows-worker.py`，通过随包 Python 的私有管道读取；不接受 renderer 文件路径。预览、冲突选择、取消与提交在共享 Electron 模块，Cookie 通过当前 profile 的私有 CDP 目标写入并回读核验（含 partitionKey 两字段、host-only/domain、session、SameSite、Secure/HttpOnly）。解析边界、权限与验收范围见 `docs/native_browser.md`；真实合成导入与跨进程持久化回归在 `test/2026-11-13_WindowsElectron导入/`。此手动入口不代表自动迁移旧资料，也不保证任意网站登录保持。
+主窗口和独立窗口均支持**手动 Chrome 导入**。浏览记录按 Chrome 用户资料读取，密码和 Cookie 分别来自用户选择的密码 CSV 与授权导出的 Cookie JSON。私有管道只传用户资料 ID 或文件内容。预览、冲突选择、取消与提交在共享 Electron 模块，Cookie 通过当前 profile 的私有 CDP 目标写入并回读核验。解析范围见 `docs/native_browser.md`，合成数据导入与跨进程持久化回归见 `test/2026-11-13_WindowsElectron导入/`。
 
 Windows 快捷对话设置沿用 `%USERPROFILE%\.astrion\quick-entry-windows.json`，默认 Alt，支持左 Ctrl、右 Ctrl、Shift。配置启用时关闭主窗会留托盘；禁用快捷对话后关主窗退出应用。
 
@@ -108,7 +108,7 @@ NSIS 使用 `useZip:true` 与 `differentialPackage:false` 配对。electron-buil
 
 加固（两层，均在 `desktop-electron/build/`）：
 
-1. `installer-windows.nsh` 的 `AstrionCheckRequired` + `customInstall`：校验 `astrion-desktop.exe`、`resources.pak`、`snapshot_blob.bin`、`v8_context_snapshot.bin`、`resources\app.asar`，以及（仅当 `resources\runtime` 存在时）`resources\runtime\python\python.exe`；缺失则用同一份 `$PLUGINSDIR\app-$packageArch.zip` 原地重解压一次，仍缺失则写 `install-incomplete.log`、`SetErrorLevel 3`、非静默弹窗并 `Abort`。
+1. `installer-windows.nsh` 的 `AstrionCheckRequired` + `customInstall` 校验主程序、Chromium 资源与 `resources\app.asar`。随包运行时存在时，同时校验 `resources\runtime\rust\astrion-headless.exe` 与 `resources\astrion-windows-helper.exe`。缺失时用同一份 `$PLUGINSDIR\app-$packageArch.zip` 原地重解压一次，仍缺失则写 `install-incomplete.log`、`SetErrorLevel 3`、非静默弹窗并 `Abort`。
 2. `astrion-install-guard.ps1`（仅静默安装时由 `customInit` 启动）：独立进程，等安装器退出后复核同一组文件。最初发布包使用共享 TEMP 状态、缺失重跑一次并关闭阻塞对话框；后续源码已改为每次安装独立状态目录、保留错误对话框与日志、重试保留参数与目录，并接续独立进度窗口（见文末“安装进度窗口”）。独立进程自身也可能启动失败或被终止，不能保证必然恢复。
 
 此前隔离 appId 验证：`cache/nsis-diag-app` 三轮——正常安装无误报、人为删文件后自动重解压修复、归档不可用时 `exit 3` + 失败日志；`cache/crosscheck-app`（`--prepackaged` 真实 1.2GB 载荷、appId `com.astrion.crosscheck.20261114`、装到 E 盘隔离目录）——完整安装 15,476 文件，删掉 3 个关键文件后重跑恢复为同样的 15,476 文件。后续正式产品身份、真实界面验收见文末。

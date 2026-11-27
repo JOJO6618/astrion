@@ -1,13 +1,30 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
+import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const output = path.join(root, `output/windows-electron/import-${Date.now()}`);
 fs.mkdirSync(output, { recursive: true });
-const python = path.join(root, 'desktop/src-tauri/runtime/python/python.exe');
-const fixture = spawnSync(python, ['-I', '-B', path.join(root, 'test/2026-11-13_WindowsElectron导入/create_fixture.py'), output], { encoding: 'utf8', windowsHide: true, timeout: 30000 });
-if (fixture.status !== 0) throw new Error(`Synthetic fixture failed: ${fixture.stderr}`);
+const source = path.join(output, 'localapp/Google/Chrome/User Data');
+fs.mkdirSync(path.join(source, 'Default'), { recursive: true });
+fs.writeFileSync(path.join(source, 'Local State'), JSON.stringify({
+  profile: { info_cache: { Default: { name: 'Synthetic import source' } } }
+}));
+const history = new DatabaseSync(path.join(source, 'Default/History'));
+history.exec('CREATE TABLE urls(url TEXT, title TEXT, last_visit_time INTEGER)');
+const visit = history.prepare('INSERT INTO urls VALUES(?, ?, ?)');
+const at = (BigInt(Date.now()) + 11_644_473_600_000n) * 1_000n;
+visit.run('https://history.example.test/', 'Synthetic visit', at);
+visit.run('file:///synthetic-only', 'Local visit', at);
+visit.run('https://', 'Bad address', at);
+visit.run('https://invalid-time.example.test/', '', 0);
+history.close();
+const filesWithHashes = Object.fromEntries(['Local State', 'Default/History'].map(file => [
+  file, createHash('sha256').update(fs.readFileSync(path.join(source, file))).digest('hex')
+]));
+fs.writeFileSync(path.join(output, 'source-hashes.json'), JSON.stringify(filesWithHashes));
 const env = { ...process.env, ASTRION_IMPORT_TEST_ROOT: output };
 if (process.argv.includes('--packaged')) env.ASTRION_IMPORT_RESOURCES = path.join(root, 'output/windows-electron/build/win-unpacked/resources');
 delete env.ELECTRON_RUN_AS_NODE;

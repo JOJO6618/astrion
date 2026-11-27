@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('astrionBrowser', {
   // 能力标记：与主窗口同步，声明本壳支持「跟随智能体」。
   followAi: true,
   credentialFileImport: process.platform === 'win32',
+  credentialHistoryOnly: process.platform === 'win32',
   connect: (scope, labels) => ipcRenderer.invoke('browser:connect', null, labels),
   theme: theme => ipcRenderer.send('browser:theme', theme),
   command: payload => ipcRenderer.invoke('browser:command', payload),

@@ -38,7 +38,6 @@ pub(crate) mod thinking;
 pub(crate) mod thinking_auxiliary;
 mod tool_loading;
 mod knowledge_tools;
-mod custom_tools;
 mod schedule_tools;
 pub mod transfer;
 pub(crate) mod todos;

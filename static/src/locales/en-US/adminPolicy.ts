@@ -1,6 +1,22 @@
 // Locale namespace: adminPolicy (en-US mirror, keys must match zh-CN/adminPolicy.ts exactly).
 export default {
   gateDescription: 'Enter your admin secondary password to continue configuring policies.',
+  gate: {
+    notConfiguredTitle: 'Secondary password not set',
+    notConfiguredDesc: 'An admin secondary password protects the policy settings.',
+    step1Text:
+      'Run this command in a terminal with Node.js. Enter the password, press Enter, then press Ctrl+D (Ctrl+Z followed by Enter on Windows).',
+    step2TextPre: 'Write the output to the',
+    step2TextPost: 'section of settings.json:',
+    step3Text: 'Restart the service, then click "Recheck" below.',
+    recheck: 'Recheck',
+    rechecking: 'Checking...',
+    title: 'Enter admin secondary password',
+    passwordPlaceholder: 'Secondary password',
+    verifying: 'Verifying...',
+    confirmEnter: 'Confirm & enter',
+    defaultDescription: 'Secondary verification is required to view sensitive data.'
+  },
   title: 'Admin Policy Configuration',
   subtitle:
     'Control tool categories, model availability, and disabled frontend features. Last saved: {time}',
@@ -14,9 +30,8 @@ export default {
   catForced: 'Forced State',
   tableActions: 'Actions',
   selectTools: 'Select tools',
-  toolSearchPlaceholder: 'Search or add a tool ID',
+  toolSearchPlaceholder: 'Search by tool ID',
   noMatchingTool: 'No matching tools',
-  addCustomToolWith: 'Add custom tool "{id}"',
   enabledOn: 'On',
   enabledOff: 'Off',
   forcedNone: 'Not forced',

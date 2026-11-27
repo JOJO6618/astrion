@@ -9,11 +9,10 @@
 ## 1) 当前项目结构（按代码现状）
 
 - **后端入口**
-  - `main.py`: 统一启动入口（默认走 Host Web + thinking_mode=True）
   - `backend-rust/src/main.rs` 按启动参数装配 Host Web 或 headless。Electron 默认运行包内 `astrion-headless --web`，CLI 默认探测并复用本机 Rust Gateway。
-  - `server/app.py` 默认启动 Rust Host Web，显式 `--backend python` 进入 Flask。旧 Python headless 保留在 `server/headless_app.py`。
-  - `web_server.py`: 兼容入口，已标记 deprecated，但仍可启动
-- **后端核心目录**
+  - `start.sh` / `start.bat` 从源码启动 Rust Host Web。CLI 与 Electron 也使用 `astrion-headless`。
+- **后端核心目录**：`backend-rust/src/` 实现运行时、Web 与 Gateway、任务、会话和工具。`config/`、`prompts/`、`workflows/` 与 `agentskills/` 提供可分发的产品资源。
+- **旧 Python 后端目录历史**（以下路径对应迁移前的源码，可查 `fb0a27032`）
   - `server/`: Flask 业务主线（chat/task/status/context 已拆分为子包：`server/chat/`、`server/status/`、`server/tasks/`、`server/context/`（用户资源/身份/个性化，原 `server/context.py` 已拆包并保留兼容 re-export）；**REST 任务轮询为唯一实时通道**——Socket.IO 已于 2026-09-11 整体移除，详见 §12.5）
   - `server/context/`（2026-10-12）：`workspace.py` 解析可信身份／工作区路径；`data.py` 与 `data_decorators.py` 提供不装配执行资源的存储访问；`resources.py` 仅创建／复用运行实例；`background.py` 聚合后台状态并合并异步激活；`modes.py`、`status_view.py`、`sub_agent_views.py` 提供对应读视图。原兼容 re-export 保留。
   - `server/runtime/`: 公共任务入口（2026-09 Gateway 化阶段二新增）：`context.py` 定义 RuntimeContext 三层模型（TrustedPrincipal/TaskParams/InternalDirectives），`service.py` 提供 RuntimeService（create_task/cancel/guidance/get_task_events）；契约见 `docs/runtime_contract.md`
@@ -29,7 +28,7 @@
 - **桌面内置浏览器验证版（macOS 2026-11-08 / Windows Electron 迁移 2026-11-13）**
   - `desktop-electron/src/browser/` 由 macOS 与 Windows 共用，按管理器、策略、用户资料、原生标签和下载/权限分工，网页为独立安全 `WebContentsView`；`preload-view.cjs` 仅向主应用内容视图暴露可信桥；`desktop-electron/src/views/` 的 ViewManager 管理主窗口内每标签一个内容视图与独立对话窗口（见 `docs/desktop_multi_view.md`）。网站资料必须位于 sessionData 内，DOM 浮层走透明叠层与输入转发；Windows 元数据根另加 `electron/`，旧 WebView2 数据不迁移。
   - `desktop-electron/src/windows/` 管理 Job guardian、WGC 调用和注册表 PATH；`native/windows-helper/` 直接复用 `desktop/src-tauri/src/quick/` 的 Rust 原生模块，编译成无 Tauri 依赖的 CLI。Windows 构建及数据边界见 `docs/windows_electron.md`。
-  - `desktop/src-tauri/src/browser/` 保留旧 WebView2 实现，其原生区域裁剪与controller不用于Electron。例外是共用的 `chrome_worker.py`：Windows Electron 0.10.3通过固定私有管道复用其DPAPI/AES-GCM与CSV/JSON解析，按extraResources打包；目的端预览、冲突、密码库与Cookie提交在Electron模块内。此手动导入不等于自动迁移旧WebView2资料。
+  - `desktop/src-tauri/src/browser/` 保留旧 WebView2 实现，旧壳的 Chrome 导入入口已退役。Windows Electron 通过 `native/windows-helper/` 的 Rust 命令列出 Chrome 用户资料、读取浏览记录和解析用户选择的 CSV/JSON，预览、冲突处理和提交在共享 Electron 模块内。
   - `static/src/components/browser/` 与 `stores/nativeBrowser.ts` 由 Agent / Chat、macOS / Windows 共用，通过 AppShell 挂载和 ConversationSidebar 进入。资料按用户共享，标签按稳定桌面对话标签 key 归属。边界和验证见 `docs/native_browser.md`。
   - `desktop/browser-migration-extension/` 是用户主动加载的 Chrome Cookie 授权导出扩展，HTML/CSS/JS 分离，不连接网络；Windows 通过共享导入界面选择 CSV/JSON 并复用预览/提交。两平台手动 file 网址入口独立于 AI 的网页网址与密码 origin 校验。
 - **前端目录**

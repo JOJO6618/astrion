@@ -21,9 +21,7 @@ export class ChromeImporter {
   readWindows(request, signal) {
     return (this.dependencies.windowsRequest || readWindowsChrome)(request, { signal });
   }
-  async windowsPreview(profile, vault, input, ensure, signal, action, progress) {
-    progress('decrypt');
-    const value = action === 'preview' ? { ...input, preservePartitionCookies: true } : input;
+  async windowsPreview(profile, vault, action, value, selected, ensure, signal) {
     const rows = await this.readWindows({ action, value }, signal);
     signal?.throwIfAborted(); ensure();
     const cookies = [];
@@ -31,15 +29,22 @@ export class ChromeImporter {
       try { cookies.push(importedCookie(row)); }
       catch { rows.stats.cookies.ready--; issue(rows.stats.cookies, 'invalid_record'); }
     }
-    const selected = action === 'preview-file' ? { passwords: input.format === 'password-csv' } : input.selected;
-    return rememberImportPreview(this, profile, vault, { ...rows, cookies }, selected, ensure);
+    const history = rows.history.map(row => ({ ...row, id: randomUUID() }));
+    return rememberImportPreview(this, profile, vault, { ...rows, cookies, history }, selected, ensure);
   }
   async previewFile(profile, vault, input, ensure, signal, progress = () => {}) {
     if (this.platform !== 'win32') throw new Error('invalid_import_file');
-    return this.windowsPreview(profile, vault, input, ensure, signal, 'preview-file', progress);
+    progress('import-file');
+    const value = { format: input?.format, content: input?.content };
+    return this.windowsPreview(profile, vault, 'preview-file', value, { passwords: value.format === 'password-csv' }, ensure, signal);
   }
   async preview(profile, vault, input, ensure, signal, progress = () => {}) {
-    if (this.platform === 'win32') return this.windowsPreview(profile, vault, input, ensure, signal, 'preview', progress);
+    if (this.platform === 'win32') {
+      const selected = input?.selected;
+      if (selected?.passwords !== false || selected.cookies !== false || selected.history !== true) throw new Error('invalid_import_selection');
+      progress('history');
+      return this.windowsPreview(profile, vault, 'preview-history', { source: input.source }, selected, ensure, signal);
+    }
     if (!input || !TYPES.every(type => typeof input.selected?.[type] === 'boolean') || !TYPES.some(type => input.selected[type])) throw new Error('请选择至少一项导入内容。');
     const directory = profileDirectory(input.source, this.dependencies.root);
     const stats = Object.fromEntries(TYPES.map(type => [type, stat()]));

@@ -13,19 +13,85 @@ from __future__ import annotations
 
 import json
 import sys
+import math
+from typing import Any, Dict, Optional
 import urllib.request
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(REPO_ROOT))
 
 SNAPSHOT_PATH = REPO_ROOT / "config" / "modelsdev_snapshot.json"
 CATALOG_PATH = REPO_ROOT / "config" / "providers_catalog.json"
 API_URL = "https://models.dev/api.json"
 
 
+def positive_token_limit(*values: Any) -> Optional[int]:
+    """Return the first valid positive token count from the supplied fields."""
+    for value in values:
+        if value is None or isinstance(value, bool):
+            continue
+        try:
+            tokens = int(value)
+        except (TypeError, ValueError, OverflowError):
+            continue
+        if 0 < tokens <= (1 << 63) - 1 and (isinstance(value, str) or value == tokens):
+            return tokens
+    return None
+
+
+def clean_rates(cost: Any) -> dict[str, float]:
+    if not isinstance(cost, dict):
+        return {}
+    rates = {}
+    for key in ('input', 'cache_read', 'output'):
+        value = cost.get(key)
+        if isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) and value >= 0:
+            rates[key] = float(value)
+    return rates
+
+
+def slim_full_dump(full: Dict[str, Any], md_keys: set[str]) -> Dict[str, Any]:
+    """全量 api.json → 瘦身结构（只保留指定 provider 与所需字段）。脚本与在线缓存共用。"""
+    providers: Dict[str, Any] = {}
+    for key in sorted(md_keys):
+        pdata = full.get(key)
+        if not isinstance(pdata, dict):
+            continue
+        models: Dict[str, Any] = {}
+        for model_id, m in (pdata.get("models") or {}).items():
+            if not isinstance(m, dict):
+                continue
+            entry: Dict[str, Any] = {}
+            npm = (m.get("provider") or {}).get("npm")
+            if npm:
+                entry["npm"] = npm
+            if m.get("reasoning") is not None:
+                entry["reasoning"] = bool(m.get("reasoning"))
+            modalities = (m.get("modalities") or {}).get("input")
+            if isinstance(modalities, list):
+                entry["modalities_input"] = modalities
+            limit = m.get("limit")
+            if isinstance(limit, dict):
+                for field, cached_field in (
+                    ("context", "context"), ("input", "max_input"), ("output", "max_output")
+                ):
+                    if (value := positive_token_limit(limit.get(field))) is not None:
+                        entry[cached_field] = value
+            if isinstance(m.get("cost"), dict):
+                entry["cost"] = clean_rates(m["cost"])
+            models[model_id] = entry
+        providers[key] = {"npm": pdata.get("npm"), "models": models}
+    from datetime import datetime, timezone
+
+    return {
+        "version": 3,
+        "source": _API_URL,
+        "fetched_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "providers": providers,
+    }
+
+
 def main() -> None:
-    from modules.modelsdev_registry import slim_full_dump
 
     if len(sys.argv) > 1:
         full = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))

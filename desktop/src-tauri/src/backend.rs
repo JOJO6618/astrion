@@ -625,8 +625,7 @@ fn create_main_window(app: &AppHandle, port: u16) -> tauri::Result<()> {
     layout_webviews(&host_window);
     #[cfg(windows)]
     {
-        let (python, backend) = resolve_runtime(app).map_err(|error| tauri::Error::Anyhow(std::io::Error::other(error).into()))?;
-        crate::browser::initialize(app, format!("http://127.0.0.1:{port}"), crate::rundata::resolve_data_root(), python, backend)
+        crate::browser::initialize(app, format!("http://127.0.0.1:{port}"), crate::rundata::resolve_data_root())
             .map_err(|error| tauri::Error::Anyhow(std::io::Error::other(error).into()))?;
     }
     #[cfg(windows)]

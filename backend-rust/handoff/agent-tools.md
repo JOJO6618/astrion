@@ -39,4 +39,4 @@
 | `ask_master`、`ask_other_agent`、`answer_other_agent`、`get_sub_agent_status` | 同主对话内通信、状态与真实结果回填。 |
 | `list_mcp_servers`、`mcp__*` | 独立子 MCP 客户端及各子实例运行权限。 |
 
-实际请求的重点回归在 [Agent 工具夹具](../../test/2026-11-27_RustAgent工具对照/) 和 [网页工具夹具](../../test/2026-11-27_Rust内置网页工具/web_tools_http.py)。各第三方搜索商、真实 OCR 服务、桌面界面和 Linux / Windows 自定义工具实机未纳入这些本机回环。
+实际请求的重点回归在 [Agent 工具夹具](../../test/2026-11-27_RustAgent工具对照/) 和 [网页工具夹具](../../test/2026-11-27_Rust内置网页工具/web_tools_http.py)。这些本机回环使用模拟模型和工具服务。第三方搜索、真实 OCR 服务和桌面界面需要独立验收。

@@ -73,7 +73,7 @@
 
 ### 阶段 3 · 删掉主仓的 Docker、API 用户和 Android 分支
 
-- 先处理导入和调用方，再移除镜像及容器专属实现。按文件读写和元数据、前台命令、后台命令、持久终端、子智能体资源、工作区记忆与提示词逐链验证，然后清理 `container_file_proxy`、容器监控、Docker 只读与作用域执行器、容器记忆挂载、镜像目录及专属配置。`modules/linux_sandbox/`、Windows WSL 安装脚本及 macOS Host 沙箱继续进入对应安装和打包链。
+- 先处理导入和调用方，再移除镜像及容器专属实现。按文件读写和元数据、前台命令、后台命令、持久终端、子智能体资源、工作区记忆与提示词逐链验证，然后清理 `container_file_proxy`、容器监控、Docker 只读与作用域执行器、容器记忆挂载、镜像目录及专属配置。Linux Host 受限助手、Windows WSL 安装脚本及 macOS Host 沙箱继续进入对应安装和打包链。
 - 移出 `UserManager` 的多用户职责、`ApiUserManager`、API Token 认证和配额、用户／容器管理界面、`/api/projects*` 及 API 用户路由。先检查 `UserWorkspace` 等共用表示、Host 策略、自定义工具、MCP、提供商、上传和附件路由的调用方。API 用户的管理和执行入口移除后，再收拢相关 `RuntimeIdentity` / `TrustedPrincipal` 分支、部署配置和数据路径引用。Host 对话费用账本、订阅额度和个人设置沿用各自的数据源。
 - 在 Host 前后端去掉 Android 专用桥接和 APK 端点、构建和静态入口。保留浏览器的下载、上传、预览和窄屏布局。复核 Vite 入口与 manifest、桌面 staging 和官网桌面更新。
 - 清理安装向导中的 Docker 模式选项、容器配额和镜像参数，更新主仓 README、示例配置、项目契约、测试和发布说明。执行侧的产品依赖必须消失。用户项目将 Docker 用作普通命令的能力、历史里的容器路径和历史兼容标识按各自语义处理。

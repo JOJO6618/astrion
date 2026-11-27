@@ -17,7 +17,6 @@ export default {
   groupAgents: '智能体',
   groupInterface: '界面',
   groupAccount: '账户',
-  groupAdmin: '管理',
 
   // ── 导航项 ──
   navProviders: '提供商',
@@ -89,7 +88,6 @@ export default {
   navUsage: '用量统计',
   navStorage: '存储空间',
   navAppearance: '外观',
-  navAdmin: '管理员',
 
   // ── 分区页头（标题 + 说明） ──
   providersTitle: '提供商',
@@ -176,7 +174,6 @@ export default {
   usageTitle: '用量统计',
   storageTitle: '存储空间',
   appearanceTitle: '外观',
-  adminTitle: '管理员',
 
   // ── 卡片标题 ──
   cardAppearanceTheme: '主题与语言',

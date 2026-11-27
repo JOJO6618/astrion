@@ -26,21 +26,11 @@
     }
   },
   "bundle": {
-    "active": true,
-    "createUpdaterArtifacts": true,
-    "targets": [
-      "app",
-      "nsis",
-      "dmg"
-    ],
+    "active": false,
     "icon": [
       "icons/icon.icns",
       "icons/icon.png",
       "icons/icon.ico"
-    ],
-    "resources": [
-      "runtime/python",
-      "runtime/backend"
     ],
     "macOS": {
       "signingIdentity": "Astrion Local Sign"

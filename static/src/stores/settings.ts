@@ -35,15 +35,12 @@ export type SettingsSection =
   | 'sub-agents'
   | 'review-agents'
   // 界面
-  | 'appearance'
-  // 管理
-  | 'admin';
+  | 'appearance';
 
 /** 仅管理员可见的分区（providers：连接/断开提供商是管理员操作） */
 export const SETTINGS_ADMIN_SECTIONS: ReadonlySet<SettingsSection> = new Set([
   'providers',
-  'codex',
-  'admin'
+  'codex'
 ]);
 
 interface SettingsState {

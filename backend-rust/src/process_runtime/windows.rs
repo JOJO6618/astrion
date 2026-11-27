@@ -71,14 +71,7 @@ pub(super) fn command(
     command_argv(workspace,cwd,access,&["/bin/bash","--noprofile","--norc","-c",script],reads,writes,fixed_write_root)
 }
 
-pub(super) fn plugin_interpreter() -> io::Result<&'static str> {
-    let wsl = system_program("wsl.exe").ok_or_else(||denied("缺少自定义工具所需的 WSL"))?;
-    let name = distro()?;
-    if probe(&wsl,&name,&["/usr/bin/test","-x","/usr/bin/python3"]) { Ok("/usr/bin/python3") }
-    else { Err(denied("Astrion WSL 沙箱缺少 /usr/bin/python3")) }
-}
-
-pub(super) fn command_argv(
+fn command_argv(
     workspace: &Path, cwd: &Path, access: SandboxAccess, argv: &[&str], reads: Vec<String>, writes: Vec<String>,
     fixed_write_root: Option<&Path>,
 ) -> io::Result<Command> {

@@ -205,10 +205,30 @@ pub(super) fn disable(
     save(directory, &disabled).map_err(|_| DisableError::Unavailable)
 }
 
+/// Local administrator password reset; shares the web service's lock and generation scheme.
+pub fn set_host_password(directory: &Path, password: &str) -> io::Result<()> {
+    if !(8..=1024).contains(&password.chars().count()) {
+        return Err(io::Error::new(io::ErrorKind::InvalidInput, "密码长度必须为 8 到 1024 个字符"));
+    }
+    let salt = uuid::Uuid::new_v4().simple().to_string();
+    let parameters = Params::new(15, 8, 1, 64).map_err(|_| invalid())?;
+    let mut digest = [0; 64];
+    scrypt(password.as_bytes(), salt.as_bytes(), &parameters, &mut digest).map_err(|_| invalid())?;
+    let hex: String = digest.iter().map(|byte| format!("{byte:02x}")).collect();
+    fs::create_dir_all(directory)?;
+    let _lock = lock_credentials(directory)?;
+    save(directory, &StoredCredentials {
+        version: 1, enabled: true, password_hash: format!("{HASH_METHOD}${salt}${hex}"),
+        generation: uuid::Uuid::new_v4().simple().to_string(),
+    })
+}
+
 fn save(directory: &Path, credentials: &StoredCredentials) -> io::Result<()> {
     let target = directory.join(FILENAME);
-    if !is_regular(&fs::symlink_metadata(&target)?) {
-        return Err(invalid());
+    match fs::symlink_metadata(&target) {
+        Ok(metadata) if !is_regular(&metadata) => return Err(invalid()),
+        Err(error) if error.kind() != io::ErrorKind::NotFound => return Err(error),
+        _ => {}
     }
     let temporary = directory.join(format!(".host_auth.{}.tmp", credentials.generation));
     let mut options = OpenOptions::new();

@@ -166,7 +166,7 @@ pub(super) fn normalize(
                 strings(raw, usize::MAX)
                     .into_iter()
                     .filter(|name| schema().tool_categories.contains_key(*name)
-                        || *name == "custom"
+                        || *name == "custom" // Preserve the retired category in saved preferences.
                         || name.starts_with("mcp_server__"))
                     .collect::<Vec<_>>()
             ),

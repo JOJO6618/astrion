@@ -1,7 +1,7 @@
 // Astrion 桌面壳入口（Electron/Chromium，替代 desktop/ 的 Tauri/WKWebView 壳）。
 //
 // 架构（与 Tauri 壳一致，后端契约零改动）：
-//   1. 选取空闲端口 → spawn Python 后端（开发期系统 python；生产期内嵌 sidecar 解释器）
+//   1. 选取空闲端口 → 启动 Rust 后端（生产包内嵌 astrion-headless）
 //   2. 轮询后端就绪（/api/host-mode-enabled，无需鉴权）
 //   3. 创建主窗口：BaseWindow + 双 WebContentsView——
 //      chrome 视图（顶部 46px 独立对话标签条，加载 /chrome，常驻不随主页面导航重载）

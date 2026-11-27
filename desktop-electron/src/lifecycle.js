@@ -4,13 +4,9 @@
 import { app, dialog } from 'electron';
 import { randomBytes } from 'node:crypto';
 import {
-  loadPreferredPort,
-  pickFreePort,
   resolveBackendPort,
-  resolveRuntime,
   savePreferredPort,
   shutdownBackend,
-  spawnBackend,
   spawnRustBackend,
   waitBackendReady
 } from './backend.js';
@@ -36,37 +32,11 @@ import { productionRustPaths } from './rust-backend.js';
 
 export { shutdownBackend };
 
-/**
- * 启动后端并等到就绪，返回实际使用的端口。
- *
- * 端口优先复用上次成功使用的那个：session cookie 名（agents_session_<port>）与
- * localStorage 都按 origin 隔离，每次换端口等于丢掉登录态、用户主题和本地缓存。
- * 复用端口在「探测」与「spawn」之间仍可能被其它进程抢占，后端会立刻退出，
- * 这种情况下换随机端口重试一次。
- */
-async function startBackend(launch) {
-  const preferred = loadPreferredPort();
-  const port = await resolveBackendPort();
-  try {
-    await waitBackendReady(port, spawnBackend({ ...launch, port }));
-    savePreferredPort(port);
-    return port;
-  } catch (error) {
-    if (!preferred || port !== preferred) throw error;
-    console.warn(`[astrion-desktop] 端口 ${port} 启动失败，改用随机端口重试:`, error?.message || error);
-    if (await shutdownBackend() === false) throw error;
-    const fallbackPort = await pickFreePort();
-    await waitBackendReady(fallbackPort, spawnBackend({ ...launch, port: fallbackPort }));
-    savePreferredPort(fallbackPort);
-    return fallbackPort;
-  }
-}
-
 async function startRustDesktop(runtime) {
   const port = await resolveBackendPort();
   const child = spawnRustBackend(runtime, { port, version: app.getVersion(), browserToken: runtime.browserToken });
   try {
-    await waitBackendReady(port, child, 'rust');
+    await waitBackendReady(port, child);
     if (!await primeDesktopSession(port)) throw new Error('Rust desktop session unavailable');
   } catch (error) {
     await shutdownBackend();
@@ -76,8 +46,8 @@ async function startRustDesktop(runtime) {
   return port;
 }
 
-export async function startBackendAndCreateWindow(rust = null) {
-  if (rust?.experimental) {
+export async function startBackendAndCreateWindow(rust) {
+  if (rust.experimental) {
     const port = await startRustDesktop(rust);
     setBrowserDataRoot(rust.dataRoot);
     setMainWindowBackend(port);
@@ -149,31 +119,14 @@ export async function startBackendAndCreateWindow(rust = null) {
     console.warn(`[astrion-desktop] 登录 shell PATH 加载失败 (${shellEnvironment.status})，使用原始 PATH`);
   }
 
-  const rustPaths = rust && productionRustPaths(desktopDataRoot);
-  const port = rust
-    ? await startRustDesktop({ ...rust, ...rustPaths, bridgePort, browserToken: desktopSupported() ? browserToken : null, shellPath: shellEnvironment.path })
-    : await startBackend({
-      ...resolveRuntime(),
-      bridgePort,
-      browserToken: desktopSupported() ? browserToken : null,
-      version: app.getVersion(),
-      shellPath: shellEnvironment.path,
-      desktopDataRoot
-    });
-
-  // 建窗之前先备好桌面免密会话：否则 chrome 标签条的首个 /api/conversation-tabs
-  // 会在前端登录完成前拿到 401，界面显示「同步失败，重试」且没有标签。
-  // 预登录失败只告警，前端原有的登录流程仍然兜底。
-  if (!rust) {
-    try {
-      await primeDesktopSession(port);
-    } catch (error) {
-      console.warn('[astrion-desktop] 启动预登录失败（交由前端登录流程处理）:', error?.message || error);
-    }
-  }
+  const rustPaths = productionRustPaths(desktopDataRoot);
+  const port = await startRustDesktop({
+    ...rust, ...rustPaths, bridgePort,
+    browserToken: desktopSupported() ? browserToken : null, shellPath: shellEnvironment.path,
+  });
   setBrowserDataRoot(desktopDataRoot);
   await startQuickEntry({
-    port, dataRoot: desktopDataRoot, dataDir: rustPaths?.dataDir, staticRoot: rust?.staticRoot,
+    port, dataRoot: desktopDataRoot, dataDir: rustPaths.dataDir, staticRoot: rust.staticRoot,
     isManagedView, openMain: route => focusMainWindow(route),
   });
   setMainWindowBackend(port);

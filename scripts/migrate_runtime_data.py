@@ -39,12 +39,14 @@ import tarfile
 from datetime import datetime
 from pathlib import Path
 
-# 确保以 `python scripts/migrate_runtime_data.py` 直接运行时也能导入仓库根的 config 包。
-REPO_ROOT = Path(__file__).resolve().parents[1]
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
+import json
+import subprocess
+from types import SimpleNamespace
 
-import config
+REPO_ROOT = Path(__file__).resolve().parents[1]
+config = SimpleNamespace(**json.loads(subprocess.check_output(
+    ["node", str(REPO_ROOT / "scripts/host-config.mjs")], text=True
+)))
 
 
 # 需要迁移的 Host 运行态目录：源码树相对路径 -> 目标绝对路径（取自 config，与程序一致）。

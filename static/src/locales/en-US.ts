@@ -13,7 +13,6 @@ import monitor from './en-US/monitor';
 import workflow from './en-US/workflow';
 import adminPolicy from './en-US/adminPolicy';
 import adminApi from './en-US/adminApi';
-import adminCustomTools from './en-US/adminCustomTools';
 import appMessages from './en-US/appMessages';
 import appTasks from './en-US/appTasks';
 import appUi from './en-US/appUi';
@@ -58,7 +57,6 @@ const enUS: DeepString<typeof zhCN> = {
   workflow,
   adminPolicy,
   adminApi,
-  adminCustomTools,
   appMessages,
   schedules,
   appTasks,

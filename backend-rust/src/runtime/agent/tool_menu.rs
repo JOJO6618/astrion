@@ -15,7 +15,6 @@ pub(in crate::runtime) struct ToolMenu {
     pub(super) browser_names: HashSet<String>,
     pub(super) interaction_names: HashSet<String>,
     pub(super) process_names: HashSet<String>,
-    pub(super) plugins: Vec<super::super::custom_tools::Plugin>,
     pub(super) disabled: HashSet<String>,
     pub(super) mcp: Option<Arc<crate::mcp::Runtime>>,
     pub(super) mcp_snapshot: crate::mcp::ToolSnapshot,
@@ -115,12 +114,6 @@ pub(in crate::runtime) async fn for_round(
         .map(str::to_owned)
         .collect::<HashSet<_>>();
     round_schemas.extend(process_schemas);
-    let mut plugins = if workflow && can_write {
-        let data = runtime.store().map_err(|error|error.message)?.data_dir.clone();
-        super::super::custom_tools::load(&data)?
-    } else { Vec::new() };
-    plugins.retain(|plugin| !round_schemas.iter().any(|spec|spec["function"]["name"] == plugin.name));
-    round_schemas.extend(plugins.iter().map(|plugin|plugin.schema.clone()));
     let disabled = if workflow {
         runtime.disabled_task_tools(task_id)?
     } else {
@@ -147,7 +140,6 @@ pub(in crate::runtime) async fn for_round(
         browser_names,
         interaction_names,
         process_names,
-        plugins,
         disabled,
         mcp,
         mcp_snapshot,

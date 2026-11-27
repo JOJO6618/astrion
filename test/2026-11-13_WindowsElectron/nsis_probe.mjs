@@ -51,7 +51,7 @@ try {
   const stop = path.join(output, 'locker-stop');
   for (const file of [ready, stop]) if (fs.existsSync(file)) fs.unlinkSync(file);
   const { spawn } = await import('node:child_process');
-  const locker = spawn(path.join(root, 'desktop/src-tauri/runtime/python/python.exe'), ['-u', '-B', path.join(root, 'test/2026-11-13_WindowsElectron/rollback_locker.py'), marker], { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
+  const locker = spawn(process.env.ASTRION_TEST_PYTHON || 'python', ['-u', '-B', path.join(root, 'test/2026-11-13_WindowsElectron/rollback_locker.py'), marker], { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
   try {
     await new Promise((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error('Locker readiness timeout')), 10000);

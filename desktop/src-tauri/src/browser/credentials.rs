@@ -71,21 +71,11 @@ impl Browser {
         json!({"prompt":prompt,"fill":self.credentials.fills.get(&tab)})
     }
     pub fn credential_request(&mut self, request: &Value) {
-        match request["data"]["action"].as_str().unwrap_or("") {
-            "sources" | "preview" | "preview-file" | "import" | "cancel-import" => {
-                self.import_request(request);
-                return;
-            }
-            _ => {}
-        }
         let result = self.credential_command(&request["data"]);
         self.publish();
         self.reply(request, result);
     }
     fn credential_command(&mut self, input: &Value) -> Result<Value, String> {
-        if self.imports.running() {
-            return Err("browser_import_busy".into());
-        }
         let action = input["action"].as_str().ok_or("invalid_password_action")?;
         match action {
             "fill" => {

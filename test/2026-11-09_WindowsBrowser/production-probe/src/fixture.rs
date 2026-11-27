@@ -40,7 +40,6 @@ fn handle(mut stream:TcpStream,shared:Arc<Mutex<Value>>,finished:Arc<AtomicBool>
         "/ai"=>("text/html",include_str!("../web/ai.html").into()),
         "/ai/data"=>("application/json",json!({"synthetic":true}).to_string()),
         "/suite.js"=>("text/javascript",include_str!("../web/suite.js").into()),
-        "/migration-suite.js"=>("text/javascript",include_str!("../web/migration-suite.js").into()),
         "/page.js"=>("text/javascript",include_str!("../web/page.js").into()),
         "/fixture.css"=>("text/css",include_str!("../web/fixture.css").into()),
         "/page"|"/popup"=>("text/html",include_str!("../web/page.html").into()),

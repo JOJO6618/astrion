@@ -25,6 +25,9 @@ pub(super) async fn serve(
         return StatusCode::NOT_FOUND.into_response();
     }
     let lower_name = filename.to_ascii_lowercase();
+    if lower_name.starts_with("custom_tools/") {
+        return no_store(StatusCode::NOT_FOUND);
+    }
     let admin_dashboard = lower_name.starts_with("admin_dashboard");
     if admin_dashboard && session.is_none() {
         return no_store(StatusCode::NOT_FOUND);
@@ -36,12 +39,10 @@ pub(super) async fn serve(
         "index.html" => return show(Page::Main, assets, session, policy).await,
         "terminal.html" => return show(Page::Terminal, assets, session, policy).await,
         "admin_policy/index.html" => return show(Page::AdminPolicy, assets, session, policy).await,
-        "custom_tools/index.html" => return show(Page::AdminTools, assets, session, policy).await,
         "login.html" => return redirect("/login"),
         "chrome.html" => return render(assets, "chrome.html").await,
         "browser-window.html" => return render(assets, "browser-window.html").await,
         "quick.html" => return render(assets, "quick.html").await,
-        "custom_tools/guide.html" => return render(assets, "custom_tools/guide.html").await,
         _ => (),
     }
     read_asset(move || {

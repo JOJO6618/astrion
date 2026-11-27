@@ -30,7 +30,7 @@ function Get-MissingFile {
         if (-not [IO.File]::Exists((Join-Path $root $relative))) { return $relative }
     }
     if ([IO.Directory]::Exists((Join-Path $root 'resources\runtime'))) {
-        foreach ($relative in @('resources\runtime\rust\astrion-headless.exe', 'resources\runtime\python\astrion-backend.exe', 'resources\astrion-windows-helper.exe')) {
+        foreach ($relative in @('resources\runtime\rust\astrion-headless.exe', 'resources\astrion-windows-helper.exe')) {
             if (-not [IO.File]::Exists((Join-Path $root $relative))) { return $relative }
         }
     }

@@ -31,12 +31,7 @@ pub(super) struct Policy {
 }
 
 impl Policy {
-    pub(super) fn effective(
-        &self,
-        data: &Path,
-        catalog: &Catalog,
-        custom: &[String],
-    ) -> Result<Value> {
+    pub(super) fn effective(&self, data: &Path, catalog: &Catalog) -> Result<Value> {
         let _lock = self.updates.lock().map_err(AdminError::lock)?;
         let dir = policy_dir(data)?;
         let policy = load(&dir)?;
@@ -46,23 +41,18 @@ impl Policy {
             .expect("policy object")
             .shift_remove("version");
         effective["updated_at"] = policy["updated_at"].clone();
-        effective["categories"] = Value::Object(effective_categories(data, &policy, custom));
+        effective["categories"] = Value::Object(effective_categories(data, &policy));
         Ok(json!({"success": true, "data": effective}))
     }
 
-    pub(super) fn describe(
-        &self,
-        data: &Path,
-        catalog: &Catalog,
-        custom: &[String],
-    ) -> Result<Value> {
+    pub(super) fn describe(&self, data: &Path, catalog: &Catalog) -> Result<Value> {
         let _lock = self.updates.lock().map_err(AdminError::lock)?;
         let policy = load(&policy_dir(data)?)?;
         let mut models = catalog.registered_model_keys();
         models.sort();
         models.dedup();
         Ok(json!({"success": true, "data": policy, "defaults": {
-            "models": models, "categories": default_admin_tool_categories(data, custom), "ui_block_keys": UI_BLOCK_KEYS
+            "models": models, "categories": default_admin_tool_categories(data), "ui_block_keys": UI_BLOCK_KEYS
         }}))
     }
 
@@ -170,8 +160,8 @@ fn normalized(config: &Value, catalog: &Catalog) -> Result<Value> {
     Ok(normalized)
 }
 
-fn effective_categories(data: &Path, policy: &Value, custom: &[String]) -> Map<String, Value> {
-    let base = default_admin_tool_categories(data, custom);
+fn effective_categories(data: &Path, policy: &Value) -> Map<String, Value> {
+    let base = default_admin_tool_categories(data);
     let mut categories = base.clone();
     let mut remove = BTreeSet::new();
     let mut overrides = Map::new();
@@ -190,7 +180,7 @@ fn effective_categories(data: &Path, policy: &Value, custom: &[String]) -> Map<S
     }
     categories.retain(|id, _| !remove.contains(id.as_str()));
     for (id, value) in overrides {
-        if !value.is_object() || !value["tools"].is_null() && !value["tools"].is_array() {
+        if id == "custom" || !value.is_object() || !value["tools"].is_null() && !value["tools"].is_array() {
             continue;
         }
         let tools: Vec<_> = value["tools"]

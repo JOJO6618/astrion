@@ -15,12 +15,11 @@ fn main(){
     let port=if write{0}else{let previous:Value=serde_json::from_slice(&std::fs::read(root.join("write.json")).unwrap()).unwrap();previous["origin"].as_str().unwrap().rsplit(':').next().unwrap().parse().unwrap()};
     let fixture=fixture::start(phase,port);let origin=fixture.origin.clone();
     let final_report=Arc::new(Mutex::new(json!({"origin":origin,"phase":phase,"root":root})));let output=root.join(format!("{phase}.json"));
-    let python=std::env::var_os("ASTRION_BROWSER_PROBE_PYTHON").map(PathBuf::from).expect("explicit python");
     tauri::Builder::default().setup(move|app|{
         let view=WebviewWindowBuilder::new(app,"main",WebviewUrl::External(format!("{origin}/new").parse()?)).data_directory(root.join("main-webview2")).initialization_script(browser::BRIDGE_SCRIPT).title("Astrion production browser regression").inner_size(1000.,700.).build()?;
         let main=app.get_webview("main").unwrap();main.set_auto_resize(false)?;
         main.set_bounds(tauri::Rect{position:tauri::LogicalPosition::new(0.,46.).into(),size:tauri::LogicalSize::new(1000.,654.).into()})?;
-        browser::initialize(app.handle(),origin.clone(),root.clone(),python,PathBuf::new()).map_err(std::io::Error::other)?;
+        browser::initialize(app.handle(),origin.clone(),root.clone()).map_err(std::io::Error::other)?;
         let parent=view.hwnd()?.0 as isize;let scale=view.scale_factor()?;let handle=app.handle().clone();let state=fixture.state.clone();let done=fixture.done.clone();let measure=fixture.measure.clone();let report=final_report.clone();
         std::thread::spawn(move||{
             let start=Instant::now();

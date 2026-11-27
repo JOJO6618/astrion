@@ -7,12 +7,6 @@ const entry = fileURLToPath(new URL('./static/src/main.ts', import.meta.url));
 const adminPolicyEntry = fileURLToPath(
   new URL('./static/src/admin/policyMain.ts', import.meta.url)
 );
-const adminCustomToolsEntry = fileURLToPath(
-  new URL('./static/src/admin/customToolsMain.ts', import.meta.url)
-);
-const adminCustomToolsGuideEntry = fileURLToPath(
-  new URL('./static/src/admin/customToolsGuideMain.ts', import.meta.url)
-);
 const loginEntry = fileURLToPath(new URL('./static/src/auth/loginMain.ts', import.meta.url));
 // 桌面壳顶部对话标签条（独立 chrome webview 的页面入口，双 webview 架构见
 // desktop/src-tauri/src/backend.rs）
@@ -54,8 +48,6 @@ export default defineConfig({
       input: {
         main: entry,
         adminPolicy: adminPolicyEntry,
-        adminCustomTools: adminCustomToolsEntry,
-        adminCustomToolsGuide: adminCustomToolsGuideEntry,
         login: loginEntry,
         quick: fileURLToPath(new URL('./static/src/quick.ts', import.meta.url)),
         chrome: chromeEntry,

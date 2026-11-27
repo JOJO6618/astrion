@@ -27,6 +27,12 @@ use tokio::net::TcpListener;
 
 #[tokio::main]
 async fn main() -> ExitCode {
+    if env::args_os().nth(1).is_some_and(|arg| arg == "host-password") {
+        return match launch::configure_password() {
+            Ok(()) => { println!("Host 网页密码已设置。"); ExitCode::SUCCESS }
+            Err(error) => { eprintln!("astrion-headless host-password: {error}"); ExitCode::FAILURE }
+        };
+    }
     if env::args_os()
         .nth(1)
         .is_some_and(|v| v == "--help" || v == "-h")

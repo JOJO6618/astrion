@@ -2,14 +2,10 @@
   "name": "astrion-desktop",
   "private": true,
   "version": "0.9.3",
-  "description": "Astrion 桌面壳（Tauri 2）：系统 WebView + 内嵌 Python 后端",
+  "description": "Astrion Windows 更新兼容补签工具",
   "type": "module",
   "scripts": {
-    "tauri": "tauri",
-    "dev": "tauri dev",
-    "prepare-backend": "python scripts/prepare_backend.py || python3 scripts/prepare_backend.py",
-    "build": "npm run prepare-backend && tauri build",
-    "build:debug": "npm run prepare-backend && tauri build --debug"
+    "sign:updater": "tauri signer sign"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2"

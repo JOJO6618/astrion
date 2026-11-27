@@ -284,7 +284,7 @@ const mock = await startModel();
 let runtime;
 try {
   const legacySeed = join(repo, 'test/2026-11-24_Rust后端/cli_python_fixture.py');
-  const seed = execFileSync('python3.11', ['-B', legacySeed, 'seed', data, workspace], { encoding: 'utf8' });
+  const seed = execFileSync('python3.11', ['-B', join(repo, 'test/2026-11-24_Rust后端/with_legacy_source.py'), legacySeed, 'seed', data, workspace], { encoding: 'utf8' });
   const { id, path: source } = JSON.parse(seed.trim().split('\n').at(-1));
   const dataDir = join(data, 'host/data');
   const childId = 'sub_gui_history';

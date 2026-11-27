@@ -68,11 +68,6 @@ export const NAV_GROUPS: NavGroup[] = [
       { id: 'sub-agents', labelKey: 'settings.navSubAgents', icon: 'sub-agents' },
       { id: 'review-agents', labelKey: 'settings.navReviewAgents', icon: 'review-agents' }
     ]
-  },
-  {
-    id: 'admin',
-    titleKey: 'settings.groupAdmin',
-    items: [{ id: 'admin', labelKey: 'settings.navAdmin', icon: 'admin' }]
   }
 ];
 
@@ -96,8 +91,7 @@ export const SECTION_TITLE_KEYS: Record<SettingsSection, string> = {
   browser: 'settings.browserTitle',
   'sub-agents': 'settings.subAgentsTitle',
   'review-agents': 'settings.reviewAgentsTitle',
-  appearance: 'settings.appearanceTitle',
-  admin: 'settings.adminTitle'
+  appearance: 'settings.appearanceTitle'
 };
 
 interface SearchEntry {
@@ -237,8 +231,7 @@ const SEARCH_ENTRIES: SearchEntry[] = [
     ['settings.mcp.services', 'settings.mcp.servicesDesc'],
     'settings.mcp.defaults',
     ['settings.mcp.workspace', 'settings.mcp.workspaceDesc']
-  ]),
-  ...entries('admin', [`${P}customToolsAdminTitle`])
+  ])
 ];
 
 export interface SearchResult {

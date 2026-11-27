@@ -11,7 +11,7 @@
 ## ⚠️ 重要声明
 
 - **本项目处于开发中，不要用于正式生产环境。**
-- 宿主机沙箱已在 **macOS（sandbox-exec）** 与 **Windows（WSL2）** 完成测试；**Linux 首批适配 Ubuntu 24.04**（bwrap + seccomp + AppArmor + systemd/cgroup IP 过滤），已完成隔离环境实测，须由管理员安装受限助手，Astrion 本体以普通用户运行。其它 Linux 发行版和全局安装流程尚需实机验收，详见 [Linux Host 沙箱](docs/agents_details/linux_host_sandbox.md)。
+- 宿主机沙箱已在 **macOS（sandbox-exec）** 与 **Windows（WSL2）** 完成测试。**Linux 首批适配 Ubuntu 24.04**（bwrap + seccomp + AppArmor + systemd/cgroup IP 过滤），由管理员安装 Rust 沙箱助手，Astrion 本体以普通用户运行。Rust 助手的生产安装及其它 Linux 发行版尚需实机验收。详见 [Linux Host 沙箱](docs/agents_details/linux_host_sandbox.md)。
 - 主仓交付 **Host Web、本机 CLI、macOS / Windows 桌面端（含 Quick Chat）与本机沙箱**。多用户 Web 服务、Docker 镜像、普通账号、API 用户与 Android 工程归入独立 Docker 版的拆分范围。现有 Docker 部署继续使用对应旧版本，详见 [拆分方案](docs/docker_fork_split_plan.md)。
 - 本项目的大量设计借鉴了 **Codex、Claude Code、OpenCode、OpenClaw** 等智能体产品的优秀实践，特此致谢。
 
@@ -46,14 +46,14 @@
 
 ## 快速开始
 
-**环境要求**：Python 3.10+、Node.js 18+。
+**环境要求**：Rust（含 Cargo）、Node.js 18+。
 
 ```bash
 # 1. 克隆
 git clone https://github.com/JOJO6618/astrion.git
 cd astrion
 
-# 2. 初始化：创建 venv、安装依赖、运行交互式配置向导
+# 2. 初始化：安装前端依赖、运行交互式配置向导
 #    向导会依次询问：监听地址/端口 → 数据目录 → 模型 API（并自动生成会话密钥）
 ./setup.sh
 
@@ -63,15 +63,14 @@ cargo build --locked --release --manifest-path backend-rust/Cargo.toml
 
 # 4. 启动 Host Web
 ./start.sh
-# 或：python3 -m server.app --port 8091
-# 或：python3 main.py
+# 指定端口：./start.sh --port 8091
 ```
 
 访问 `http://localhost:8091`。Host 模式默认本机免登录。启用 Host 网页密码后使用密码登录，详见下文。桌面端免密码。
 
-上面的启动命令均使用 Rust 后端。需要对照旧 Flask 实现时，运行 `python3 -m server.app --backend python`。Rust 和 Python 实例共用数据根时只能启动一个。
+Host Web 和桌面版使用同一套 Rust 后端，每个数据目录只运行一个实例。
 
-> Linux 首次使用还需由管理员安装 Host 沙箱助手：`sudo bash scripts/setup-linux-sandbox.sh`。Windows 首次使用按设置页向导安装 WSL2 沙箱。
+> Linux 在完成上述构建后，首次使用或从旧版更新时执行 `sudo bash scripts/setup-linux-sandbox.sh` 安装 Rust 沙箱助手。Windows 首次使用按设置页向导安装 WSL2 沙箱。
 >
 > 说明：`setup.sh` 向导当前将配置写入仓库根目录 `.env`（开发备用方式）。
 > 生产部署建议按「配置」一节迁移为 `<数据根目录>/settings.json` 或系统环境变量。
@@ -91,7 +90,7 @@ CLI 通过本机 Gateway Bearer 连接服务，探测到无服务时默认启动
 默认沿用本机免登录。需要密码保护时，在源码目录运行：
 
 ```bash
-python3 scripts/host_password.py --password 'YOUR_PASSWORD'
+./backend-rust/target/release/astrion-headless host-password --password 'YOUR_PASSWORD'
 ```
 
 将 `YOUR_PASSWORD` 替换为 8 至 1024 个字符的密码。每次执行都会设置密码并开启保护，旧网页登录会话随即失效，无需重启服务。脚本默认使用服务同一套 `DATA_DIR` 配置；也可通过 `--data-dir /absolute/path/to/data` 显式指定目标实例的数据目录。
@@ -221,25 +220,22 @@ Host 运行态数据默认位于 **`~/.astrion/astrion/`**。桌面端默认使�
 Host 模式默认本机免登录。需要网页密码时按上文「Host 网页密码」运行：
 
 ```bash
-python3 scripts/host_password.py --password 'YOUR_PASSWORD'
+./backend-rust/target/release/astrion-headless host-password --password 'YOUR_PASSWORD'
 ```
 
 `setup` 向导不再创建旧管理员账号。
 
-敏感操作的管理员二级密码仍保留：生成哈希后写入 settings.json 的 `admin.secondary_password_hash` 或环境变量 `ADMIN_SECONDARY_PASSWORD_HASH`：
+二级密码需要先生成哈希，再写入 `settings.json` 的 `admin.secondary_password_hash` 或环境变量 `ADMIN_SECONDARY_PASSWORD_HASH`。在装有 Node.js 的终端运行命令，输入密码并回车，然后按 Ctrl+D（Windows 按 Ctrl+Z 后回车）。
 
 ```bash
-python3 -c "from werkzeug.security import generate_password_hash; print(generate_password_hash('你的二级密码'))"
+node -e "const c=require('node:crypto'); const p=require('node:fs').readFileSync(0,'utf8').trim(); if (!p) process.exit(1); const s=c.randomBytes(16).toString('hex'); console.log(['pbkdf2:sha256:1000000',s,c.pbkdf2Sync(p,s,1000000,32,'sha256').toString('hex')].join(String.fromCharCode(36)))"
 ```
 
 ## 项目结构
 
 ```
-├── main.py / server/        # Flask 后端（chat / status / tasks 子包）
-├── core/                    # Agent 循环与工具编排
-├── modules/                 # 能力模块（终端 / 文件 / 记忆 / 子智能体 / MCP …）
-├── config/                  # 配置聚合、路径解析、模型注册
-├── utils/                   # API 客户端、上下文与对话管理
+├── backend-rust/            # Rust Host Web、Gateway、Agent 与宿主机工具
+├── config/                  # 产品配置资源与默认值
 ├── prompts/                 # 系统提示词
 ├── static/src/              # Vue 3 + TypeScript Web 前端
 ├── cli/                     # opentui + React 19 终端 CLI（bun，命令名 astrion）
@@ -257,7 +253,7 @@ python3 -c "from werkzeug.security import generate_password_hash; print(generate
 - 提供商与设置页 API 契约：[docs/providers_api.md](docs/providers_api.md)
 
 ```bash
-python -m pytest test/历史测试_日期不明/test_server_refactor_smoke.py -q       # 后端冒烟
+cargo test --locked --manifest-path backend-rust/Cargo.toml --lib  # Rust 后端回归
 cd cli && ./node_modules/.bin/tsc --noEmit                   # CLI 类型检查
 ```
 

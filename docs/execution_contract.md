@@ -29,7 +29,7 @@
 | 后台 | `background`：查询、等待、取消、状态协调、通知、认领与回滚通知；精简 owner 未提供时允许为 None |
 | 环境 | `get_environment()`：JSON 可序列化的执行侧 workspace、OS、架构、模式、网络和能力 |
 | 编辑备份 | `track_file_edit(...)`：从执行侧获取原内容，关联当前对话与工作段 |
-| 插件 | `execute_mcp_tool` / `execute_custom_tool` / `list_mcp_servers`；能力不存在应明确报错或返回空发现结果 |
+| MCP | `execute_mcp_tool` / `list_mcp_servers`，按连接与发现结果提供可用工具 |
 
 这些是 Python 内部接口，不是网络 RPC 公共协议。`working_dir` 仍保留在内部实现（供 Git 工作树、审核智能体等内部调用指定 cwd），但**不再作为模型可见工具参数**：模型侧命令默认在当前执行目录（工作区根或当前工作树）下运行。未来传输必须显式编码 bytes、校验请求身份、执行设备与路径归属，处理取消、超时、乱序和幂等；不得直接暴露任意 Python 属性／方法。
 
@@ -70,13 +70,11 @@ Rust Host 的 `POST /api/upload` 将通过管理员策略、文件类型、大�
 - 浅版本通过注入 `filesystem` 获取执行侧当前字节、写回或删除；合法新文件记录 None，撤销创建时删除。备份本体、对话与检查点记录仍存控制端 data_dir，不要求把对话存储搬到节点。
 - 完整 Git 备份仍未接入执行后端，见后续边界，不能宣称 full 备份已远程化。
 
-## MCP 与自定义工具
+## MCP
 
-插件调用位置通过后端入口收敛，启用、管理员和目录规则仍由原有编排判定。MCP 是外置服务，继续使用自己的 cwd、连接与权限语义；接入公共执行层不等于 MCP 获得了原生目录沙箱保护。独立资源工厂不自动创建 MCP 服务。
+MCP 工具通过后端调用外置服务，沿用服务自己的 cwd、连接与权限语义。原生目录沙箱作用于内置工具的宿主执行。独立资源工厂按已配置的服务建立连接。
 
-Rust Host 从管理员安装的自定义工具目录读取 `definition.json`、`execution.py` 和可选 `return.json`。Agent 执行沿用当前对话的权限、工作区根、网络档位、审批与进程超时。插件由独立 Python 3 子进程在选定执行环境解译。Rust 用标准输入传递 JSON，旧模板中的参数以值绑定，返回格式沿用 `output`、`stderr`、`return_code` 及可选结果模板。只读和计划模式禁止执行插件。
-
-Rust 壳和后端不内嵌 Python。macOS 默认按顺序探测 /opt/homebrew、/usr/local 与系统 Python 3；Linux 使用系统安装的 Python 3，沙箱沿用管理员安装的执行助手；Windows 沙箱使用专用 WSL 发行版的 `/usr/bin/python3`，完全访问使用 Windows 的 Python。宿主解释器可配置 `ASTRION_CUSTOM_PYTHON` 绝对路径；WSL 由沙箱发行版提供解释器。缺失时工具返回明确错误。
+本地脚本形式的自定义工具已下线。旧工具目录和已有对话中的工具调用与结果由各自的存储保留。
 
 ## 正式 Remote 上线前的剩余边界
 

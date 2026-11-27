@@ -13,7 +13,7 @@ Get-ChildItem -LiteralPath $env:TEMP -Directory -Filter 'ns*.tmp' | ForEach-Obje
         $owned += [PSCustomObject]@{ name = $_.Name }
         if ($Clean) {
             Write-Output ('Cleaning verified owned NSIS temp: ' + $_.Name)
-            $python = Join-Path $PSScriptRoot '..\..\desktop\src-tauri\runtime\python\python.exe'
+            $python = if ($env:ASTRION_TEST_PYTHON) { $env:ASTRION_TEST_PYTHON } else { 'python' }
             & $python -c 'import shutil, sys; shutil.rmtree(sys.argv[1])' $_.FullName
             if ($LASTEXITCODE -ne 0) { throw 'Owned temp cleanup failed' }
         }

@@ -234,7 +234,10 @@ pub fn admin_policy(data_dir: &Path, catalog: &Catalog) -> io::Result<Value> {
             }
         }
         if let Some(values) = scope["forced_category_states"].as_object() {
-            for (key, value) in values.iter().filter(|(key, _)| !key.is_empty()) {
+            for (key, value) in values
+                .iter()
+                .filter(|(key, _)| !key.is_empty() && key.as_str() != "custom")
+            {
                 forced.insert(key.clone(), json!(value.as_bool()));
             }
         }

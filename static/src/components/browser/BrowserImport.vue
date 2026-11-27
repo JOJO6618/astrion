@@ -1,13 +1,15 @@
 <template>
   <div class="nb-credentials">
-    <p v-if="!fileMode" class="nb-credential-note">{{ $t('browser.chromeImportHint') }}</p>
+    <p v-if="!fileMode" class="nb-credential-note">
+      {{ $t(historyOnly ? 'browser.chromeHistoryImportHint' : 'browser.chromeImportHint') }}
+    </p>
     <p v-if="error" class="nb-credential-error" role="alert">{{ error }}</p>
     <div v-if="fileSupported && !preview && !report" class="nb-choice-options">
       <button role="radio" :aria-checked="fileMode" :disabled="busy" @click="fileMode = true">
         <FancyCheck :checked="fileMode" :size="16" />{{ $t('browser.importExportedFile') }}
       </button>
       <button role="radio" :aria-checked="!fileMode" :disabled="busy" @click="fileMode = false">
-        <FancyCheck :checked="!fileMode" :size="16" />{{ $t('browser.importChromeDatabase') }}
+        <FancyCheck :checked="!fileMode" :size="16" />{{ $t('browser.importChromeHistory') }}
       </button>
     </div>
     <BrowserImportFile
@@ -26,18 +28,20 @@
           :disabled="busy || !sources.length"
         />
       </div>
-      <button
-        v-for="type in kinds"
-        :key="type"
-        class="nb-setting"
-        role="switch"
-        :aria-checked="selection[type]"
-        :disabled="busy"
-        @click="selection[type] = !selection[type]"
-      >
-        <span>{{ $t(labels[type]) }}</span
-        ><UiSwitch decorative :checked="selection[type]" />
-      </button>
+      <template v-if="!historyOnly">
+        <button
+          v-for="type in kinds"
+          :key="type"
+          class="nb-setting"
+          role="switch"
+          :aria-checked="selection[type]"
+          :disabled="busy"
+          @click="selection[type] = !selection[type]"
+        >
+          <span>{{ $t(labels[type]) }}</span
+          ><UiSwitch decorative :checked="selection[type]" />
+        </button>
+      </template>
     </template>
     <p v-if="busy" class="nb-credential-note" role="status">{{ $t(stageLabel) }}</p>
     <template v-if="preview || report">
@@ -172,7 +176,8 @@ const store = useNativeBrowserStore(),
   { request, valid } = useCredentialRequest();
 const sources = ref<{ id: string; name: string }[]>([]),
   source = ref('');
-const selection = ref({ passwords: true, cookies: true, history: true });
+const historyOnly = browserBridge()?.credentialHistoryOnly === true;
+const selection = ref({ passwords: !historyOnly, cookies: !historyOnly, history: true });
 const fileSupported = browserBridge()?.credentialFileImport === true;
 const fileMode = ref(fileSupported);
 const fileKind = ref<ImportKind>('passwords');
@@ -180,7 +185,7 @@ const kinds: ImportKind[] = ['passwords', 'cookies', 'history'];
 const labels = {
   passwords: 'browser.passwordRecords',
   cookies: 'browser.cookieRecords',
-  history: 'browser.clearHistory'
+  history: 'browser.history'
 };
 const selectedKinds = computed(() =>
   fileMode.value ? [fileKind.value] : kinds.filter((type) => selection.value[type])
@@ -211,6 +216,7 @@ const stageLabel = computed(
       history: 'browser.readingHistory',
       keychain: 'browser.waitingKeychain',
       decrypt: 'browser.checkingImport',
+      'import-file': 'browser.checkingExportFile',
       committing: 'browser.importingRecords'
     })[stage.value] || 'browser.readingChrome'
 );
@@ -220,7 +226,6 @@ const reasonKeys: Record<string, string> = {
   missing_database: 'browser.importDatabaseMissing',
   keychain_timeout: 'browser.importKeychainTimeout',
   keychain_denied: 'browser.importKeychainDenied',
-  windows_decryption_failed: 'browser.importWindowsDecryptFailed',
   unsupported_encryption: 'browser.importEncryptionUnsupported',
   unsupported_partition: 'browser.importPartitionUnsupported',
   conflicting_cookie_storage: 'browser.importCookieConflict',
@@ -281,6 +286,7 @@ function importError(failure: unknown) {
     invalid_import_file: 'browser.invalidImportFile',
     import_file_too_large: 'browser.importFileTooLarge',
     import_file_too_many_records: 'browser.importFileTooManyRecords',
+    invalid_import_selection: 'browser.invalidImportSelection',
     browser_import_timed_out_partial: 'browser.importPartialTimeout',
     chrome_read_failed: 'browser.importDatabaseUnavailable'
   };
@@ -293,7 +299,7 @@ async function readFile(value: { format: 'password-csv' | 'cookie-json'; content
   fileKind.value = value.format === 'password-csv' ? 'passwords' : 'cookies';
   busy.value = true;
   error.value = '';
-  stage.value = 'decrypt';
+  stage.value = 'import-file';
   try {
     const result = await request({ action: 'preview-file', value });
     if (ticket !== sequence || lease !== ownedLease) return;
@@ -360,22 +366,25 @@ const unsubscribe = browserBridge()?.onCredentialProgress((event) => {
 });
 watch(
   [() => store.snapshot?.lease, () => fileMode.value],
-  async ([lease]) => {
-    await cancel();
-    if (!valid() || store.snapshot?.lease !== lease) return;
+  async ([lease, readingFile]) => {
+    const cancellation = cancel();
+    const ticket = sequence;
+    await cancellation;
+    if (!valid() || ticket !== sequence || store.snapshot?.lease !== lease) return;
     ownedLease = lease || '';
     report.value = undefined;
     sources.value = [];
     source.value = '';
     error.value = '';
-    if (!lease || fileMode.value) return;
+    if (!lease || readingFile) return;
     try {
       const result = await request({ action: 'sources' });
+      if (ticket !== sequence || !valid()) return;
       sources.value = result.sources || [];
       source.value =
         sources.value.find((row) => row.id === 'Default')?.id || sources.value[0]?.id || '';
     } catch (failure) {
-      if (valid() && ownedLease === lease) error.value = credentialError(failure);
+      if (valid() && ticket === sequence) error.value = credentialError(failure);
     }
   },
   { immediate: true }

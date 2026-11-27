@@ -2,7 +2,6 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { spawn } from 'node:child_process';
-import { resolveRuntime } from '../backend.js';
 import { productionRustPaths, resolveDesktopBackend } from '../rust-backend.js';
 
 export class QuickGateway {
@@ -63,13 +62,6 @@ export class QuickGateway {
       DEPLOY_CONFIG_DIR: paths.deployDir, LOGS_DIR: paths.logsDir, HOST_WORKSPACES_FILE: paths.registry,
     };
     const rust = resolveDesktopBackend();
-    if (!rust) {
-      const { python, backendDir } = resolveRuntime();
-      return {
-        command: python, cwd: backendDir, env,
-        args: ['-m', 'server.headless_app', '--port', String(this.port), '--path', this.workspacePath, '--thinking-mode'],
-      };
-    }
     const args = ['--workspace', this.workspacePath, '--data-dir', this.dataDir, '--port', String(this.port)];
     if (env.ASTRION_RUST_MODEL_ENDPOINT) {
       args.push('--endpoint', env.ASTRION_RUST_MODEL_ENDPOINT, '--model', env.ASTRION_RUST_MODEL);

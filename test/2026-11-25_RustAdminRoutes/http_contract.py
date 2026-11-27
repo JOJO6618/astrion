@@ -136,6 +136,11 @@ def write_json(path, value):
 
 
 def check(binary, fixture):
+    saved = fixture.data / 'custom_tools/fixture-admin-tool/execution.py'
+    saved.parent.mkdir(parents=True)
+    source = "print('fixture')\n"
+    saved.write_text(source)
+    write_json(saved.parent / 'definition.json', {'id': 'fixture-admin-tool'})
     with fixture.serve(binary, web=True) as origin:
         primary, second = Browser(origin), Browser(origin)
         primary.request('OPTIONS', POLICY, accept_json=False)
@@ -163,27 +168,26 @@ def check(binary, fixture):
         assert effective['ui_blocks']['block_realtime_terminal'] is True
         assert effective['disabled_models'] == ['admin_fixture_model']
         second.request('GET', '/terminal', 403, accept_json=False)
-        primary.request('POST', TOOLS, payload={'id': 'fixture-admin-tool', 'execution_code': "print('fixture')\n"})
-        saved = fixture.data / 'custom_tools/fixture-admin-tool/execution.py'
-        assert saved.read_text() == "print('fixture')\n"
-        assert second.request('GET', EFFECTIVE)['data']['categories']['custom']['tools'] == ['fixture-admin-tool']
-        primary.request('POST', FILE, payload={'id': 'fixture-admin-tool', 'name': 'execution.py', 'content': "print('edited')\n"})
-        assert primary.request('GET', TOOLS)['data'][0]['execution_code'] == "print('fixture')\n"
-        primary.request('POST', TOOLS + '/reload')
-        headers, content = primary.request('GET', FILE + '?id=fixture-admin-tool&name=execution.py', accept_json=False)
-        assert headers['Content-Type'].startswith('text/plain') and content == b"print('edited')\n"
-        primary.request('GET', FILE + '?id=fixture-admin-tool&name=..%2F..%2Fadmin_policy.json', 400)
+        assert 'custom' not in effective['categories']
+        for method, path in (
+            ('GET', '/admin/custom-tools'),
+            ('GET', TOOLS),
+            ('POST', TOOLS),
+            ('DELETE', TOOLS + '?id=fixture-admin-tool'),
+            ('GET', FILE + '?id=fixture-admin-tool&name=execution.py'),
+            ('POST', FILE),
+            ('POST', TOOLS + '/reload'),
+        ):
+            primary.request(method, path, 404, accept_json=False)
+        assert saved.read_text() == source
     with fixture.serve(binary, web=True) as origin:
         browser = Browser(origin)
         browser.login()
         assert not browser.request('GET', STATUS)['verified']
         browser.request('GET', '/terminal', 403, accept_json=False)
         browser.verify()
-        assert browser.request('GET', TOOLS)['data'][0]['execution_code'] == "print('edited')\n"
-        browser.request('DELETE', TOOLS + '?id=fixture-admin-tool', 403, csrf=False)
-        browser.request('DELETE', TOOLS + '?id=fixture-admin-tool')
-        assert not saved.exists()
-        assert browser.request('GET', TOOLS)['data'] == []
+        browser.request('GET', TOOLS, 404, accept_json=False)
+        assert saved.read_text() == source
     with fixture.serve(binary, web=False) as origin:
         browser = Browser(origin)
         for path in (EFFECTIVE, POLICY, STATUS, VERIFY, TOOLS, FILE, TOOLS + '/reload'):
@@ -196,7 +200,7 @@ def main():
     binary = parser.parse_args().binary.resolve(strict=True)
     with tempfile.TemporaryDirectory(prefix='admin-http-', dir=HERE) as temporary:
         check(binary, Instance(Path(temporary)))
-    print('PASS: Host Web administrator API, cookie-bound verification, CSRF, terminal policy, tool persistence and headless exclusion')
+    print('PASS: Host administrator policy, secondary verification, CSRF, retired tool routes and data retention')
 
 
 if __name__ == '__main__':

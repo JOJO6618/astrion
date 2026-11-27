@@ -56,7 +56,6 @@ elif sys.argv[1] == 'build-production-probe':
 elif sys.argv[1] == 'test-ai-native':
     probe_root = ARTIFACTS / ('ai-run-' + str(time.time_ns()))
     env['ASTRION_BROWSER_PRODUCTION_PROBE_ROOT'] = str(probe_root)
-    env['ASTRION_BROWSER_PROBE_PYTHON'] = sys.executable
     executable = ROOT / 'desktop/src-tauri/target/debug/astrion-browser-production-probe.exe'
     code = run([executable, '--ai'], ARTIFACTS / 'ai-native.log', 500)
     if code:
@@ -74,9 +73,6 @@ elif sys.argv[1] == 'test-ai-backend':
 elif sys.argv[1] == 'run-production-probe':
     probe_root = ARTIFACTS / ('production-run-' + str(time.time_ns()))
     env['ASTRION_BROWSER_PRODUCTION_PROBE_ROOT'] = str(probe_root)
-    env['ASTRION_BROWSER_PROBE_PYTHON'] = sys.executable
-    from import_fixture import create
-    env['LOCALAPPDATA'] = str(create(probe_root))
     executable = ROOT / 'desktop/src-tauri/target/debug/astrion-browser-production-probe.exe'
     for phase in ('write', 'read'):
         code = run([executable, '--' + phase], ARTIFACTS / ('production-' + phase + '.log'), 100)
@@ -89,8 +85,6 @@ elif sys.argv[1] == 'run-production-probe':
         assert data['pixels']['holeShowsMain'] and data['pixels']['outsideShowsPage'], data['pixels']
         print('PASS verbatim production browser module:', phase)
     (ARTIFACTS / 'production-latest.json').write_text(json.dumps({'root': str(probe_root)}, indent=2), encoding='utf-8')
-elif sys.argv[1] == 'test-import':
-    sys.exit(run([sys.executable, '-B', TEST / 'test_chrome_import.py', '-v'], ARTIFACTS / 'import-tests.log', 120))
 elif sys.argv[1] == 'test-ui':
     sys.exit(run(['node', TEST / 'test_ui.cjs'], ARTIFACTS / 'ui-tests.log', 120))
 elif sys.argv[1] in ('format-ui', 'lint-ui'):
@@ -108,12 +102,11 @@ elif sys.argv[1] == 'frontend':
     sys.exit(run(['cmd.exe', '/d', '/c', 'npm run build --silent'], ARTIFACTS / 'frontend-build.log', 1800))
 elif sys.argv[1] in ('check-native', 'test-native', 'format-native', 'build-native'):
     action = sys.argv[1]
-    manifest = ROOT / 'desktop/src-tauri/Cargo.toml'
     if action == 'format-native':
         files = sorted((ROOT / 'desktop/src-tauri/src/browser').glob('*.rs'))
         sys.exit(run([CARGO.parent / 'rustfmt.exe', '--edition', '2021', *files], ARTIFACTS / 'native-format.log'))
     args = {'check-native': ['check'], 'test-native': ['test'], 'build-native': ['build']}[action]
-    args += ['--offline', '--manifest-path', manifest]
+    args += ['--offline', '--manifest-path', TEST / 'production-probe/Cargo.toml']
     if action == 'test-native':
         args += ['browser', '--', '--test-threads=1']
     sys.exit(run([CARGO, *args], ARTIFACTS / (action + '.log'), 1800))

@@ -51,13 +51,6 @@ pub(super) fn write(dir: &Dir, name: &str, content: &[u8]) -> io::Result<()> {
     publish(dir, name, content, exists)
 }
 
-pub(super) fn remove(dir: &Dir, name: &str) -> io::Result<()> {
-    match dir.remove_file(name) {
-        Err(error) if error.kind() == ErrorKind::NotFound => Ok(()),
-        result => result,
-    }
-}
-
 pub(super) fn pretty(value: &Value) -> io::Result<Vec<u8>> {
     Ok(serde_json::to_vec_pretty(value)?)
 }

@@ -2,6 +2,22 @@
 // 规范见 doc/frontend/i18n_spec.md。由迁移任务填充，en-US 同名文件必须保持 key 完全一致（tsc 强制）。
 export default {
   gateDescription: '请输入管理员二级密码后继续配置策略。',
+  gate: {
+    notConfiguredTitle: '尚未设置二级密码',
+    notConfiguredDesc: '策略配置由管理员二级密码保护。',
+    step1Text:
+      '在装有 Node.js 的终端运行命令，输入密码并回车，然后按 Ctrl+D（Windows 按 Ctrl+Z 后回车）。',
+    step2TextPre: '将输出写入 settings.json 的',
+    step2TextPost: '段：',
+    step3Text: '重启服务，然后点击下方「重新检测」。',
+    recheck: '重新检测',
+    rechecking: '检测中...',
+    title: '请输入管理员二级密码',
+    passwordPlaceholder: '二级密码',
+    verifying: '校验中...',
+    confirmEnter: '确认进入',
+    defaultDescription: '为保护敏感数据，需二级校验后查看。'
+  },
   title: '管理员策略配置',
   subtitle: '控制工具分类、模型与前端功能禁用。最新保存：{time}',
   load: '载入',
@@ -14,9 +30,8 @@ export default {
   catForced: '强制状态',
   tableActions: '操作',
   selectTools: '选择工具',
-  toolSearchPlaceholder: '搜索或添加工具 ID',
+  toolSearchPlaceholder: '搜索工具 ID',
   noMatchingTool: '未找到匹配的工具',
-  addCustomToolWith: '添加自定义工具 “{id}”',
   enabledOn: '开',
   enabledOff: '关',
   forcedNone: '不强制',

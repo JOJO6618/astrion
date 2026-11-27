@@ -13,17 +13,13 @@
 
 identifier 与正式版不同是刻意的：相同 identifier 时 Tauri 的单实例锁会让测试版直接激活正式版窗口。代价是两个进程可以并存，所以必须靠启动器拦一道——**同一份数据目录只能有一个写者**（AGENTS §12 单写者不变量）。
 
-## 构建与校验
+## 已有测试包校验
 
 ```cmd
-python test\2026-11-10_Windows共用数据测试包\package.py build
-python test\2026-11-10_Windows共用数据测试包\package.py assemble
 python test\2026-11-10_Windows共用数据测试包\package.py smoke
 ```
 
-- `build`：`desktop/scripts/prepare_backend.py` staging 后端 → `tauri build --debug --no-bundle --features browser-test --config windows-shared.conf.json`，成功后把源码输入的哈希与 exe 哈希写进 `_experiments/windows-shared-test-20261110/build-success.json`。
-- `assemble`：校验 receipt 与当前源码一致才落盘到 `output/Astrion-Windows-Shared-Test-20261110/`；同时检查打包内容不含 `.env`/`secrets.json`/`providers.json`/`host_api_token`/`passwords.dpapi`，并按 `static/dist/.vite/manifest.json` 核对前端资源齐全。
-- `smoke`：用**临时隔离数据根**启动包内 exe，验健康检查、前端资源、browser 工具能力、原生窗口可见、关闭按钮与后端回收。**不会**读写共用数据目录。
+构建和组装入口已随 Tauri 退役。冒烟脚本用临时隔离数据根启动已有包，验证健康检查、前端资源、浏览器工具、原生窗口、关闭按钮与后端回收。
 
 ## 本轮结果（2026-11-10）
 

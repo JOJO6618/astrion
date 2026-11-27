@@ -4,7 +4,6 @@
 mod policy;
 mod secondary;
 mod store;
-mod tools;
 
 use std::{
     io,
@@ -14,14 +13,12 @@ use std::{
 
 use axum::{
     Extension, Json, Router,
-    body::Bytes,
-    extract::{Query, Request, State, rejection::JsonRejection},
+    extract::{Request, State, rejection::JsonRejection},
     http::{HeaderValue, StatusCode, header},
     middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::{get, options, post},
 };
-use serde::Deserialize;
 use serde_json::{Value, json};
 
 use crate::{
@@ -31,13 +28,6 @@ use crate::{
 
 use policy::Policy;
 use secondary::Secondary;
-use tools::ToolRegistry;
-
-pub(crate) fn runtime_custom_tools(data: &std::path::Path) -> io::Result<Vec<Value>> {
-    ToolRegistry::for_host(data)?
-        .model_tools()
-}
-
 
 type Result<T> = std::result::Result<T, AdminError>;
 type Payload = std::result::Result<Json<Value>, JsonRejection>;
@@ -49,34 +39,21 @@ struct AdminState {
     catalog: CatalogSource,
     policy: Policy,
     secondary: Secondary,
-    tools: ToolRegistry,
 }
 
 impl AdminRoutes {
-    pub fn for_host(catalog: CatalogSource) -> io::Result<Self> {
-        let data = catalog.host_data_dir();
-        let secondary = Secondary::for_host(data);
-        let tools = ToolRegistry::for_host(data)?;
-        Ok(Self(Arc::new(AdminState {
+    pub fn for_host(catalog: CatalogSource) -> Self {
+        let secondary = Secondary::for_host(catalog.host_data_dir());
+        Self(Arc::new(AdminState {
             catalog,
             policy: Policy::default(),
             secondary,
-            tools,
-        })))
+        }))
     }
 
     pub fn router(&self, auth: &WebAuth) -> Router {
         let protected = Router::new()
             .route("/api/admin/policy", get(describe_policy).post(save_policy))
-            .route(
-                "/api/admin/custom-tools",
-                get(list_tools).post(upsert_tool).delete(delete_tool),
-            )
-            .route(
-                "/api/admin/custom-tools/file",
-                get(read_tool_file).post(write_tool_file),
-            )
-            .route("/api/admin/custom-tools/reload", post(reload_tools))
             .route_layer(middleware::from_fn_with_state(
                 self.clone(),
                 require_secondary,
@@ -95,12 +72,6 @@ impl AdminRoutes {
             ("/api/admin/policy", "GET, HEAD, POST, OPTIONS"),
             ("/api/admin/secondary/status", "GET, HEAD, OPTIONS"),
             ("/api/admin/secondary/verify", "POST, OPTIONS"),
-            (
-                "/api/admin/custom-tools",
-                "GET, HEAD, POST, DELETE, OPTIONS",
-            ),
-            ("/api/admin/custom-tools/file", "GET, HEAD, POST, OPTIONS"),
-            ("/api/admin/custom-tools/reload", "POST, OPTIONS"),
         ] {
             preflight = preflight.route(
                 path,
@@ -177,14 +148,9 @@ async fn verify_secondary(
 async fn effective_policy(State(admin): State<AdminRoutes>) -> Result<Json<Value>> {
     blocking(move || {
         let state = &admin.0;
-        let custom_ids = state.tools.ids()?;
         state
             .policy
-            .effective(
-                state.catalog.host_data_dir(),
-                &state.catalog.load(),
-                &custom_ids,
-            )
+            .effective(state.catalog.host_data_dir(), &state.catalog.load())
             .map(Json)
     })
     .await
@@ -193,14 +159,9 @@ async fn effective_policy(State(admin): State<AdminRoutes>) -> Result<Json<Value
 async fn describe_policy(State(admin): State<AdminRoutes>) -> Result<Json<Value>> {
     blocking(move || {
         let state = &admin.0;
-        let custom_ids = state.tools.ids()?;
         state
             .policy
-            .describe(
-                state.catalog.host_data_dir(),
-                &state.catalog.load(),
-                &custom_ids,
-            )
+            .describe(state.catalog.host_data_dir(), &state.catalog.load())
             .map(Json)
     })
     .await
@@ -220,98 +181,6 @@ async fn save_policy(State(admin): State<AdminRoutes>, payload: Payload) -> Resu
             .map(Json)
     })
     .await
-}
-
-async fn list_tools(State(admin): State<AdminRoutes>) -> Result<Json<Value>> {
-    blocking(move || admin.0.tools.list().map(Json)).await
-}
-
-async fn upsert_tool(State(admin): State<AdminRoutes>, payload: Payload) -> Result<Json<Value>> {
-    let payload = payload_object(payload)?;
-    blocking(move || admin.0.tools.upsert(&payload).map(Json)).await
-}
-
-#[derive(Default, Deserialize)]
-struct ToolQuery {
-    id: Option<String>,
-    name: Option<String>,
-}
-
-impl ToolQuery {
-    fn delete_id(&self, body: &Value) -> Result<String> {
-        self.id
-            .as_deref()
-            .filter(|id| !id.is_empty())
-            .or_else(|| store::nonempty(&body["id"]))
-            .map(str::to_owned)
-            .ok_or_else(|| AdminError::bad("Missing id"))
-    }
-
-    fn file(&self, body: &Value) -> Result<(String, String)> {
-        let field = |query: Option<&str>, key| {
-            query
-                .filter(|value| !value.is_empty())
-                .map(str::to_owned)
-                .or_else(|| store::nonempty(&body[key]).map(str::to_owned))
-        };
-        field(self.id.as_deref(), "id")
-            .zip(field(self.name.as_deref(), "name"))
-            .ok_or_else(|| AdminError::bad("Missing id or name"))
-    }
-}
-
-async fn delete_tool(
-    State(admin): State<AdminRoutes>,
-    Query(query): Query<ToolQuery>,
-    bytes: Bytes,
-) -> Result<Json<Value>> {
-    let body = if query.id.as_deref().is_none_or(str::is_empty) && !bytes.is_empty() {
-        serde_json::from_slice(&bytes).map_err(|_| AdminError::bad("Invalid JSON"))?
-    } else {
-        Value::Null
-    };
-    let id = query.delete_id(&body)?;
-    blocking(move || admin.0.tools.delete(&id).map(Json)).await
-}
-
-async fn read_tool_file(
-    State(admin): State<AdminRoutes>,
-    Query(query): Query<ToolQuery>,
-) -> Result<String> {
-    let (id, name) = query.file(&Value::Null)?;
-    blocking(move || {
-        admin
-            .0
-            .tools
-            .file(&id, &name, None)?
-            .ok_or_else(|| AdminError::missing("File not found"))
-    })
-    .await
-}
-
-async fn write_tool_file(
-    State(admin): State<AdminRoutes>,
-    Query(query): Query<ToolQuery>,
-    payload: Payload,
-) -> Result<Json<Value>> {
-    let payload = payload_object(payload)?;
-    let (id, name) = query.file(&payload)?;
-    blocking(move || {
-        let content = if payload["content"].is_null() {
-            ""
-        } else {
-            payload["content"]
-                .as_str()
-                .ok_or_else(|| AdminError::bad("Invalid file content"))?
-        };
-        admin.0.tools.file(&id, &name, Some(content))?;
-        Ok(Json(json!({"success": true})))
-    })
-    .await
-}
-
-async fn reload_tools(State(admin): State<AdminRoutes>) -> Result<Json<Value>> {
-    blocking(move || admin.0.tools.reload().map(Json)).await
 }
 
 fn payload_object(payload: Payload) -> Result<Value> {
@@ -336,9 +205,6 @@ struct AdminError(StatusCode, &'static str);
 impl AdminError {
     fn bad(message: &'static str) -> Self {
         Self(StatusCode::BAD_REQUEST, message)
-    }
-    fn missing(message: &'static str) -> Self {
-        Self(StatusCode::NOT_FOUND, message)
     }
     fn unavailable() -> Self {
         Self(

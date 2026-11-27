@@ -98,6 +98,7 @@ if (['darwin', 'win32'].includes(process.platform)) {
     // 能力标记：本壳支持「跟随智能体」（AI 操作哪个标签，用户视图就跟到哪个）。
     followAi: true,
     credentialFileImport: process.platform === 'win32',
+    credentialHistoryOnly: process.platform === 'win32',
     connect: (scope, labels) => ipcRenderer.invoke('browser:connect', scope, labels),
     openConversationLink: url => ipcRenderer.invoke('browser:open-conversation-link', url),
     theme: theme => ipcRenderer.send('browser:theme', theme),

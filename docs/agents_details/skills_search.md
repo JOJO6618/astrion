@@ -28,7 +28,7 @@
 
 ## 注册清单（新增／改名时同步）
 
-- `core/tool_config.py` 的 `skills` 类别（同时使保留名生效，`custom_tool_registry._RESERVED_TOOLS` 由类别自动派生）。
+- 工具设置中的 `skills` 类别负责技能工具的启用状态。
 - 上下文 formatter：`utils/tool_result_formatter/dispatch.py`；子通信 formatter：`modules/sub_agent/toolkit.py::_format_tool_result`。
 - i18n：`modules/i18n_messages/tools_read.py`（`tools_read.skills_*`）、`tools_execution.py`（`tools_exec.search_skills_needs_keywords`）。
 - 前端：`toolRenderers.ts::renderSearchSkills`、`subAgentToolText.ts`、`MinimalBlocks.vue`（归入 `search` 摘要）、`chatDisplay.ts` 四态、`icons.ts`、`avatarFace.ts`、`stores/monitor.ts`；文案 `toolResults.*.searchSkills`、`toolResults.counts.skillHits`、`toolResults.sentences.noMatchesSkill`、`quickdock.toolSearchSkills`（中英双语）。

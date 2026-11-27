@@ -9,6 +9,27 @@ use uuid::Uuid;
 
 pub const USAGE: &str = "astrion-headless --workspace DIR --data-dir DATA_DIR [--web --static-root DIR --bind IP] [--endpoint MODEL_URL --model NAME] [--port PORT]\nDATA_DIR is the existing Astrion host/data directory. Optional provider credential: ASTRION_MODEL_API_KEY.";
 
+pub fn configure_password() -> io::Result<()> {
+    let mut args = env::args_os().skip(2);
+    let mut directory = None;
+    let mut password = None;
+    let usage = || io::Error::other("host-password --password VALUE [--data-dir DIR]");
+    while let Some(arg) = args.next() {
+        match arg.to_str() {
+            Some("--data-dir") if directory.is_none() => directory = Some(PathBuf::from(args.next().ok_or_else(usage)?)),
+            Some("--password") if password.is_none() => password = args.next().and_then(|p| p.into_string().ok()),
+            _ => return Err(usage()),
+        }
+    }
+    let password = password.ok_or_else(usage)?;
+    let directory = match directory {
+        Some(dir) => dir,
+        None => astrion_headless::catalog::CatalogSource::from_environment(&env::current_dir()?)
+            .map_err(io::Error::other)?.host_data_dir().to_owned(),
+    };
+    astrion_headless::web_auth::set_host_password(&directory, &password)
+}
+
 pub struct Launch {
     pub workspace: PathBuf,
     pub data: PathBuf,

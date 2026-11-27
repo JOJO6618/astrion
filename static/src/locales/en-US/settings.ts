@@ -17,7 +17,6 @@ export default {
   groupAgents: 'Agents',
   groupInterface: 'Interface',
   groupAccount: 'Account',
-  groupAdmin: 'Administration',
 
   // ── Nav items ──
   navProviders: 'Providers',
@@ -89,7 +88,6 @@ export default {
   navUsage: 'Usage',
   navStorage: 'Storage',
   navAppearance: 'Appearance',
-  navAdmin: 'Admin',
 
   // ── Section page headers (title + description) ──
   providersTitle: 'Providers',
@@ -181,7 +179,6 @@ export default {
   usageTitle: 'Usage',
   storageTitle: 'Storage',
   appearanceTitle: 'Appearance',
-  adminTitle: 'Admin',
 
   // ── Card titles ──
   cardAppearanceTheme: 'Theme & language',

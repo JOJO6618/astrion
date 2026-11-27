@@ -8,7 +8,7 @@ import { readFile } from 'node:fs/promises';
 import { closeSync, existsSync, lstatSync, openSync, mkdirSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { basename, isAbsolute, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { spawn, execFileSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { createConnection } from 'node:net';
 import { setTimeout as delay } from 'node:timers/promises';
 import type { ToolApprovalItem } from './approval';
@@ -19,12 +19,11 @@ const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const DEFAULT_DATA_ROOT = resolve(homedir(), '.astrion/astrion');
 
 export function cliExperiment(): boolean {
-  return cliBackend() === 'rust' && process.env.ASTRION_RUST_EXPERIMENT === '1';
+  return !pairedGateway() && process.env.ASTRION_RUST_EXPERIMENT === '1';
 }
 
-function cliBackend(): string {
-  if (process.env.ASTRION_CLI_BACKEND) return process.env.ASTRION_CLI_BACKEND;
-  return process.env.ASTRION_API_BASE || process.env.ASTRION_HOST_TOKEN_FILE ? 'python' : 'rust';
+function pairedGateway(): boolean {
+  return Boolean(process.env.ASTRION_API_BASE || process.env.ASTRION_HOST_TOKEN_FILE);
 }
 
 export function cliConfigRoot(): string | null {
@@ -105,31 +104,6 @@ function portIsUnbound(port: number): Promise<boolean> {
   });
 }
 
-/** 探测能跑后端的 python 解释器：依次试候选，能 import 服务端关键依赖（yaml/flask）才用；
- *  全部失败时退回第一个存在的候选（让启动日志留下真实报错，而不是 CLI 侧静默）。 */
-function pickPython(repoRoot: string): string {
-  const candidates = [
-    resolve(repoRoot, '.venv/bin/python'),
-    '/opt/homebrew/bin/python3.12',
-    '/opt/homebrew/bin/python3.11',
-    '/usr/local/bin/python3.12',
-    '/usr/local/bin/python3.11',
-    'python3',
-  ];
-  let firstExisting = '';
-  for (const bin of candidates) {
-    if (bin.startsWith('/') && !existsSync(bin)) continue;
-    if (!firstExisting) firstExisting = bin;
-    try {
-      execFileSync(bin, ['-c', 'import yaml, flask'], { stdio: 'ignore' });
-      return bin;
-    } catch {
-      // 缺依赖，试下一个
-    }
-  }
-  return firstExisting || 'python3';
-}
-
 export interface WorkspaceItem {
   workspace_id: string;
   label: string;
@@ -154,18 +128,20 @@ export class GatewayClient {
   readonly baseUrl: string;
   private token = '';
   private tokenPath: string | null;
-  private readonly backend = cliBackend();
+  private readonly paired = pairedGateway();
   private readonly port: number;
   private readonly explicitToken = process.env.ASTRION_HOST_TOKEN_FILE;
   /** cwd 绑定的工作区 id（boot 确定后写入，后续请求自动携带） */
   workspaceId = '';
 
   constructor() {
-    const rust = this.backend === 'rust';
+    if (process.env.ASTRION_CLI_BACKEND && process.env.ASTRION_CLI_BACKEND !== 'rust') {
+      throw new GatewayError('Astrion CLI requires the Rust backend');
+    }
     const defaultPort = cliExperiment() ? RUST_PORT : process.env.WEB_SERVER_PORT || DEFAULT_PORT;
     this.port = Number(process.env.ASTRION_API_PORT || defaultPort);
-    this.baseUrl = (!rust && process.env.ASTRION_API_BASE) || `http://127.0.0.1:${this.port}`;
-    this.tokenPath = rust ? null : (this.explicitToken || resolve(cliDataDir() || resolve(DEFAULT_DATA_ROOT, 'host/data'), 'host_api_token'));
+    this.baseUrl = process.env.ASTRION_API_BASE || `http://127.0.0.1:${this.port}`;
+    this.tokenPath = !this.paired ? null : (this.explicitToken || resolve(cliDataDir() || resolve(DEFAULT_DATA_ROOT, 'host/data'), 'host_api_token'));
   }
 
   /** 读取 host Bearer token；文件不存在 = 服务未启动或非 host 模式 */
@@ -190,25 +166,12 @@ export class GatewayClient {
    */
   async ensureRunning(cwd: string, onPhase?: (phase: 'connecting' | 'starting') => void): Promise<void> {
     onPhase?.('connecting');
-    if (this.backend === 'rust') return this.ensureRustRunning(cwd, onPhase);
-    if (this.backend !== 'python') throw new GatewayError('ASTRION_CLI_BACKEND must be python or rust');
+    if (!this.paired) return this.ensureRustRunning(cwd, onPhase);
     if (await this.readToken()) {
-      try {
-        await this.listWorkspaces();
-        return;
-      } catch {
-        // token 失效或服务未就绪，进入后续流程
-      }
+      try { await this.listWorkspaces(); return; } catch { /* Server may still be starting. */ }
     }
-    const alive = await this.probeAlive();
-    if (!alive) {
-      // An explicitly paired instance owns its credential and lifecycle.
-      if (this.explicitToken || process.env.ASTRION_API_BASE)
-        throw new GatewayError(`connect_failed: ${this.baseUrl}`);
-      onPhase?.('starting');
-      this.spawnServer(cwd);
-    }
-    const deadline = Date.now() + (alive ? 4_000 : 30_000);
+    if (!await this.probeAlive()) throw new GatewayError(`connect_failed: ${this.baseUrl}`);
+    const deadline = Date.now() + 4_000;
     while (Date.now() < deadline) {
       if (await this.readToken()) {
         try {
@@ -220,7 +183,7 @@ export class GatewayClient {
       }
       await new Promise((r) => setTimeout(r, 500));
     }
-    throw new GatewayError(alive ? 'stale_server' : 'start_timeout');
+    throw new GatewayError('stale_server');
   }
 
   private async probeRust(starting = false): Promise<number | null> {
@@ -245,9 +208,6 @@ export class GatewayClient {
   }
 
   private async ensureRustRunning(cwd: string, onPhase?: (phase: 'starting') => void): Promise<void> {
-    if (process.env.ASTRION_API_BASE || this.explicitToken) {
-      throw new GatewayError('Use ASTRION_API_PORT for self-started Rust, or unset ASTRION_CLI_BACKEND and pair an existing server with ASTRION_API_BASE and ASTRION_HOST_TOKEN_FILE');
-    }
     if (!Number.isInteger(this.port) || this.port < 1024 || this.port > 65535) throw new GatewayError('Invalid ASTRION_API_PORT');
     const experimental = cliExperiment();
     const root = experimental ? rustExperimentRoot() : cliConfigRoot()!;
@@ -327,43 +287,6 @@ export class GatewayClient {
       return true;
     } catch {
       return false;
-    }
-  }
-
-  /** CLI 自启动后端（detached + unref；走 headless 入口，只挂 Gateway/任务/审批等运行时蓝图，
-   *  不拉起 web 站点路由面；显式 --port 避免默认端口歧义）
-   *  python 解释器做依赖探测（import yaml/flask 通过才用）——本机 .venv 缺 yaml 会启动即崩；
-   *  输出落日志文件便于诊断启动失败。 */
-  private spawnServer(cwd: string): void {
-    // cli/src → 项目根；fileURLToPath 正确解码中文路径（new URL().pathname 会留下
-    // 百分号编码，导致 existsSync 永远 false、spawn cwd 无效——中文路径必用此函数）
-    const repoRoot = REPO_ROOT;
-    const port = this.port;
-    const pythonBin = pickPython(repoRoot);
-    const logDir = configuredPath('LOGS_DIR') || resolve(cliConfigRoot() || DEFAULT_DATA_ROOT, 'host/logs');
-    try {
-      mkdirSync(logDir, { recursive: true });
-      const logFd = openSync(resolve(logDir, 'cli_spawned_server.log'), 'a');
-      const child = spawn(
-        pythonBin,
-        ['-m', 'server.headless_app', '--path', cwd, '--port', String(port), '--thinking-mode'],
-        {
-          cwd: repoRoot,
-          env: {
-            ...process.env,
-            TERMINAL_SANDBOX_MODE: 'host',
-            HOST_PROJECT_PATH: cwd,
-            WEB_SERVER_PORT: String(port),
-            AGENTS_CLI_STARTED_SERVER: '1',
-          },
-          detached: true,
-          stdio: ['ignore', logFd, logFd],
-        },
-      );
-      child.on('error', () => {}); // spawn 失败由后续轮询超时统一报错
-      child.unref();
-    } catch {
-      // 同上
     }
   }
 
@@ -514,7 +437,7 @@ export class GatewayClient {
       response = await fetch(`${this.baseUrl}${path}`, {
         method: options.method,
         headers,
-        ...(this.backend === 'rust' && { redirect: 'error' }),
+        redirect: 'error',
         body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
       });
     } catch (err) {

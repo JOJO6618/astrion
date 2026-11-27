@@ -6,18 +6,15 @@ module.exports = {
   productName: 'Astrion',
   copyright: 'Copyright © 2026',
   directories: { output: '../output/windows-electron/build', buildResources: 'build' },
-  files: ['src/**', 'package.json'],
-  asarUnpack: ['src/windows/*.py'],
+  files: ['src/**', '!src/windows/*.py', 'package.json'],
   extraMetadata: { version: release.version, astrionBuildId: buildId },
   extraResources: [
     { from: '../static/src/locales/zh-CN/updatePolicy.json', to: 'update-policy-locales/zh-CN.json' },
     { from: '../static/src/locales/en-US/updatePolicy.json', to: 'update-policy-locales/en-US.json' },
     { from: '.cache/windows-rust-backend', to: 'runtime/rust' },
-    { from: '../desktop/src-tauri/runtime/python', to: 'runtime/python' },
     { from: '.cache/astrion-windows-helper.exe', to: 'astrion-windows-helper.exe' },
     { from: '../desktop/src-tauri/icons/icon.ico', to: 'icon.ico' },
-    { from: '../desktop/browser-migration-extension', to: 'browser-migration-extension' },
-    { from: '../desktop/src-tauri/src/browser/chrome_worker.py', to: 'chrome-import/windows-worker.py' }
+    { from: '../desktop/browser-migration-extension', to: 'browser-migration-extension' }
   ],
   win: {
     icon: '../desktop/src-tauri/icons/icon.ico',

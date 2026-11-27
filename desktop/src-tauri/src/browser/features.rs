@@ -146,14 +146,6 @@ impl Browser {
         }
     }
     pub fn expire(&mut self) {
-        if self
-            .imports
-            .preview
-            .as_ref()
-            .is_some_and(|preview| preview.until <= policy::now())
-        {
-            self.imports.preview = None;
-        }
         let ids: Vec<_> = self
             .permissions
             .iter()

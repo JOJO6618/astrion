@@ -3,7 +3,7 @@
 // 背景（2026-11-22）：产物名带内容哈希（见 vite.config.ts），而 emptyOutDir 为 false，
 // 于是每次构建都只新增文件、从不删除旧文件。实测累积到 107 MB / 1171 个文件，
 // 其中当前 manifest 只引用 152 个（7.4 MB），其余 92.9% 是历史残留；
-// desktop/scripts/prepare_backend.py 又整目录 copytree，导致安装包里多塞近百 MB。
+// 当时的桌面打包会复制整个目录，导致安装包里多塞近百 MB。
 //
 // 本脚本只做“按引用裁剪”，不参与产物生成：
 //   1. 读 static/dist/.vite/manifest.json，递归收集所有可达文件

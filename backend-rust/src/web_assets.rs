@@ -69,7 +69,6 @@ impl WebAssets {
             .route("/workflow/{*name}", page(Page::Main))
             .route("/terminal", page(Page::Terminal))
             .route("/admin/policy", page(Page::AdminPolicy))
-            .route("/admin/custom-tools", page(Page::AdminTools))
             .route("/chrome", page(Page::Chrome))
             .route("/browser-window", page(Page::BrowserWindow))
             .route(
@@ -142,7 +141,6 @@ enum Page {
     Main,
     Terminal,
     AdminPolicy,
-    AdminTools,
     Chrome,
     BrowserWindow,
 }
@@ -217,7 +215,6 @@ async fn show(
         },
         // The verified Host Web session represents the Host administrator.
         Page::AdminPolicy => render(assets, "admin_policy/index.html").await,
-        Page::AdminTools => render(assets, "custom_tools/index.html").await,
         _ => render(assets, "index.html").await,
     }
 }

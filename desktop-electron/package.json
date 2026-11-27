@@ -1,7 +1,7 @@
 {
   "name": "astrion-desktop-electron",
   "private": true,
-  "version": "1.0.0",
+  "version": "0.99.0",
   "description": "Astrion 桌面壳（Electron/Chromium）：内嵌后端与双 WebContentsView 标签条",
   "type": "module",
   "main": "src/main.js",

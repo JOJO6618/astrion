@@ -888,11 +888,6 @@ export function usePersonalizationContext(options: PersonalizationContextOptions
     closeDropdown();
   };
 
-  const openCustomTools = () => {
-    window.open('/admin/custom-tools', '_blank', 'noopener');
-    personalization.closeDrawer();
-  };
-
   // ===== 主题切换 =====
   const { setTheme, loadTheme } = useTheme();
   const themeOptions: Array<{
@@ -1022,7 +1017,6 @@ export function usePersonalizationContext(options: PersonalizationContextOptions
     localeLabel,
     localeOptions,
     minimalExpandHeightLimited,
-    openCustomTools,
     permissionModeLabel,
     personalization,
     projectMemoryInjectLimitMin,

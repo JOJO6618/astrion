@@ -47,6 +47,8 @@ Windows NSIS 自绘按钮可能只暴露 UIAutomation Pane、不支持 InvokePat
 
 小型独立 NSIS 产品使用相同生产钩子但不执行 Electron/helper，只包含少量合成文件，便于先隔离安装逻辑。`nsis_probe.mjs --prepare` 创建两版 payload，然后在 `desktop-electron` 目录分别设置 `ASTRION_NSIS_PROBE_VERSION=0.10.0` / `0.10.1`，执行：
 
+合成文件锁夹具使用测试机的 `python`，可用 `ASTRION_TEST_PYTHON` 指定解释器。
+
 ```cmd
 node node_modules\electron-builder\cli.js --config ..\test\2026-11-13_WindowsElectron\nsis-probe.cjs --prepackaged ..\output\windows-electron\nsis-probe\0.10.0\payload --win --x64 --publish never
 ```

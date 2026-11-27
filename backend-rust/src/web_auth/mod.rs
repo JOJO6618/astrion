@@ -2,6 +2,7 @@
 //! separately with its own authentication and listener policy.
 
 mod credentials;
+pub use credentials::set_host_password;
 mod origin;
 mod sessions;
 

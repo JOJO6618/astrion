@@ -20,7 +20,6 @@ import BrowserTab from './tabs/BrowserTab.vue';
 import SubAgentsTab from './tabs/SubAgentsTab.vue';
 import ReviewAgentsTab from './tabs/ReviewAgentsTab.vue';
 import AppearanceTab from './tabs/AppearanceTab.vue';
-import AdminTab from './tabs/AdminTab.vue';
 import UsageStatsTab from './tabs/UsageStatsTab.vue';
 import StorageTab from './tabs/StorageTab.vue';
 import UiIconButton from '@/components/ui/UiIconButton.vue';
@@ -117,8 +116,7 @@ const SECTION_COMPONENTS: Record<SettingsSection, Component> = {
   browser: BrowserTab,
   'sub-agents': SubAgentsTab,
   'review-agents': ReviewAgentsTab,
-  appearance: AppearanceTab,
-  admin: AdminTab
+  appearance: AppearanceTab
 };
 
 const activeTitleKey = computed(

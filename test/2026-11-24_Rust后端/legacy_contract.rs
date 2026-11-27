@@ -557,6 +557,7 @@ fn python_fixture(root: &Path, project: &Path, conversation_id: &str, action: &s
         .env("DEPLOY_CONFIG_DIR", root.join("python-deploy"))
         .env("HOST_WORKSPACES_FILE", root.join("host_workspaces.json"))
         .args(["-B", "-X", "utf8"])
+        .arg(script.with_file_name("with_legacy_source.py"))
         .arg(script)
         .arg(action)
         .arg(root)
@@ -565,7 +566,7 @@ fn python_fixture(root: &Path, project: &Path, conversation_id: &str, action: &s
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    for key in ["HOME", "USERPROFILE", "SystemRoot", "TMPDIR"] {
+    for key in ["HOME", "USERPROFILE", "SystemRoot", "TMPDIR", "ASTRION_LEGACY_TEST_SOURCE"] {
         if let Some(value) = std::env::var_os(key) {
             command.env(key, value);
         }

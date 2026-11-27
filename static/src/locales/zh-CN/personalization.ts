@@ -534,8 +534,6 @@ export default {
   // ── 管理员 ──
   mcpConfigTitle: 'MCP 服务器管理',
   mcpConfigDesc: '管理智能体可用的 MCP 服务器',
-  customToolsAdminTitle: '自定义工具管理',
-  customToolsAdminDesc: '在线创建和编辑自定义工具',
   open: '打开',
 
   // ── 提示与错误（script：toast/confirm/Error） ──

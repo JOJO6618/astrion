@@ -1,7 +1,7 @@
 # 桌面端更新日志（Windows / Tauri 壳）
 
 > 本文件是 **Windows** 桌面端「软件更新」说明的唯一来源：发布脚本
-> `desktop/scripts/release_win.ps1` 提取顶部小节，上传为 `release-notes-windows.txt`。
+> 以下为旧版 Tauri 的发布记录。当前 Windows 说明由 `desktop-electron/windows-release.json` 维护。
 > **macOS** 桌面端（Electron 壳）自 2026-09-29 起独立维护版本号与日志：
 > `desktop-electron/DESKTOP_CHANGELOG.md`（上传为 `release-notes-macos.txt`）。
 > 0.4.2 是两条线分开维护的起点，此前版本号与日志为两端共用。

@@ -11,7 +11,7 @@ if (process.platform === 'darwin') {
   const installedCargo = path.join(process.env.USERPROFILE || '', '.cargo/bin/cargo.exe');
   const cargo = existsSync(installedCargo) ? installedCargo : 'cargo';
   const target = path.join(desktop, '.cache/windows-native-target');
-  execFileSync(cargo, ['build', '--release', '--manifest-path', path.join(desktop, 'native/windows-helper/Cargo.toml'), '--target-dir', target], { stdio: 'inherit', windowsHide: true });
+  execFileSync(cargo, ['build', '--locked', '--release', '--manifest-path', path.join(desktop, 'native/windows-helper/Cargo.toml'), '--target-dir', target], { stdio: 'inherit', windowsHide: true });
   copyFileSync(path.join(target, 'release/astrion-windows-helper.exe'), path.join(desktop, '.cache/astrion-windows-helper.exe'));
 } else {
   throw new Error(`Desktop native build is unsupported on ${process.platform}; Windows artifacts must be built on Windows.`);

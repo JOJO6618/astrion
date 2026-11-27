@@ -32,8 +32,6 @@ const TEMPLATES: &[&str] = &[
     "browser-window.html",
     "quick.html",
     "admin_policy/index.html",
-    "custom_tools/index.html",
-    "custom_tools/guide.html",
     "voice_test.html",
     "security.js",
     "icons/browser.svg",
@@ -70,8 +68,6 @@ impl Fixture {
             "browserWindow",
             "quick",
             "adminPolicy",
-            "adminCustomTools",
-            "adminCustomToolsGuide",
         ] {
             let script = format!("assets/{name}-hAsH_01-.js");
             let style = format!("assets/{name}-zAsH-01_.css");
@@ -82,11 +78,6 @@ impl Fixture {
                 json!({"file": script, "name": name, "isEntry": true, "css": [style]}),
             );
         }
-        self.write("dist/assets/SecondaryGate-Xzy_01-2.css", b"body {}\n");
-        manifest.insert(
-            "_SecondaryGate.js".to_owned(),
-            json!({"file": "assets/SecondaryGate-Xzy_01-2.js", "css": ["assets/SecondaryGate-Xzy_01-2.css"]}),
-        );
         self.write_json("dist/.vite/manifest.json", Value::Object(manifest));
         self.write(
             "dist/style-a123456789.css",
@@ -239,12 +230,6 @@ async fn real_templates_use_vite_entries_styles_and_assemblies() {
         ("/static/quick.html", "quick", false),
         ("/new", "main", true),
         ("/admin/policy", "adminPolicy", true),
-        ("/admin/custom-tools", "adminCustomTools", true),
-        (
-            "/static/custom_tools/guide.html",
-            "adminCustomToolsGuide",
-            false,
-        ),
     ] {
         let page = html(server.get(path, authenticated).await).await;
         assert!(
@@ -255,9 +240,6 @@ async fn real_templates_use_vite_entries_styles_and_assemblies() {
             !page.contains(&format!("/static/dist/assets/{entry}.js")),
             "{path}"
         );
-        if matches!(path, "/admin/policy" | "/admin/custom-tools") {
-            assert!(page.contains("/static/dist/assets/SecondaryGate-Xzy_01-2.css"));
-        }
     }
     let login = html(server.get("/login", false).await).await;
     assert!(login.contains("/static/dist/assets/login-zAsH-01_.css"));
@@ -302,10 +284,8 @@ async fn known_entry_routes_gate_sessions_and_effective_terminal_policy() {
         "/",
         "/terminal",
         "/admin/policy",
-        "/admin/custom-tools",
         "/static/terminal.html",
         "/static/admin_policy/index.html",
-        "/static/custom_tools/index.html",
     ]) {
         let response = server.get(path, false).await;
         assert_eq!(response.status(), StatusCode::FOUND, "{path}");
@@ -347,8 +327,13 @@ async fn known_entry_routes_gate_sessions_and_effective_terminal_policy() {
             fs::read_to_string(fixture.root.join("terminal.html")).unwrap()
         );
     }
+    fixture.write("custom_tools/index.html", b"old tool management page");
+    fixture.write("custom_tools/guide.html", b"old tool guide");
     for path in [
         "/unknown",
+        "/admin/custom-tools",
+        "/static/custom_tools/index.html",
+        "/static/custom_tools/guide.html",
         "/chat/no-conversation",
         "/chat/conv_20261124_120001_12",
         "/import_012345",
@@ -865,8 +850,6 @@ async fn production_payload_entries_and_all_vite_artifacts_load_over_http() {
         ("/browser-window", false),
         ("/static/quick.html", false),
         ("/admin/policy", true),
-        ("/admin/custom-tools", true),
-        ("/static/custom_tools/guide.html", false),
     ] {
         let page = html(server.get(path, authenticated).await).await;
         assert!(page.contains("/static/dist/assets/"), "{path}");

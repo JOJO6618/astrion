@@ -2,29 +2,27 @@
   <div class="secondary-overlay">
     <!-- 未配置二级密码：设置引导页（verify 恒 401，给输入框是死锁） -->
     <div v-if="!configured" class="secondary-card secondary-card--guide">
-      <h3>{{ $t('adminCustomTools.gate.notConfiguredTitle') }}</h3>
-      <p class="muted">{{ $t('adminCustomTools.gate.notConfiguredDesc') }}</p>
+      <h3>{{ $t('adminPolicy.gate.notConfiguredTitle') }}</h3>
+      <p class="muted">{{ $t('adminPolicy.gate.notConfiguredDesc') }}</p>
       <ol class="guide-steps">
         <li>
-          <span class="step-text">{{ $t('adminCustomTools.gate.step1Text') }}</span>
-          <code class="step-code">{{ $t('adminCustomTools.gate.step1Code') }}</code>
+          <span class="step-text">{{ $t('adminPolicy.gate.step1Text') }}</span>
+          <code class="step-code">{{ passwordHashCommand }}</code>
         </li>
         <li>
           <span class="step-text"
-            >{{ $t('adminCustomTools.gate.step2TextPre') }} <code>admin</code
-            >{{ $t('adminCustomTools.gate.step2TextPost') }}</span
+            >{{ $t('adminPolicy.gate.step2TextPre') }} <code>admin</code
+            >{{ $t('adminPolicy.gate.step2TextPost') }}</span
           >
           <code class="step-code">"admin": { "secondary_password_hash": "pbkdf2:sha256:..." }</code>
         </li>
         <li>
-          <span class="step-text">{{ $t('adminCustomTools.gate.step3Text') }}</span>
+          <span class="step-text">{{ $t('adminPolicy.gate.step3Text') }}</span>
         </li>
       </ol>
       <div class="secondary-actions">
         <button type="button" :disabled="loading" @click="$emit('recheck')">
-          {{
-            loading ? $t('adminCustomTools.gate.rechecking') : $t('adminCustomTools.gate.recheck')
-          }}
+          {{ loading ? $t('adminPolicy.gate.rechecking') : $t('adminPolicy.gate.recheck') }}
         </button>
       </div>
       <p v-if="error" class="secondary-error">{{ error }}</p>
@@ -32,26 +30,22 @@
 
     <!-- 已配置：常规的二级密码输入框 -->
     <div v-else class="secondary-card">
-      <h3>{{ $t('adminCustomTools.gate.title') }}</h3>
-      <p class="muted">{{ description || $t('adminCustomTools.gate.defaultDescription') }}</p>
+      <h3>{{ $t('adminPolicy.gate.title') }}</h3>
+      <p class="muted">{{ description || $t('adminPolicy.gate.defaultDescription') }}</p>
       <input
         class="secondary-input"
         type="password"
         v-model="password"
         :disabled="loading"
-        :placeholder="$t('adminCustomTools.gate.passwordPlaceholder')"
+        :placeholder="$t('adminPolicy.gate.passwordPlaceholder')"
         @keyup.enter="submit"
       />
       <div class="secondary-actions">
         <button type="button" :disabled="loading" @click="submit">
-          {{
-            loading
-              ? $t('adminCustomTools.gate.verifying')
-              : $t('adminCustomTools.gate.confirmEnter')
-          }}
+          {{ loading ? $t('adminPolicy.gate.verifying') : $t('adminPolicy.gate.confirmEnter') }}
         </button>
         <button type="button" class="ghost-btn" :disabled="loading" @click="$emit('recheck')">
-          {{ $t('adminCustomTools.gate.recheck') }}
+          {{ $t('adminPolicy.gate.recheck') }}
         </button>
       </div>
       <p v-if="error" class="secondary-error">{{ error }}</p>
@@ -61,6 +55,8 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
+
+const passwordHashCommand = `node -e "const c=require('node:crypto'); const p=require('node:fs').readFileSync(0,'utf8').trim(); if (!p) process.exit(1); const s=c.randomBytes(16).toString('hex'); console.log(['pbkdf2:sha256:1000000',s,c.pbkdf2Sync(p,s,1000000,32,'sha256').toString('hex')].join(String.fromCharCode(36)))"`;
 
 const props = withDefaults(
   defineProps<{

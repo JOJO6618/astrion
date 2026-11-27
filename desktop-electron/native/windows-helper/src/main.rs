@@ -90,6 +90,8 @@ fn main() {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
     let result = if args.first().is_some_and(|arg| arg == "guard-backend") {
         backend_guardian::run(&args[1..]).map_err(|error| error.to_string())
+    } else if args.len() == 1 && args[0] == "chrome-import" {
+        astrion_windows_helper::chrome_import_main()
     } else {
         args.into_iter()
             .map(|arg| arg.into_string().map_err(|_| "Invalid native helper argument".to_owned()))

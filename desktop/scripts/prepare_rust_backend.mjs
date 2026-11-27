@@ -10,7 +10,7 @@ const catalogSeeds = [
 const staticPayload = [
   'index.html', 'login.html', 'terminal.html', 'chrome.html', 'browser-window.html', 'quick.html',
   'apple-touch-icon.png', 'astrion-avatar.svg', 'favicon-16x16.png', 'favicon-32x32.png', 'security.js',
-  'admin_policy', 'custom_tools', 'icons', 'logo', 'easter-eggs', 'quick-capture', 'vendor', 'dist'
+  'admin_policy', 'icons', 'logo', 'easter-eggs', 'quick-capture', 'vendor', 'dist'
 ];
 
 function verifyAssets(root) {
@@ -49,10 +49,16 @@ export function stageRustResources(destination) {
   for (const name of catalogSeeds) {
     copyPublicTree(path.join(repoRoot, 'config', name), path.join(destination, 'config', name));
   }
-  if (process.platform === 'win32') {
+  if (process.platform === 'win32' || process.platform === 'linux') {
     const scripts = path.join(destination, 'scripts');
     fs.mkdirSync(scripts);
-    copyPublicTree(path.join(repoRoot, 'scripts/setup-wsl-sandbox.ps1'), path.join(scripts, 'setup-wsl-sandbox.ps1'));
+    const setup = process.platform === 'win32' ? 'setup-wsl-sandbox.ps1' : 'setup-linux-sandbox.sh';
+    copyPublicTree(path.join(repoRoot, 'scripts', setup), path.join(scripts, setup));
+  }
+  if (process.platform === 'linux') {
+    const helper = 'astrion-linux-sandbox';
+    copyPublicTree(path.join(repoRoot, 'backend-rust/target/release', helper), path.join(destination, helper));
+    fs.chmodSync(path.join(destination, helper), 0o755);
   }
 }
 

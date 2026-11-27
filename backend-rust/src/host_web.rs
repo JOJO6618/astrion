@@ -183,7 +183,7 @@ pub fn routes(
         .merge(usage::host_router(data, &paths.workspace_config));
     Ok(auth
         .router_with_login(assets.login())
-        .merge(astrion_headless::admin_routes::AdminRoutes::for_host(gateway.catalog.clone())?.router(auth))
+        .merge(astrion_headless::admin_routes::AdminRoutes::for_host(gateway.catalog.clone()).router(auth))
         .merge(client_debug::router(paths.logs.clone()))
         .merge(auth.with_browser_session(pages))
         .merge(auth.protect_api(api)))

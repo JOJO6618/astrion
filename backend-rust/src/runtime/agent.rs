@@ -83,7 +83,7 @@ async fn run_inner(
             messages=compacted;
             budget=RoundBudget::new(None);
         }
-        let tool_menu::ToolMenu {complete_schemas, round_schemas, browser_names, interaction_names, process_names, plugins, disabled, mcp, mcp_snapshot, mut deferred} =
+        let tool_menu::ToolMenu {complete_schemas, round_schemas, browser_names, interaction_names, process_names, disabled, mcp, mcp_snapshot, mut deferred} =
             tool_menu::for_round(runtime, task_id, tools, &model).await?;
         let workflow_prompt = if workflow {
             messages.extend(runtime.drain_sub_agent_notices(task_id, None)?);
@@ -183,7 +183,6 @@ async fn run_inner(
             if is_todo(name) {
                 return arguments.as_object().map(|_| false).ok_or_else(|| format!("Invalid {name} arguments"));
             }
-            if plugins.iter().any(|plugin| plugin.name == name) { return Ok(false); }
             if process_names.contains(name) || interaction_names.contains(name) || browser_names.contains(name) || mcp_snapshot.allows(name) {
                 return Ok(false);
             }
@@ -409,8 +408,6 @@ async fn run_inner(
                 runtime.execute_browser_tool(task_id, &call.id, &call.name, call.arguments, &batch).await?
             } else if process_names.contains(&call.name) {
                 runtime.execute_process_tool(task_id, &call.id, &call.name, call.arguments, &batch).await?
-            } else if let Some(plugin) = plugins.iter().find(|plugin|plugin.name == call.name) {
-                runtime.execute_custom_plugin(task_id,&call.id,plugin,&call.arguments,&batch).await
             } else if let Some(manager) = &mcp && mcp_snapshot.allows(&call.name) {
                 manager.execute(&mcp_snapshot, &call.name, call.arguments).await
             } else if workflow && runtime.validate_sub_agent_tool(&call.name, &call.arguments).is_some() {

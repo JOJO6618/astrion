@@ -20,9 +20,6 @@ const EFFECTIVE: &str = "/api/effective-policy";
 const POLICY: &str = "/api/admin/policy";
 const SECONDARY: &str = "/api/admin/secondary/status";
 const VERIFY: &str = "/api/admin/secondary/verify";
-const TOOLS: &str = "/api/admin/custom-tools";
-const TOOL_FILE: &str = "/api/admin/custom-tools/file";
-const RELOAD: &str = "/api/admin/custom-tools/reload";
 
 struct Fixture {
     root: PathBuf,
@@ -41,12 +38,10 @@ impl Fixture {
         let catalog = CatalogSource::with_paths(&root, &root.join("deploy"), &root);
         let auth = WebAuth::new(WebAuthConfig::new(&root, PORT)).unwrap();
         let secondary = Secondary::from_configuration(&settings, |_| None);
-        let tools = ToolRegistry::open(&root, root.join("custom_tools"), true).unwrap();
         let admin = AdminRoutes(Arc::new(AdminState {
             catalog: catalog.clone(),
             policy: Policy::default(),
             secondary,
-            tools,
         }));
         let app = auth.router().merge(admin.router(&auth));
         Self { root, catalog, app }
@@ -272,13 +267,6 @@ async fn admin_requires_browser_secondary_and_csrf_and_throttles_host() {
     );
     assert_eq!(
         fixture
-            .call(request(Method::POST, RELOAD, None, Some(&first), false))
-            .await
-            .status(),
-        StatusCode::FORBIDDEN
-    );
-    assert_eq!(
-        fixture
             .call(request(Method::GET, "/logout", None, Some(&first), false))
             .await
             .status(),
@@ -391,121 +379,45 @@ async fn saves_python_policy_and_applies_it_to_current_rust_enforcement() {
 }
 
 #[tokio::test]
-async fn manages_the_persisted_custom_tool_registry_and_explicitly_reloads_file_edits() {
+async fn retires_the_custom_tool_routes_and_category_without_rewriting_stored_data() {
     let fixture = Fixture::configured();
     let browser = fixture.login().await;
     fixture.verify(&browser).await;
-    let registered = fixture.json(Method::POST, TOOLS, Some(json!({"id":"fixture-tool","description":"Fixture tool","execution_code":"print('first')\n","return":{"truncate":100},"meta":{"notes":"test"}})), &browser).await;
-    assert_eq!(registered["data"]["execution"]["type"], "python");
     let tool_dir = fixture.root.join("custom_tools/fixture-tool");
-    assert_eq!(
-        fs::read_to_string(tool_dir.join("execution.py")).unwrap(),
-        "print('first')\n"
-    );
-    for name in ["definition.json", "return.json", "meta.json"] {
-        assert!(tool_dir.join(name).is_file());
-    }
-    assert_eq!(
-        fixture.json(Method::GET, EFFECTIVE, None, &browser).await["data"]["categories"]["custom"]
-            ["tools"],
-        json!(["fixture-tool"])
-    );
-    fixture
-        .json(
-            Method::POST,
-            TOOL_FILE,
-            Some(json!({"id":"fixture-tool","name":"execution.py","content":"print('edited')\n"})),
-            &browser,
-        )
-        .await;
-    let response = fixture
-        .call(request(
-            Method::GET,
-            &format!("{TOOL_FILE}?id=fixture-tool&name=execution.py"),
-            None,
-            Some(&browser),
-            false,
-        ))
-        .await;
-    assert_eq!(response.status(), StatusCode::OK);
-    assert!(
-        response.headers()[CONTENT_TYPE]
-            .to_str()
-            .unwrap()
-            .starts_with("text/plain")
-    );
-    assert_eq!(
-        to_bytes(response.into_body(), 1024).await.unwrap(),
-        "print('edited')\n"
-    );
-    assert_eq!(
-        fixture.json(Method::GET, TOOLS, None, &browser).await["data"][0]["execution_code"],
-        "print('first')\n"
-    );
-    fixture.json(Method::POST, RELOAD, None, &browser).await;
-    assert_eq!(
-        fixture.json(Method::GET, TOOLS, None, &browser).await["data"][0]["execution_code"],
-        "print('edited')\n"
-    );
-    let restart =
-        ToolRegistry::open(&fixture.root, fixture.root.join("custom_tools"), true).unwrap();
-    assert_eq!(
-        restart.list().ok().unwrap()["data"][0]["execution_code"],
-        "print('edited')\n"
-    );
-    for path in [
-        format!("{TOOL_FILE}?id=..%2f..&name=execution.py"),
-        format!("{TOOL_FILE}?id=fixture-tool&name=..%2f..%2fadmin_policy.json"),
+    fs::create_dir_all(&tool_dir).unwrap();
+    let source = "print('fixture')\n";
+    fs::write(tool_dir.join("execution.py"), source).unwrap();
+    let definition = json!({"id":"fixture-tool","description":"Fixture tool"}).to_string();
+    fs::write(tool_dir.join("definition.json"), &definition).unwrap();
+    let stored = json!({"global":{
+        "category_overrides":{"custom":{"label":"Custom Tools", "tools":["fixture-tool"]}},
+        "forced_category_states":{"custom":true}
+    }}).to_string();
+    let policy_file = fixture.root.join("admin_policy.json");
+    fs::write(&policy_file, &stored).unwrap();
+    for (method, path) in [
+        (Method::GET, "/api/admin/custom-tools"),
+        (Method::POST, "/api/admin/custom-tools"),
+        (Method::DELETE, "/api/admin/custom-tools"),
+        (Method::GET, "/api/admin/custom-tools/file?id=fixture-tool&name=execution.py"),
+        (Method::POST, "/api/admin/custom-tools/file"),
+        (Method::POST, "/api/admin/custom-tools/reload"),
+        (Method::OPTIONS, "/api/admin/custom-tools/reload"),
     ] {
-        assert_eq!(
-            fixture
-                .call(request(Method::GET, &path, None, Some(&browser), false))
-                .await
-                .status(),
-            StatusCode::BAD_REQUEST
-        );
+        let response = fixture.call(request(method, path, None, Some(&browser), true)).await;
+        assert_eq!(response.status(), StatusCode::NOT_FOUND, "{path}");
     }
-    let reserved = fixture
-        .call(request(
-            Method::POST,
-            TOOLS,
-            Some(json!({"id":"read_file"})),
-            Some(&browser),
-            true,
-        ))
-        .await;
-    assert_eq!(reserved.status(), StatusCode::BAD_REQUEST);
-    #[cfg(unix)]
-    {
-        let outside = fixture.root.join("outside.txt");
-        fs::write(&outside, "untouched").unwrap();
-        fs::remove_file(tool_dir.join("execution.py")).unwrap();
-        std::os::unix::fs::symlink(&outside, tool_dir.join("execution.py")).unwrap();
-        let write = fixture
-            .call(request(
-                Method::POST,
-                TOOL_FILE,
-                Some(json!({"id":"fixture-tool","name":"execution.py","content":"overwrite"})),
-                Some(&browser),
-                true,
-            ))
-            .await;
-        assert_ne!(write.status(), StatusCode::OK);
-        assert_eq!(fs::read_to_string(outside).unwrap(), "untouched");
-    }
-    fixture
-        .json(
-            Method::DELETE,
-            &format!("{TOOLS}?id=fixture-tool"),
-            None,
-            &browser,
-        )
-        .await;
-    assert!(!tool_dir.exists());
-    assert_eq!(
-        fixture.json(Method::GET, TOOLS, None, &browser).await["data"],
-        json!([])
-    );
+    let effective = fixture.json(Method::GET, EFFECTIVE, None, &browser).await;
+    assert!(effective["data"]["categories"].get("custom").is_none());
+    assert!(effective["data"]["forced_category_states"].get("custom").is_none());
+    let described = fixture.json(Method::GET, POLICY, None, &browser).await;
+    assert!(described["defaults"]["categories"].get("custom").is_none());
+    let (categories, _) = crate::web_assets::personalization::runtime_categories(&fixture.root).unwrap();
+    assert!(!categories.iter().any(|category| category["id"] == "custom"));
+    assert!(categories.iter().any(|category| category["id"] == "mcp"));
+    assert_eq!(fs::read_to_string(policy_file).unwrap(), stored);
+    assert_eq!(fs::read_to_string(tool_dir.join("definition.json")).unwrap(), definition);
+    assert_eq!(fs::read_to_string(tool_dir.join("execution.py")).unwrap(), source);
 }
 
 #[tokio::test]

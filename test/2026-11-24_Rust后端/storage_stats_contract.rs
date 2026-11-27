@@ -743,6 +743,7 @@ async fn matches_python_storage_blueprint_on_the_same_fixture() {
         std::env::var_os("ASTRION_STORAGE_STATS_PYTHON").unwrap_or_else(|| "python3".into());
     let output = std::process::Command::new(python)
         .arg("-B")
+        .arg(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../test/2026-11-24_Rust后端/with_legacy_source.py"))
         .arg(
             fixture
                 .root

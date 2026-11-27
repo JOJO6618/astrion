@@ -9,8 +9,6 @@ mod clipboard;
 mod credential_dom;
 mod credentials;
 mod features;
-mod import_commit;
-mod imports;
 mod layout;
 mod manager;
 mod model;
@@ -49,10 +47,6 @@ pub enum Event {
     Tick,
     Retention(u64, Result<Value, String>),
     Page(String, u64, Box<Event>),
-    ImportCookies(String, Result<Vec<Value>, String>),
-    ImportCookieWritten(String, Result<Value, String>),
-    ImportVerified(String, Result<Vec<Value>, String>),
-    ImportStep,
     Command {
         request: Value,
         lease: String,
@@ -93,12 +87,6 @@ pub enum Event {
     ),
     Cdp(String, String, Value),
     Close(String),
-    Worker {
-        request: Value,
-        lease: String,
-        profile: String,
-        result: Result<Value, String>,
-    },
     Clear {
         request: Value,
         lease: String,
@@ -129,7 +117,7 @@ pub fn enqueue(app: &AppHandle, event: Event) {
     }
 }
 fn drain() {
-    // Yield to the Windows message loop between bounded batches (imports/downloads).
+    // Yield to the Windows message loop between bounded batches.
     for _ in 0..32 {
         let event = QUEUE.with(|queue| queue.borrow_mut().pop_front());
         let Some(event) = event else { break };
@@ -156,8 +144,6 @@ pub fn initialize(
     app: &AppHandle,
     origin: String,
     root: PathBuf,
-    python: PathBuf,
-    backend: PathBuf,
 ) -> Result<(), String> {
     let view = app.get_webview("main").ok_or("browser_main_view_missing")?;
     let app = app.clone();
@@ -178,8 +164,6 @@ pub fn initialize(
             app.clone(),
             origin,
             root,
-            python,
-            backend,
             controller.clone(),
         ) {
             Ok(browser) => STATE.with(|state| *state.borrow_mut() = Some(browser)),

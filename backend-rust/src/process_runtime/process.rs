@@ -96,31 +96,21 @@ impl Output {
 
 impl Process {
     pub(super) fn spawn(command: Command, timeout: Option<Duration>, cmd_input: bool) -> io::Result<Arc<Self>> {
-        Self::spawn_with_input(command,timeout,cmd_input,None)
-    }
-
-    pub(super) fn spawn_json(command: Command, timeout: Duration, input: Vec<u8>) -> io::Result<Arc<Self>> {
-        Self::spawn_with_input(command,Some(timeout),false,Some(input))
-    }
-
-    fn spawn_with_input(command: Command, timeout: Option<Duration>, cmd_input: bool, input: Option<Vec<u8>>) -> io::Result<Arc<Self>> {
-        let plugin = input.is_some();
-        let has_input = plugin || timeout.is_none();
         let now = now();
         let (revision, _) = watch::channel(0);
         let shared = Arc::new(Shared {
             state: Mutex::new(State {
                 status: Status::Running, return_code: None, message: None, created_at: now, updated_at: now,
                 finished_at: None, last_output_at: None, last_command: String::new(), command_count: 0,
-                output: Output { bytes: VecDeque::new(), end: 0, limit: if plugin { 512 * 1024 } else if timeout.is_some() { COMMAND_BUFFER } else { TERMINAL_BUFFER } },
-                cancelled: false, input: input.map(VecDeque::from).unwrap_or_default(),
+                output: Output { bytes: VecDeque::new(), end: 0, limit: if timeout.is_some() { COMMAND_BUFFER } else { TERMINAL_BUFFER } },
+                cancelled: false, input: VecDeque::new(),
                 marker: timeout.is_none().then(|| if cmd_input { CMD_READY.as_bytes().to_vec() }
                     else { b"\x1eASTRION_TERMINAL_READY\x1f".to_vec() }),
                 marker_tail: Vec::new(),
             }),
             wake: Condvar::new(), revision,
         });
-        platform::spawn(command, timeout, shared.clone(), has_input)?;
+        platform::spawn(command, timeout, shared.clone(), timeout.is_none())?;
         let process = Arc::new(Self { shared, cmd_input });
         if timeout.is_none() { process.require_terminal_ready()?; }
         Ok(process)

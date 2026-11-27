@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
@@ -19,7 +19,7 @@ const output = path.join(root, 'output/windows-electron');
 mkdirSync(output, { recursive: true });
 const receiptPath = path.join(output, 'build-receipt.json');
 rmSync(receiptPath, { force: true });
-const env = { ...process.env, ASTRION_BUILD_ID: buildId, PYTHONUTF8: '1', ELECTRON_MIRROR: 'https://npmmirror.com/mirrors/electron/' };
+const env = { ...process.env, ASTRION_BUILD_ID: buildId, ELECTRON_MIRROR: 'https://npmmirror.com/mirrors/electron/' };
 const node = process.execPath;
 function run(command, args, cwd = desktop) {
   console.info(`[windows-build] ${path.basename(command)} ${args.join(' ')}`);
@@ -30,12 +30,6 @@ if (!options.has('--skip-frontend') && !env.ASTRION_RUST_STATIC_ROOT) {
   run(process.env.ComSpec || 'C:\\Windows\\System32\\cmd.exe', ['/d', '/s', '/c', 'npm run build --silent'], root);
 }
 if (!options.has('--skip-native')) run(node, [path.join(desktop, 'scripts/build_quick_native.mjs')]);
-
-// The interpreter belongs to the existing private Chrome import worker.
-const chromePython = path.join(root, 'desktop/src-tauri/runtime/python/python.exe');
-if (!existsSync(chromePython)) throw new Error('The private Windows Chrome import interpreter is missing.');
-run(chromePython, ['-I', '-B', '-c', 'from cryptography.hazmat.primitives.ciphers.aead import AESGCM']);
-copyFileSync(chromePython, path.join(path.dirname(chromePython), 'astrion-backend.exe'));
 
 const target = 'x86_64-pc-windows-msvc';
 const cargoTarget = path.resolve(root, env.ASTRION_RUST_CARGO_TARGET_DIR || 'desktop-electron/.cache/windows-rust-target');
@@ -61,11 +55,22 @@ run(node, [builder, '--config', 'electron-builder.win.cjs', '--win', '--x64', '-
 const executable = path.join(output, 'build/win-unpacked/astrion-desktop.exe');
 const resources = path.join(path.dirname(executable), 'resources');
 const backend = path.join(resources, 'runtime/rust/astrion-headless.exe');
+const helper = path.join(resources, 'astrion-windows-helper.exe');
 for (const file of [executable, backend, path.join(resources, 'runtime/rust/scripts/setup-wsl-sandbox.ps1'),
-  path.join(resources, 'runtime/rust/static/dist/.vite/manifest.json'), path.join(resources, 'astrion-windows-helper.exe')]) {
+  path.join(resources, 'runtime/rust/static/dist/.vite/manifest.json'), helper,
+  path.join(resources, 'browser-migration-extension/manifest.json')]) {
   if (!statSync(file).isFile()) throw new Error(`Required Windows package file is missing: ${file}`);
 }
-if (existsSync(path.join(resources, 'runtime/backend'))) throw new Error('Unexpected legacy Python Host backend in the Windows package.');
+for (const relative of ['runtime/backend', 'runtime/python', 'chrome-import']) {
+  if (existsSync(path.join(resources, relative))) throw new Error(`Unexpected legacy resource in the Windows package: ${relative}`);
+}
+const chromeProbe = JSON.parse(execFileSync(helper, ['chrome-import'], {
+  input: JSON.stringify({ action: 'preview-file', value: { format: 'password-csv', content: 'url,username,password\r\n' } }),
+  encoding: 'utf8', windowsHide: true, timeout: 10000
+}));
+if (chromeProbe.ok !== true || chromeProbe.value?.stats.passwords.read !== 0) {
+  throw new Error('The Windows package is missing a working Chrome import helper.');
+}
 const release = JSON.parse(readFileSync(path.join(desktop, 'windows-release.json'), 'utf8'));
 const receipt = {
   version: release.version,

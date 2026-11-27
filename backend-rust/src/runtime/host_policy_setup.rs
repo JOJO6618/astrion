@@ -183,20 +183,21 @@ impl Setup {
 
 #[cfg(target_os = "linux")]
 fn linux_installer(resources: &std::path::Path) -> Option<Installer> {
+    use astrion_linux_sandbox::linux::config::{EXECUTABLE_NAME, ordinary_user, trusted_path};
     use std::{fs, os::unix::fs::MetadataExt, path::Path, process::Command};
 
-    if unsafe { libc::getuid() == 0 } { return None; }
+    if !ordinary_user() { return None; }
     let root = resources.canonicalize().ok()?;
-    let trusted = |path: &Path| fs::symlink_metadata(path).ok().is_some_and(|metadata| {
-        !metadata.is_symlink() && metadata.uid() == 0 && metadata.mode() & 0o022 == 0
-    });
     let script = root.join("scripts/setup-linux-sandbox.sh");
-    let support = root.join("modules/linux_sandbox");
-    if !script.is_file() || !root.ancestors().all(trusted)
-        || ![script.as_path(), script.parent()?, support.as_path(), support.parent()?].into_iter().all(trusted)
-        || !fs::read_dir(&support).ok()?.all(|entry| entry.is_ok_and(|entry| trusted(&entry.path())))
-        || !Path::new("/usr/bin/sudo").is_file()
-    {
+    let staged = root.join(EXECUTABLE_NAME);
+    let executable = |path: &Path| fs::metadata(path).is_ok_and(|info| info.is_file() && info.mode() & 0o111 != 0);
+    let binary = if executable(&staged) {
+        staged
+    } else {
+        root.join("backend-rust/target/release").join(EXECUTABLE_NAME)
+    };
+    if trusted_path(&script, false).is_err() || trusted_path(&binary, false).is_err()
+        || !executable(&binary) || !Path::new("/usr/bin/sudo").is_file() {
         return None;
     }
     let output = Command::new("/usr/bin/id").arg("-un").env_clear().output().ok()?;

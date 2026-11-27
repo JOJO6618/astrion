@@ -122,29 +122,6 @@ impl ProcessResources {
         }
     }
 
-    pub(crate) fn start_plugin(&mut self, scope: Scope, request: &Value, timeout: Duration)
-        -> io::Result<PluginRun> {
-        if scope.approval_required || !scope.access.write || !self.available_mode(scope.mode) {
-            return Err(denied("当前对话缺少自定义工具执行权限。"));
-        }
-        let policy = self.policy.as_ref().expect("available process policy");
-        policy.validate_command(request["source"].as_str().unwrap_or_default())?;
-        let nonce = format!("ASTRION_PLUGIN_{}",Uuid::new_v4().simple());
-        let mut request = request.clone();
-        request["nonce"] = json!(&nonce);
-        let mut payload = serde_json::to_vec(&request)?;
-        if payload.len() >= 2 * 1024 * 1024 {
-            return Err(denied("自定义工具请求超过大小限制。"));
-        }
-        payload.push(b'\n');
-        let command = policy.command_plugin(&scope.owner.workspace,&scope.execution_root,scope.access,scope.mode)?;
-        let process = Process::spawn_json(command,timeout,payload)?;
-        let records = self.conversations.entry(scope.owner).or_default();
-        records.foreground.retain(|active| active.state().status == Status::Running);
-        records.foreground.push(process.clone());
-        Ok(PluginRun { guard:CancelOnDrop(Some(process.clone())), process, nonce })
-    }
-
     pub(crate) fn start(&mut self, scope: Scope, call: Invocation) -> io::Result<Operation> {
         self.start_scoped(scope, call, None)
     }
@@ -537,30 +514,6 @@ impl Background {
             result["background_task_created"] = json!(running);
         }
         result
-    }
-}
-
-pub(crate) struct PluginRun {
-    guard: CancelOnDrop,
-    process: Arc<Process>,
-    nonce: String,
-}
-
-impl PluginRun {
-    pub(crate) async fn finish(mut self) -> Value {
-        self.process.wait().await;
-        self.guard.0.take();
-        let state = self.process.state();
-        let output = state.output.text(0);
-        let prefix = format!("{} ",self.nonce);
-        if state.status == Status::Completed
-            && let Some(result) = output.lines().rev().find_map(|line| line.strip_prefix(&prefix))
-                .and_then(|line| serde_json::from_str::<Value>(line).ok()).filter(Value::is_object)
-        {
-            return result;
-        }
-        json!({"success":false,"custom_tool":true,"error":state.message.as_deref().unwrap_or("自定义工具解释器未返回有效结果。"),
-            "status":state.status.text(),"return_code":state.return_code,"output":output})
     }
 }
 
