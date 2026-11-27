@@ -13,7 +13,7 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 
 use super::{Knowledge, global_memory::MemoryKind, skills};
-use crate::workspace_catalog::RegisteredWorkspace;
+use crate::{web_assets::personalization::Personalization, workspace_catalog::RegisteredWorkspace};
 
 /// Mount behind Host Web authentication and the Gateway workspace scope.
 pub fn scoped_router(data: PathBuf) -> Router {
@@ -51,8 +51,12 @@ async fn memory(
 async fn workspace_menu(
     State(data): State<PathBuf>,
     Extension(workspace): Extension<RegisteredWorkspace>,
+    settings: Option<Extension<Personalization>>,
 ) -> Response {
     run(move || {
+        if let Some(Extension(settings)) = settings {
+            settings.prepare_workspace_skills(&workspace.path)?;
+        }
         let knowledge = Knowledge::open(&workspace.path, &data)?;
         Ok(json!({"success": true, "skills": skills::workspace_menu(&knowledge)?}))
     }).await
