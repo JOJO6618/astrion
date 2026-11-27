@@ -163,10 +163,23 @@ pub(super) fn recent_conversations(store: &Store, workspace: &str, conversation:
     let limit = prefs["recent_conversations_prompt_limit"].as_i64().unwrap_or(10).clamp(1, 30) as usize;
     let mut rows = store.session_rows(workspace).unwrap_or_default();
     rows.retain(|row| row["id"] != conversation);
-    rows.sort_unstable_by(|left, right| right["updated_at"].as_str().cmp(&left["updated_at"].as_str()));
-    rows.iter().take(limit).filter_map(|row| {
-        Some(format!("- {}（{}）", row["title"].as_str()?, row["id"].as_str()?))
-    }).collect::<Vec<_>>().join("\n")
+    rows.sort_unstable_by(|left, right| right["updated_at"].as_str().cmp(&left["updated_at"].as_str())
+        .then_with(|| left["id"].as_str().cmp(&right["id"].as_str())));
+    let database = store.conversation_path(workspace, conversation).ok().and_then(|path| {
+        let directory = path.parent()?;
+        directory.join(crate::conversation_db::FILENAME).is_file()
+            .then(|| crate::conversation_db::Database::open(directory).ok()).flatten()
+    });
+    rows.iter().filter_map(|row| Some((row, row["id"].as_str()?))).take(limit)
+        .enumerate().map(|(i, (row, id))| {
+            let title = row["title"].as_str().filter(|title| !title.trim().is_empty()).unwrap_or("未命名对话");
+            let updated = row["updated_at"].as_str().unwrap_or_default();
+            let first = database.as_ref().and_then(|db| db.first_prompt_user_excerpt(id).ok().flatten());
+            let excerpt = first.as_deref().filter(|text| !text.trim().is_empty()).unwrap_or_else(|| {
+                if row["incompatible"] == true { "（旧记录尚未迁移）" } else { "（无首条用户消息）" }
+            });
+            format!("{}. [{id}] 标题：{title}\n   首条用户消息：{excerpt}\n   更新时间：{updated}", i + 1)
+        }).collect::<Vec<_>>().join("\n")
 }
 
 pub(super) fn start_time(value: &str) -> String {

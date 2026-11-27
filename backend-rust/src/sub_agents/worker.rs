@@ -1,12 +1,12 @@
-use std::{collections::HashSet, path::Path, time::Duration};
+use std::{collections::{BTreeMap, HashSet}, path::Path, time::Duration};
 
 use serde_json::{Value, json};
 use tokio::{sync::watch, time::Instant};
 
 use crate::{
     conversation_db::Database, goals::GoalFailure,
-    knowledge::{self, Knowledge, KnowledgeAccess}, model::RoundBudget,
-    runtime::{ModelConfig, todos::operations as todos},
+    knowledge::{self, Knowledge, KnowledgeAccess}, model::{RoundBudget, StreamDelta},
+    runtime::{ModelConfig, todos::operations as todos, tool_call_stream::{ToolCallStream, ToolStreamEvent}},
     tools::{media, read_file, web, write_file::{EDIT_NAME, WRITE_NAME}},
 };
 
@@ -17,11 +17,12 @@ pub(super) struct Context {
     pub(super) persisted_messages: usize,
     pub(super) rewrite_history: bool,
     pub(super) threshold: u64,
+    pub(super) pending_answer_question: Option<(String, String)>,
 }
 
 impl Context {
     pub(super) fn new(record: &Value, prompt: &str) -> Self {
-        Self { persisted_messages: 0, rewrite_history:false, threshold:250_000, document: json!({
+        Self { persisted_messages: 0, rewrite_history:false, threshold:250_000, pending_answer_question: None, document: json!({
             "agent_id":record["agent_id"],"task_id":record["task_id"],"name":record["name"],"working_dir":record["working_dir"],
             "execution_root":record["execution_root"],"status":"idle","round_id":0,
             "messages":[{"role":"system","content":prompt}],
@@ -36,7 +37,8 @@ impl Context {
             !messages.is_empty() && messages.iter().all(Value::is_object) && messages[0]["role"] == "system"
         });
         if !valid { return Err("原子智能体上下文无效。".into()); }
-        Ok(Self { persisted_messages: document["messages"].as_array().unwrap().len(), rewrite_history:false, threshold:250_000, document })
+        Ok(Self { persisted_messages: document["messages"].as_array().unwrap().len(), rewrite_history:false,
+            threshold:250_000, pending_answer_question: None, document })
     }
 
     fn messages(&self) -> &[Value] { self.document["messages"].as_array().expect("validated child context") }
@@ -64,6 +66,10 @@ impl Context {
         if let Some(id) = id {
             if applied.iter().any(|value| value == id) { return Ok(()); }
             applied.push(json!(id));
+        }
+        let question = &work["rust_answer_question"];
+        if let (Some(id), Some(generation)) = (question["id"].as_str(), question["generation"].as_str()) {
+            self.pending_answer_question = Some((id.into(), generation.into()));
         }
         self.append(json!({"role":"user","content":message}));
         Ok(())
@@ -231,6 +237,7 @@ impl Worker<'_> {
                 .with_opencode_headers(external_id.filter(|_|opencode),true);
             let request = media::model_messages(context.messages(), data, images, videos);
             let request = crate::mcp::model_messages(&request, images);
+            let mut calling = Calling::new(&self.app.registry, self.id);
             let (mut completion, billing) = {
                 let mut attempt = 0;
                 loop {
@@ -244,14 +251,33 @@ impl Worker<'_> {
                             &child_name,&context.document["stats"],&model) => billing,
                     };
                     if self.timeout.is_some_and(|deadline| Instant::now() >= deadline) { return Ok(End::Timeout); }
+                    let mut stream = ToolCallStream::default();
+                    let mut activity_error = None;
                     let response = tokio::select! {
                         biased;
                         _ = stop.changed() => return Ok(End::Failed("子智能体已停止。".into())),
-                        response = model.complete_with_budget(&request, &schemas, &mut budget, |text|billing.observe_text(text)) => response,
+                        response = model.complete_with_updates(&request, &schemas, &mut budget, |delta| {
+                            match delta {
+                                StreamDelta::Text(text) => billing.observe_text(text),
+                                StreamDelta::ToolCall(update) if activity_error.is_none() => {
+                                    for event in stream.push(update) {
+                                        if let ToolStreamEvent::Preparing {id, name, ..} = event
+                                            && let Err(error) = calling.open(&id, &name)
+                                        {
+                                            activity_error = Some(error);
+                                            break;
+                                        }
+                                    }
+                                }
+                                _ => (),
+                            }
+                        }) => response,
                     };
+                    if let Some(error) = activity_error { return Err(io_error(error)); }
                     match response {
                         Ok(completion) => break (completion,billing),
                         Err(error) if attempt < 5 && GoalFailure::from_message(&error).reason() == "retryable" => {
+                            calling.close();
                             let retry = Instant::now() + Duration::from_secs(10);
                             let wake = self.timeout.map_or(retry, |deadline| deadline.min(retry));
                             tokio::select! {
@@ -289,7 +315,8 @@ impl Worker<'_> {
             for call in &calls {
                 if stop.borrow().cancelled() { return Ok(End::Failed("子智能体已停止。".into())); }
                 let Call { id, name, args } = call;
-                context.activity(&self.app.registry, json!({"tool":name,"id":id,"arguments":args,"status":"running"})).map_err(io_error)?;
+                calling.open(id, name).map_err(io_error)?;
+                context.activity(&self.app.registry, json!({"tool":name,"id":id,"args":args,"status":"running"})).map_err(io_error)?;
                 let result = match name.as_str() {
                     read_file::NAME if allowed_args(args) => {
                         context.add_stat("files_read");
@@ -323,6 +350,7 @@ impl Worker<'_> {
                         }).await.map_err(|error| error.to_string())?
                     }
                     web::SAVE => {
+                        context.add_stat("web_pages");
                         if !self.web_enabled()? {
                             Ok(json!({"success":false,"code":"network_disabled","error":"当前对话已禁止联网。"}))
                         } else {
@@ -339,6 +367,7 @@ impl Worker<'_> {
                         }
                     }
                     name if web::supports(name) => {
+                        context.add_stat("web_pages");
                         let data = self.app.registry.data_dir();
                         if !self.web_enabled()? {
                             Ok(json!({"success":false,"code":"network_disabled","error":"当前对话已禁止联网。"}))
@@ -372,6 +401,7 @@ impl Worker<'_> {
                         }
                     }
                     name if super::processes::is_tool(name) => {
+                        if name == "run_command" { context.add_stat("commands"); }
                         let cancellation = stop.clone();
                         tokio::select! {
                             biased;
@@ -390,11 +420,45 @@ impl Worker<'_> {
                 }.unwrap_or_else(failed);
                 context.tool_result(id, result.clone());
                 context.save(&self.app.registry).map_err(io_error)?;
-                context.activity(&self.app.registry, json!({"tool":name,"id":id,"arguments":args,"result":result,
+                context.activity(&self.app.registry, json!({"tool":name,"id":id,"args":args,"result":result,
                     "status":if result["success"] == false { "error" } else { "done" }})).map_err(io_error)?;
+                calling.opened.remove(id);
             }
         }
     }
+}
+
+struct Calling<'a> {
+    registry: &'a Registry,
+    actor: &'a str,
+    opened: BTreeMap<String, String>,
+}
+
+impl<'a> Calling<'a> {
+    fn new(registry: &'a Registry, actor: &'a str) -> Self {
+        Self { registry, actor, opened: BTreeMap::new() }
+    }
+
+    fn open(&mut self, id: &str, name: &str) -> std::io::Result<()> {
+        if self.opened.contains_key(id) { return Ok(()); }
+        self.registry.append_activity(self.actor, &progress(json!({
+            "tool":name,"id":id,"status":"calling"
+        })))?;
+        self.opened.insert(id.into(), name.into());
+        Ok(())
+    }
+
+    fn close(&mut self) {
+        for (id, name) in std::mem::take(&mut self.opened) {
+            let _ = self.registry.append_activity(self.actor, &progress(json!({
+                "tool":name,"id":id,"status":"cancelled"
+            })));
+        }
+    }
+}
+
+impl Drop for Calling<'_> {
+    fn drop(&mut self) { self.close(); }
 }
 
 fn progress(mut event: Value) -> Value {

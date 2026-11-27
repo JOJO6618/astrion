@@ -155,6 +155,18 @@ def run():
                 assert document['metadata']['project_memory_reads'], document['metadata']
                 assert (workspace/'page.txt').read_text() == ARTICLE
                 assert (workspace/'child-page.txt').read_text() == ARTICLE
+                deadline = time.monotonic() + 4
+                while time.monotonic() < deadline:
+                    reply = browser.api('GET',f'/api/sub_agents?workspace_id=default&conversation_id={cid}',
+                                        headers={'Accept-Language':'en-US'})
+                    reader = next((row for row in reply['data'] if row.get('name') == 'reader'
+                                   or row.get('display_name') == 'reader'), None)
+                    if reader and reader.get('status') == 'idle':
+                        break
+                    time.sleep(.02)
+                else:
+                    raise AssertionError('Child did not finish')
+                assert 'pages viewed: 1' in reader['stats_summary'].lower(), reader
                 assert (data/'memory.md').read_text().find('Fixture global entry') >= 0
                 assert service.pages == 2 and not service.errors, service.errors
         finally:

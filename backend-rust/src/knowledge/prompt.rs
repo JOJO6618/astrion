@@ -2,13 +2,13 @@
 
 use std::{io, path::Path, time::SystemTime};
 
-use cap_fs_ext::DirExt;
+use cap_fs_ext::{DirExt, MetadataExt};
 use serde_json::{Value, json};
 
 use super::{
     Knowledge,
     search::Frontmatter,
-    storage::{MAX_BYTES, optional_dir, read_bytes, version},
+    storage::{Identity, MAX_BYTES, optional_dir, read_bytes, version},
 };
 
 fn text(dir: &cap_std::fs::Dir, file: &str, limit: u64) -> io::Result<Option<String>> {
@@ -109,6 +109,42 @@ impl Knowledge {
         names.sort_unstable();
         names.truncate(80);
         names.join("\n")
+    }
+
+    pub(crate) fn prompt_recent_uploads(&self) -> String {
+        let uploads = (|| -> io::Result<_> {
+            let Some(astrion) = optional_dir(&self.workspace, ".astrion")? else { return Ok(None); };
+            if Identity::of(&astrion.dir_metadata()?) == self.data_identity { return Ok(None); }
+            let Some(uploads) = optional_dir(&astrion, "user_upload")? else { return Ok(None); };
+            if Identity::of(&uploads.dir_metadata()?) == self.data_identity { return Ok(None); }
+            Ok(Some(uploads))
+        })().ok().flatten();
+        let Some(uploads) = uploads else { return String::new(); };
+        let Ok(entries) = uploads.entries() else { return String::new(); };
+        let mut latest = std::collections::BinaryHeap::new();
+        for entry in entries.filter_map(Result::ok) {
+            let Ok(name) = entry.file_name().into_string() else { continue; };
+            if name.chars().any(char::is_control) { continue; }
+            let Ok(meta) = uploads.symlink_metadata(&name) else { continue; };
+            if !meta.is_file() || meta.nlink() != 1 { continue; }
+            latest.push(std::cmp::Reverse((meta.modified().ok(), name, meta.len())));
+            if latest.len() > 10 { latest.pop(); }
+        }
+        if latest.is_empty() { return String::new(); }
+        let mut lines = vec!["- **最近上传的文件**：".to_owned()];
+        for std::cmp::Reverse((modified, name, length)) in latest.into_sorted_vec() {
+            let size = match length {
+                n if n >= 1024 * 1024 => format!("{:.1} MB", n as f64 / 1048576.0),
+                n if n >= 1024 => format!("{:.1} KB", n as f64 / 1024.0),
+                n => format!("{n} B"),
+            };
+            let stamp = modified.and_then(|time| jiff::Timestamp::try_from(time.into_std()).ok())
+                .map(|time| format!(", {}", time.to_zoned(jiff::tz::TimeZone::system()).strftime("%Y-%m-%d %H:%M")))
+                .unwrap_or_default();
+            let name = name.replace('`', "\\`");
+            lines.push(format!("  - `.astrion/user_upload/{name}` ({size}{stamp})"));
+        }
+        lines.join("\n")
     }
 }
 

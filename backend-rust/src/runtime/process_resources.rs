@@ -1,6 +1,8 @@
 //! Bind process resources to the accepted task and expose the existing Host REST views.
 
-use std::{fs, io, path::Path};
+use std::{io, path::Path};
+#[cfg(test)]
+use std::fs;
 
 use axum::{
     Extension, Json, Router,
@@ -280,7 +282,7 @@ fn process_admission(
         return Err("Process tool is disabled by the current tool policy".into());
     }
     if let Some(key) = invocation.strict_key() {
-        enforce_strict_skill(&store.data_dir, key, &metadata)?;
+        super::strict_guides::enforce(&store.data_dir, key, &metadata)?;
     }
     Ok(scope)
 }
@@ -371,26 +373,6 @@ pub(super) fn live_scope(store: &Store, task_id: &str) -> Result<(Scope, Value),
     let network = Network::from_metadata(&metadata["network_permission"]).map_err(|error| error.to_string())?;
     let scope = Scope { owner, execution_root, access: SandboxAccess { write, network }, mode: execution, approval_required };
     Ok((scope, metadata.clone()))
-}
-
-fn enforce_strict_skill(data: &Path, key: &str, metadata: &Value) -> Result<(), String> {
-    let path = data.join("personalization.json");
-    let preferences: Value = match fs::read(path) {
-        Ok(bytes) => serde_json::from_slice(&bytes).map_err(|error| error.to_string())?,
-        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
-        Err(error) => return Err(error.to_string()),
-    };
-    if !preferences.is_object() { return Err("Invalid process personalization policy".into()); }
-    match preferences.get(key) {
-        None | Some(Value::Bool(false)) => Ok(()),
-        Some(Value::Bool(true)) => {
-            let skill = if key == "skill_strict_terminal_enabled" { "terminal-guide" } else { "run-command-guide" };
-            let slug = skill.replace('-', "_");
-            if metadata[format!("skill_read_{slug}")] == true { Ok(()) }
-            else { Err(format!("The configured process skill prerequisite is unavailable for {skill}")) }
-        }
-        _ => Err("Invalid process skill policy".into()),
-    }
 }
 
 fn request_owner(store: &Store, workspace: &RegisteredWorkspace, conversation: Option<&str>) -> Result<Option<Owner>, RuntimeError> {

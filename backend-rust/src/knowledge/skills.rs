@@ -41,12 +41,24 @@ impl SkillSettings {
             Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(Self::default()),
             Err(error) => return Err(error),
         };
-        let settings: SkillPreferences = serde_json::from_slice(&bytes).unwrap_or_default();
-        Ok(Self {
+        Ok(Self::from_preferences(serde_json::from_slice(&bytes).unwrap_or_default()))
+    }
+
+    fn from_preferences(settings: SkillPreferences) -> Self {
+        Self {
             scan_project_agents: settings.agents_skills_scan_enabled.unwrap_or(true),
             enabled_ids: preference_ids(&settings.enabled_skills),
             catalog_snapshot: preference_ids(&settings.skills_catalog_snapshot).unwrap_or_default(),
-        })
+        }
+    }
+
+    pub(crate) fn enabled_in_preferences(preferences: &Value, id: &str) -> bool {
+        let prefs = SkillPreferences {
+            agents_skills_scan_enabled: None,
+            enabled_skills: preferences["enabled_skills"].clone(),
+            skills_catalog_snapshot: preferences["skills_catalog_snapshot"].clone(),
+        };
+        Self::from_preferences(prefs).enabled(id)
     }
 
     fn enabled(&self, id: &str) -> bool {

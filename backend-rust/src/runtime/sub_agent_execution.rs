@@ -62,6 +62,7 @@ impl Runtime {
         verify_workspace_binding(&store, &workspace_id, None).map_err(|error| error.message)?;
         let root = store.workspaces[&workspace_id].clone();
         let (document, _) = store.header(&workspace_id, &conversation_id).map_err(|error| error.message)?;
+        super::strict_guides::enforce(&store.data_dir, super::strict_guides::SUB_AGENT_SETTING, &document["metadata"])?;
         let reasoning = document["metadata"]["reasoning_effort"].as_str();
         let parent = Parent { workspace_id, root, conversation_id };
         // During admission/cancellation the main task lock stays held until a
