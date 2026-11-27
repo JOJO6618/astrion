@@ -250,6 +250,28 @@ impl ProcessResources {
         json!({"success":true,"data":data})
     }
 
+    /// Child and main resources share the same workspace/conversation identity.
+    /// Only a running background process or a live shell still in the departing
+    /// tree counts: terminal notices do not keep a worktree occupied.
+    pub(crate) fn worktree_busy(
+        &self, workspace_id: &str, workspace: &Path, conversation: &str, root: &Path,
+    ) -> (bool, Option<String>) {
+        let mut background = false;
+        let mut terminal = None;
+        for (owner, resources) in &self.conversations {
+            if owner.workspace_id != workspace_id || owner.workspace != workspace || owner.conversation != conversation {
+                continue;
+            }
+            background |= resources.background.iter().any(|row| row.process.state().status == Status::Running);
+            if terminal.is_none() {
+                terminal = resources.terminals.iter()
+                    .find(|(_, shell)| shell.cwd.starts_with(root) && shell.process.state().status == Status::Running)
+                    .map(|(name, _)| name.clone());
+            }
+        }
+        (background, terminal)
+    }
+
     pub(crate) fn has_pending(&self, owner: &Owner) -> bool {
         self.conversations.get(owner).is_some_and(|records| records.background.iter().any(|row| {
             row.process.state().status == Status::Running || !(row.consumed || row.suppress_notice)
@@ -586,3 +608,7 @@ fn iso_time(timestamp: f64) -> Option<String> {
     use time::{OffsetDateTime, format_description::well_known::Rfc3339};
     OffsetDateTime::from_unix_timestamp_nanos((timestamp * 1_000_000_000.0) as i128).ok()?.format(&Rfc3339).ok()
 }
+
+#[cfg(all(test, unix))]
+#[path = "../../../test/2026-11-27_Rust工作树活动退出/worktree_process_contract.rs"]
+mod worktree_process_contract;
