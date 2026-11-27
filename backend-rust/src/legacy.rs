@@ -46,6 +46,30 @@ pub enum LegacyChatTurn<'a> {
     },
 }
 
+/// Give each declared but unpaired tool call an explicit interrupted result.
+/// The caller must pass results from this assistant batch only.
+pub(crate) fn interrupted_chat_tool_results(assistant: &Value, results: &[Value]) -> Vec<Value> {
+    let completed: HashSet<&str> = results.iter().filter_map(|tool| tool["tool_call_id"].as_str()).collect();
+    assistant["tool_calls"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|call| {
+            let id = call["id"].as_str().filter(|id| !completed.contains(id))?;
+            Some(json!({
+                "role": "tool",
+                "tool_call_id": id,
+                "name": call["function"]["name"],
+                "content": json!({
+                    "success": false,
+                    "status": "cancelled",
+                    "message": "执行已中断，未取得完成结果",
+                }).to_string(),
+            }))
+        })
+        .collect()
+}
+
 #[derive(Debug, Serialize)]
 pub struct LegacyInspection<'a> {
     pub source_id: &'a str,
@@ -261,21 +285,27 @@ impl LegacyDocument {
 
     /// Builds the selected branch's wire history, using a saved frozen prompt when present.
     pub fn chat_model_history(&self, leaf_id: Option<&str>) -> Result<Vec<Value>, LegacyError> {
-        self.project_chat_history(&self.chat_path(leaf_id)?)
+        self.project_chat_history(self.chat_path(leaf_id)?)
     }
 
     /// Uses the given turn's parent or tip, independent of the saved latest branch.
     pub fn chat_turn_history(&self, turn_id: &str) -> Result<Vec<Value>, LegacyError> {
         self.require_chat()?;
-        self.project_chat_history(&tree::chat_turn_path(&self.raw, turn_id)?)
+        self.project_chat_history(tree::chat_turn_path(&self.raw, turn_id)?)
     }
 
-    pub(crate) fn chat_turn_history_with_media(
-        &self, turn_id: &str, account: &Path,
+    pub(crate) fn chat_turn_path(&self, turn_id: &str) -> Result<Vec<Value>, LegacyError> {
+        self.require_chat()?;
+        tree::chat_turn_path(&self.raw, turn_id)
+    }
+
+    pub(crate) fn chat_path_history_with_media(
+        &self, path: Vec<Value>, account: &Path, include_frozen: bool,
     ) -> Result<Vec<Value>, LegacyError> {
         self.require_chat()?;
-        let path = tree::chat_turn_path(&self.raw, turn_id)?;
-        let frozen = self.raw["metadata"]["frozen_system_prompt"].as_str().filter(|prompt| !prompt.trim().is_empty());
+        let path = self.complete_interrupted_chat_batches(path);
+        let frozen = self.raw["metadata"]["frozen_system_prompt"].as_str()
+            .filter(|prompt| include_frozen && !prompt.trim().is_empty());
         let mut history = agent::project_history(&path, frozen, true, true)
             .map_err(|reason| LegacyError::unsupported(&[reason]))?;
         media::attach_chat_blobs(&path, &mut history[usize::from(frozen.is_some())..], account)
@@ -360,12 +390,48 @@ impl LegacyDocument {
         Ok(())
     }
 
-    fn project_chat_history(&self, messages: &[Value]) -> Result<Vec<Value>, LegacyError> {
+    fn project_chat_history(&self, messages: Vec<Value>) -> Result<Vec<Value>, LegacyError> {
         let frozen = self.raw["metadata"]["frozen_system_prompt"]
             .as_str()
             .filter(|prompt| !prompt.trim().is_empty());
-        agent::project_history(messages, frozen, true, false)
+        let messages = self.complete_interrupted_chat_batches(messages);
+        agent::project_history(&messages, frozen, true, false)
             .map_err(|reason| LegacyError::unsupported(&[reason]))
+    }
+
+    /// Already-closed turns from early Rust releases can predate durable batch
+    /// recovery. Fill their missing results in the model projection only; do
+    /// not rewrite a user's saved tree, replay tools, or reorder real results.
+    fn complete_interrupted_chat_batches(&self, path: Vec<Value>) -> Vec<Value> {
+        let interrupted: HashSet<&str> = self.raw["metadata"]["chat"]["turns"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|turn| matches!(turn["status"].as_str(), Some("stopped" | "failed")))
+            .filter_map(|turn| turn["id"].as_str())
+            .collect();
+        if interrupted.is_empty() {
+            return path;
+        }
+        let mut projected = Vec::with_capacity(path.len());
+        let mut rows = path.into_iter().peekable();
+        while let Some(message) = rows.next() {
+            let track = message["role"] == "assistant"
+                && message["tool_calls"].as_array().is_some_and(|calls| !calls.is_empty())
+                && message["metadata"]["chat"]["turn_id"]
+                    .as_str()
+                    .is_some_and(|turn| interrupted.contains(turn));
+            let index = projected.len();
+            projected.push(message);
+            if track {
+                while let Some(tool) = rows.next_if(|row| row["role"] == "tool") {
+                    projected.push(tool);
+                }
+                let absent = interrupted_chat_tool_results(&projected[index], &projected[index + 1..]);
+                projected.extend(absent);
+            }
+        }
+        projected
     }
 
     /// Builds the Agent's wire history without changing the source document.

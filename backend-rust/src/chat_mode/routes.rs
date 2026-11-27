@@ -176,11 +176,35 @@ async fn list(State(mode): State<ChatMode>, Query(query): Query<Search>) -> Repl
 }
 
 fn display(task: &Value) -> Value {
-    let actions = crate::runtime::thinking::display_actions(task);
-    let messages = if actions.is_empty() { Vec::new() } else { vec![json!({"actions":actions})] };
+    let mut messages = Vec::new();
+    if task["status"] == "running" {
+        let mut actions = crate::runtime::thinking::display_actions(task);
+        // Sort the streams by their start event rather than render all thinking
+        // then all text irrespective of when an action started.
+        for action in &mut actions {
+            let source = if action["type"] == "thinking" { "thinking_stream" } else { "stream" };
+            action["start_idx"] = task[source]["start_idx"].clone();
+        }
+        if let Some(tools) = task["chat_progress"]["tools"].as_array() {
+            actions.extend(tools.iter().cloned());
+        }
+        actions.sort_by_key(|action| action["start_idx"].as_u64().unwrap_or_default());
+        if let Some(response) = task["chat_progress"]["response_id"].as_str()
+            .or_else(|| actions.iter().find_map(|action| action["responseMessageId"].as_str()))
+        {
+            let awaiting = actions.is_empty() && task["api_request_pending"] == true;
+            if awaiting || !actions.is_empty() {
+                messages.push(json!({
+                    "id":response,"role":"assistant","actions":actions,
+                    "awaitingFirstContent":awaiting,
+                }));
+            }
+        }
+    }
     json!({
         "messages":messages,
         "state":{"streaming":task["stream"]["streaming"] == true || task["thinking_stream"]["streaming"] == true,
+            "compressing":task["compressing"] == true,
             "api_request_pending":task["api_request_pending"] == true,
             "title_pending":task["title_pending"] == true},
         "task": task["task_id"].as_str().map(|id| json!({"task_id":id,"status":if task["cancel_requested"] == true { json!("cancel_requested") } else { task["status"].clone() }})),
@@ -189,12 +213,14 @@ fn display(task: &Value) -> Value {
 }
 
 fn conversation_view(mode: &ChatMode, id: &str) -> Result<Value, ChatError> {
-    mode.runtime.with_chat_display(id, |root, task| {
-        let paths = super::store::ChatPaths::new(root);
-        let mut document = public_document(paths.read_document(id)?)?;
-        crate::runtime::thinking::decorate(&paths.conversations(), id, &mut document);
-        Ok(json!({"document":document,"display":display(&task)}))
-    })
+    mode.runtime.with_chat_display(id, |root, task| view_value(root, id, &task))
+}
+
+fn view_value(root: &std::path::Path, id: &str, task: &Value) -> Result<Value, ChatError> {
+    let paths = super::store::ChatPaths::new(root);
+    let mut document = public_document(paths.read_document(id)?)?;
+    crate::runtime::thinking::decorate(&paths.conversations(), id, &mut document);
+    Ok(json!({"document":document,"display":display(task)}))
 }
 
 async fn bootstrap(State(mode): State<ChatMode>, Path(id): Path<String>) -> Reply {
@@ -443,27 +469,10 @@ async fn poll(
     Path(id): Path<String>,
     Query(query): Query<Cursor>,
 ) -> Reply {
-    let from = query.from.unwrap_or(0);
-    let runtime = mode.runtime.clone();
-    let task = tokio::task::spawn_blocking(move || runtime.poll_task("", &id, from)).await;
-    let task = match task {
-        Ok(Ok(task)) => task,
-        Ok(Err(err)) => return error(err.into()),
-        Err(_) => return error(ChatError::storage("Chat task poll interrupted")),
-    };
-    let data = super::tasks::public_task(task);
-    let conversation_id = data["conversation_id"].as_str().unwrap_or_default().to_owned();
-    let view = mode
-        .storage(|paths| {
-            let document = paths.read_document(&conversation_id)?;
-            Ok(json!({
-                "document": public_document(document)?,
-                "display": display(&data),
-            }))
-        })
-        .ok()
-        .unwrap_or(Value::Null);
-    ok(json!({
+    run(move || mode.runtime.with_chat_task_display(&id, query.from.unwrap_or(0), |root, data| {
+        let conversation_id = data["conversation_id"].as_str().unwrap_or_default();
+        let view = view_value(root, conversation_id, &data).unwrap_or(Value::Null);
+        Ok(json!({
         "success": true,
         "data": {
             "view": view,
@@ -485,7 +494,8 @@ async fn poll(
             "next_offset": data["next_offset"],
             "window_start": data["window_start"],
         }
-    }))
+        }))
+    })).await
 }
 
 async fn cancel(State(mode): State<ChatMode>, Path(id): Path<String>) -> Reply {

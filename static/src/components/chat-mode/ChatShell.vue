@@ -245,7 +245,7 @@
             :tool-settings="[]"
             :tool-settings-loading="false"
             :settings-open="false"
-            :compressing="false"
+            :compressing="chat.display?.state.compressing === true"
             :current-conversation-id="chat.cid"
             :icon-style="iconStyle"
             :tool-category-icon="() => ''"

@@ -267,43 +267,52 @@ impl ChatMode {
         let edit_message = payload["edit_message_id"]
             .as_str()
             .filter(|id| !id.is_empty());
+        if regenerate.is_some() && edit_message.is_some() {
+            return Err(ChatError::bad_request(
+                "Regenerate and edit-and-send are mutually exclusive",
+            ));
+        }
         let presentation = payload["presentation_id"].as_str();
         let message = payload["message"].as_str().unwrap_or_default();
-        let selection = match (regenerate, edit_message) {
-            (Some(turn_id), None) => Selection::Regenerate { turn_id },
-            (None, Some(message_id)) => Selection::EditAndSend {
-                message_id,
-                content: message,
-            },
-            (None, None) => Selection::Send {
-                parent_id,
-                message: json!({
-                    "role": "user",
-                    "content": message,
-                    "message_id": format!("msg_{}", Uuid::new_v4().simple()),
-                    "media_refs": media,
-                    "metadata": {"visibility":"chat","starts_work":true},
-                }),
-            },
-            (Some(_), Some(_)) => {
-                return Err(ChatError::bad_request(
-                    "Regenerate and edit-and-send are mutually exclusive",
-                ));
-            }
-        };
         let result = self.storage(|paths| {
+            let mut recovered_parent = None;
             let initial = if plan.created {
                 Some(paths.initial_document(&plan.conversation_id, timestamp_now, payload)?)
             } else {
                 let (header, count) = paths.read_header(&plan.conversation_id)?;
                 if let Some(active) = tree::active_turn(&header) {
-                    // Retire stale work before this admission takes ownership.
+                    // If the client sent the old tip before recovery, continue
+                    // from the recovered tip, which now includes the tool results.
+                    let previous_tip = header["metadata"]["chat"]["latest_leaf_id"].as_str();
                     tree::recover(paths, &plan.conversation_id, active, "failed", timestamp_now)?;
+                    if parent_id.is_some() && parent_id == previous_tip {
+                        recovered_parent = paths.read_header(&plan.conversation_id)?.0["metadata"]
+                            ["chat"]["latest_leaf_id"].as_str().map(str::to_owned);
+                    }
                 }
                 if count != 0 && parent_id.is_none() && regenerate.is_none() && edit_message.is_none() {
                     return Err(ChatError::bad_request("Continuing a Chat requires an explicit parent message"));
                 }
                 None
+            };
+            let parent_id = recovered_parent.as_deref().or(parent_id);
+            let selection = match (regenerate, edit_message) {
+                (Some(turn_id), None) => Selection::Regenerate { turn_id },
+                (None, Some(message_id)) => Selection::EditAndSend {
+                    message_id,
+                    content: message,
+                },
+                (None, None) => Selection::Send {
+                    parent_id,
+                    message: json!({
+                        "role": "user",
+                        "content": message,
+                        "message_id": format!("msg_{}", Uuid::new_v4().simple()),
+                        "media_refs": media,
+                        "metadata": {"visibility":"chat","starts_work":true},
+                    }),
+                },
+                (Some(_), Some(_)) => unreachable!("validated mutually exclusive selectors"),
             };
             let receipt = tree::begin(
                 paths, &plan.conversation_id, &operation.id, selection, initial, None, presentation,
@@ -342,7 +351,6 @@ impl ChatMode {
         message: String,
         mut cancel: oneshot::Receiver<()>,
     ) {
-        let pending = Arc::new(Mutex::new(String::new()));
         let thinking = crate::runtime::thinking_auxiliary::ThinkingWork::for_task(&self.runtime, &task_id, &model);
         let outcome = tokio::select! {
             biased;
@@ -354,7 +362,6 @@ impl ChatMode {
                 &turn_id,
                 &model,
                 message,
-                pending.clone(),
                 thinking.as_ref(),
                 ).await;
                 if result.status == "succeeded" && let Some(thinking) = &thinking { thinking.finish().await; }
@@ -362,19 +369,22 @@ impl ChatMode {
             } => result,
         };
 
-        if outcome.status == "stopped" {
-            let partial = pending.lock().map(|text| text.clone()).unwrap_or_default();
-            if !partial.trim().is_empty() {
-                let _ = self.append_partial(&conversation_id, &turn_id, &partial);
-            }
-        }
         let tree_status = match outcome.status {
             "succeeded" => "complete",
             status => status,
         };
+        let partial = if tree_status == "complete" {
+            None
+        } else {
+            self.runtime.chat_partial_response(&task_id, tree_status).ok().flatten()
+        };
         let durable = self
             .storage(|paths| {
-                tree::finish(paths, &conversation_id, &turn_id, tree_status, now())
+                if tree_status == "complete" {
+                    tree::finish(paths, &conversation_id, &turn_id, tree_status, now())
+                } else {
+                    tree::recover_with_partial(paths, &conversation_id, &turn_id, tree_status, now(), partial)
+                }
             })
             .map(|_| ());
         // A generated answer that could not release its durable turn must not be
@@ -398,7 +408,6 @@ impl ChatMode {
         turn_id: &str,
         model: &ModelConfig,
         _message: String,
-        pending: Arc<Mutex<String>>,
         work: Option<&crate::runtime::thinking_auxiliary::ThinkingWork>,
     ) -> Outcome {
         use crate::model::{RoundBudget, StreamDelta};
@@ -408,26 +417,42 @@ impl ChatMode {
         {
             return Outcome::failed(error.message);
         }
-        let (mut messages, _network) = match self.model_messages(conversation_id, turn_id) {
+        let (mut messages, mut used_ids) = match self.model_messages(conversation_id, turn_id) {
             Ok(value) => value,
             Err(error) => return Outcome::failed(error.message),
         };
         let tools = definitions();
-        let mut used_ids: std::collections::HashSet<String> = messages
-            .iter()
-            .filter_map(|message| message["tool_calls"].as_array())
-            .flatten()
-            .filter_map(|call| call["id"].as_str().map(str::to_owned))
-            .collect();
-
         for round in 0..MAX_MODEL_ROUNDS {
-            let response_message_id = format!("msg_{}", Uuid::new_v4().simple());
-            if !self.emit(task_id, "api_request_start", json!({"attempt":1,"max_attempts":1})) {
-                return Outcome::stopped();
+            if round > 0 {
+                match self.storage(|paths| tree::consume_network_notices(paths, conversation_id, turn_id, now())) {
+                    // Apply UI switches only between complete tool batches.
+                    // The normal case keeps the current wire history in memory.
+                    Ok(true) => match self.model_messages(conversation_id, turn_id) {
+                        Ok((updated, _)) => messages = updated,
+                        Err(error) => return Outcome::failed(error.message),
+                    },
+                    Ok(false) => (),
+                    Err(error) => return Outcome::failed(error.message),
+                }
             }
-            let pending_text = pending.clone();
-            if let Ok(mut text) = pending_text.lock() {
-                text.clear();
+            match self.compress_before_request(task_id, conversation_id, turn_id, model, &messages).await {
+                Ok(true) => {
+                    if let Err(error) = self.storage(|paths| tree::consume_network_notices(paths, conversation_id, turn_id, now())) {
+                        return Outcome::failed(error.message);
+                    }
+                    match self.model_messages(conversation_id, turn_id) {
+                        Ok((updated, _)) => messages = updated,
+                        Err(error) => return Outcome::failed(error.message),
+                    }
+                }
+                Ok(false) => (),
+                Err(error) => return Outcome::failed(error.message),
+            }
+            let response_message_id = format!("msg_{}", Uuid::new_v4().simple());
+            if !self.emit(task_id, "api_request_start", json!({
+                "attempt":1,"max_attempts":1,"response_message_id":response_message_id,
+            })) {
+                return Outcome::stopped();
             }
             let mut started = false;
             let mut tool_stream = crate::runtime::tool_call_stream::ToolCallStream::default();
@@ -451,9 +476,6 @@ impl ChatMode {
                         StreamDelta::Text(delta) => delta,
                     };
                     let _ = thinking.end();
-                    if let Ok(mut text) = pending_text.lock() {
-                        text.push_str(delta);
-                    }
                     if !started {
                         started = true;
                         let _ = self.emit(task_id, "text_start", json!({"response_message_id":response_message_id}));
@@ -463,13 +485,7 @@ impl ChatMode {
                 .await
             {
                 Ok(completion) => completion,
-                Err(error) => {
-                    let partial = pending.lock().map(|text| text.clone()).unwrap_or_default();
-                    if !partial.trim().is_empty() {
-                        let _ = self.append_partial(conversation_id, turn_id, &partial);
-                    }
-                    return Outcome::failed(error);
-                }
+                Err(error) => return Outcome::failed(error),
             };
             if thinking.end().is_err() { return Outcome::stopped(); }
             crate::tools::web::annotate(&mut completion.message, &messages);
@@ -483,21 +499,26 @@ impl ChatMode {
                     return Outcome::stopped();
                 }
             }
+            let calls = validated_calls(&completion.message, &mut used_ids);
+            let mut stored = assistant_message(&completion.message, model.key(), &response_message_id);
+            if calls.is_err() {
+                // An invalid provider batch is never executed or replayed.
+                // Preserve the assistant prose and usage without storing calls
+                // that would make subsequent branch projection fail.
+                stored.as_object_mut().expect("assistant message object").shift_remove("tool_calls");
+            }
             let stats = completion.usage.as_ref().and_then(usage_statistics);
-            if let Err(error) = self.store_assistant(
-                conversation_id, turn_id, assistant_message(&completion.message, model.key(), &response_message_id), stats.as_ref(),
+            if let Err(error) = self.store_message(
+                conversation_id, turn_id, stored, stats.as_ref(),
             ) {
                 return Outcome::failed(error.message);
             }
             thinking.keep();
-            if let Ok(mut text) = pending.lock() {
-                text.clear();
-            }
             if let Some(stats) = stats {
                 let _ = self.emit(task_id, "token_update", stats);
             }
 
-            let calls = match validated_calls(&completion.message, &mut used_ids) {
+            let calls = match calls {
                 Ok(calls) => calls,
                 Err(error) => return Outcome::failed(error),
             };
@@ -507,13 +528,15 @@ impl ChatMode {
             if round + 1 == MAX_MODEL_ROUNDS {
                 return Outcome::failed("Chat reached the model round limit".into());
             }
-            let mut results = Vec::with_capacity(calls.len());
+            messages.push(assistant_model_message(&completion.message));
             for call in &calls {
-                let _ = self.emit(
+                if !self.emit(
                     task_id,
                     "tool_start",
                     json!({"id":call.id,"preparing_id":call.id,"name":call.name,"arguments":call.arguments}),
-                );
+                ) {
+                    return Outcome::stopped();
+                }
                 let result = tools::execute(self, &call.name, &call.arguments, conversation_id)
                     .await
                     .map(|value| value.to_string())
@@ -527,28 +550,31 @@ impl ChatMode {
                 } else {
                     "completed"
                 };
-                let _ = self.emit(
-                    task_id,
-                    "update_action",
-                    json!({"id":call.id,"preparing_id":call.id,"status":status,"result":parsed}),
-                );
-                results.push(json!({
+                let mut message = json!({
                     "message_id": format!("msg_{}", Uuid::new_v4().simple()),
                     "role": "tool",
                     "tool_call_id": call.id,
                     "name": call.name,
                     "content": result,
-                }));
+                });
+                if let Err(error) = self.store_message(conversation_id, turn_id, message.clone(), None) {
+                    return Outcome::failed(error.message);
+                }
+                // Match what a subsequent task reads from durable history;
+                // message IDs, tool names and UI metadata are not wire fields.
+                if let Some(fields) = message.as_object_mut() {
+                    fields.shift_remove("message_id");
+                    fields.shift_remove("name");
+                }
+                messages.push(message);
+                if !self.emit(
+                    task_id,
+                    "update_action",
+                    json!({"id":call.id,"preparing_id":call.id,"status":status,"result":parsed}),
+                ) {
+                    return Outcome::stopped();
+                }
             }
-            if let Err(error) = self.store_batch(conversation_id, turn_id, calls[0].id.clone(), results.clone()) {
-                return Outcome::failed(error.message);
-            }
-            messages.push(json!({
-                "role":"assistant",
-                "content":completion.message["content"],
-                "tool_calls":completion.message["tool_calls"],
-            }));
-            messages.extend(results);
         }
         Outcome::failed("Chat model loop ended unexpectedly".into())
     }
@@ -557,17 +583,33 @@ impl ChatMode {
         &self,
         conversation_id: &str,
         turn_id: &str,
-    ) -> Result<(Vec<Value>, bool), ChatError> {
+    ) -> Result<(Vec<Value>, std::collections::HashSet<String>), ChatError> {
         let document = self.storage(|paths| paths.read_document(conversation_id))?;
         let raw = document.raw();
-        let mut messages = document.chat_turn_history_with_media(turn_id, &self.root)?;
+        let mut path = document.chat_turn_path(turn_id)?;
+        let used_ids = path.iter()
+            .filter_map(|message| message["tool_calls"].as_array())
+            .flatten()
+            .filter_map(|call| call["id"].as_str().map(str::to_owned))
+            .collect();
+        let summary = super::compression::select_summary(raw, &path)
+            .map(|(count, content)| (count, content.to_owned()));
+        if let Some((count, _)) = &summary {
+            path.drain(..*count);
+        }
+        let mut messages = document.chat_path_history_with_media(path, &self.root, true)?;
         if messages.first().is_none_or(|message| message["role"] != "system") {
             messages.insert(0, json!({
                 "role": "system",
                 "content": self.system_prompt(raw)?,
             }));
         }
-        Ok((messages, raw["metadata"]["network_enabled"] == true))
+        if let Some((_, content)) = summary {
+            messages.insert(1, json!({
+                "role":"system","content":format!("前文对话摘要（以当前系统设置为准）：\n{content}"),
+            }));
+        }
+        Ok((messages, used_ids))
     }
 
     pub(super) fn system_prompt(&self, raw: &Value) -> Result<String, ChatError> {
@@ -586,6 +628,9 @@ impl ChatMode {
             .unwrap_or("当前模型");
         parts.push(format!("当前模型：{model}"));
         let personalization = super::settings::load_preferences(self)?;
+        if let Some(profile) = crate::runtime::personalization_prompt(&personalization) {
+            parts.push(profile);
+        }
         if let Some(instructions) = personalization["chat_instructions"]
             .as_str()
             .filter(|value| !value.trim().is_empty())
@@ -624,7 +669,7 @@ impl ChatMode {
         Ok(parts.join("\n\n"))
     }
 
-    fn store_assistant(
+    fn store_message(
         &self,
         conversation_id: &str,
         turn_id: &str,
@@ -644,36 +689,7 @@ impl ChatMode {
         })
     }
 
-    fn store_batch(
-        &self,
-        conversation_id: &str,
-        turn_id: &str,
-        _assistant_id: String,
-        messages: Vec<Value>,
-    ) -> Result<(), ChatError> {
-        self.storage(|paths| {
-            tree::append_batch(paths, conversation_id, turn_id, messages, now(), |_| {})
-        })
-    }
-
-    fn append_partial(
-        &self,
-        conversation_id: &str,
-        turn_id: &str,
-        partial: &str,
-    ) -> Result<(), ChatError> {
-        let message = json!({
-            "message_id": format!("msg_{}", Uuid::new_v4().simple()),
-            "role": "assistant",
-            "content": partial,
-            "metadata": {"stopped": true},
-        });
-        self.storage(|paths| {
-            tree::append(paths, conversation_id, turn_id, message, now(), None).map(|_| ())
-        })
-    }
-
-    fn emit(&self, task_id: &str, kind: &str, data: Value) -> bool {
+    pub(super) fn emit(&self, task_id: &str, kind: &str, data: Value) -> bool {
         self.runtime.emit_chat_event(task_id, kind, data).is_ok()
     }
 }
@@ -790,16 +806,21 @@ pub(super) fn validated_calls(
     message: &Value,
     used: &mut std::collections::HashSet<String>,
 ) -> Result<Vec<Call>, String> {
-    let Some(calls) = message["tool_calls"].as_array() else {
-        return Ok(Vec::new());
+    let calls = match &message["tool_calls"] {
+        Value::Null => return Ok(Vec::new()),
+        Value::Array(calls) => calls,
+        _ => return Err("Invalid Chat tool calls array".into()),
     };
     calls
         .iter()
         .map(|call| {
             let id = call["id"]
                 .as_str()
-                .filter(|id| !id.is_empty())
+                .filter(|id| !id.trim().is_empty())
                 .ok_or("Missing Chat tool call id")?;
+            if call["type"] != "function" {
+                return Err("Unsupported Chat tool call type".into());
+            }
             if !used.insert(id.into()) {
                 return Err(format!("Duplicate Chat tool call ID: {id}"));
             }
@@ -809,9 +830,9 @@ pub(super) fn validated_calls(
             }
             let arguments = call["function"]["arguments"]
                 .as_str()
-                .unwrap_or("{}");
-            let arguments: Value =
-                serde_json::from_str(arguments).map_err(|_| format!("Invalid {name} arguments"))?;
+                .and_then(|arguments| serde_json::from_str::<Value>(arguments).ok())
+                .filter(Value::is_object)
+                .ok_or_else(|| format!("Invalid {name} arguments: expected a JSON object"))?;
             Ok(Call {
                 id: id.into(),
                 name: name.into(),
@@ -845,6 +866,22 @@ fn assistant_message(message: &Value, model_key: &str, response_message_id: &str
         if let Some(value) = message.get(field) { stored["metadata"][field] = value.clone(); }
     }
     stored
+}
+
+fn assistant_model_message(message: &Value) -> Value {
+    let mut projected = json!({
+        "role":"assistant",
+        "content":message["content"],
+        "tool_calls":message["tool_calls"],
+    });
+    // Responses' transport filters these opaque items by its configured
+    // connection; Chat Completions does not receive the Responses fields.
+    for field in ["reasoning_content", "_responses_connection", "responses_reasoning_items"] {
+        if let Some(value) = message.get(field) {
+            projected[field] = value.clone();
+        }
+    }
+    projected
 }
 
 fn usage_statistics(usage: &Value) -> Option<Value> {
