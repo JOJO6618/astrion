@@ -240,7 +240,14 @@ impl Session {
             Action::Compression { active: true } => self.change("compact", "PreCompact", at),
             Action::Compression { active: false } => self.change("thinking", "PostCompact", at),
             Action::Response { error } => self.response_error |= error,
-            Action::Finished(status) => self.finish(status, at),
+            Action::Finished(status) => {
+                if self.terminal != Some(status) {
+                    // An idle sample from before the end does not rule out
+                    // work admitted in the final tool turn.
+                    self.background = None;
+                    self.finish(status, at);
+                }
+            }
             _ => {}
         }
     }

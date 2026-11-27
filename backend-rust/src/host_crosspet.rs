@@ -93,26 +93,19 @@ impl CrossPetRuntime for HostCrossPetRuntime {
         tasks
             .iter()
             .filter_map(|task| {
-                let terminal = self.runtime.crosspet_status(task);
-                // Rust currently has no background-command or multi-agent executor.
-                // The child supervisor is the only supported background activity source.
-                let background = catalog
+                let workspace = catalog
                     .as_ref()
-                    .and_then(|catalog| catalog.by_id(&task.session.workspace_id))
-                    .and_then(|workspace| {
+                    .and_then(|catalog| catalog.by_id(&task.session.workspace_id));
+                let mut observed = self.runtime.crosspet_observation(task, workspace)?;
+                if observed.background == Some(false) {
+                    // Do not report idle if either activity source is unknown.
+                    observed.background = workspace.and_then(|workspace| {
                         self.children
-                            .has_running(workspace, &task.session.conversation_id)
+                            .has_pending_work(workspace, &task.session.conversation_id)
                             .ok()
                     });
-                (terminal.is_some() || background.is_some()).then(|| {
-                    (
-                        task.clone(),
-                        TaskObservation {
-                            terminal,
-                            background,
-                        },
-                    )
-                })
+                }
+                Some((task.clone(), observed))
             })
             .collect()
     }

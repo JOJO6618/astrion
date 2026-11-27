@@ -83,6 +83,27 @@ impl SubAgents {
             .any(running))
     }
 
+    /// A finished child can still have a result waiting for delivery to its parent.
+    pub fn has_pending_work(&self, workspace: &RegisteredWorkspace, parent: &str) -> io::Result<bool> {
+        let parent = normalize_conversation(parent).ok_or_else(|| {
+            io::Error::new(io::ErrorKind::InvalidInput, "Invalid parent conversation")
+        })?;
+        let bound = self
+            .check_workspace(workspace)
+            .map_err(|_| io::Error::other("Child activity workspace is unavailable"))?;
+        if self.live_records(workspace, &parent, &bound)?.values().any(running) {
+            return Ok(true);
+        }
+        let parent = Parent {
+            workspace_id: workspace.id.clone(),
+            root: bound,
+            conversation_id: parent,
+        };
+        self.pending_notices(&parent)
+            .map(|notices| !notices.is_empty())
+            .map_err(io::Error::other)
+    }
+
     /// The caller already holds the runtime lock and verified the workspace.
     pub(crate) fn has_running_for_bound(&self, workspace: &RegisteredWorkspace, parent: &str) -> io::Result<bool> {
         Ok(self.live_records(workspace, parent, &workspace.path)?.values().any(running))
