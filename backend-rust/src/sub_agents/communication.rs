@@ -17,6 +17,9 @@ impl SubAgents {
             protocol::text(args, "question_id")?.to_owned()
         };
         if key.len() > 100 || !safe_id(&key) { return Err("question_id格式无效。".into()); }
+        // A client may reuse a question_id after timeout. A late natural
+        // answer or receiver cleanup must not affect the newer question.
+        let generation = message_id("question_generation");
         let receiver = {
             let mut live = self.lock()?;
             let mut doc = self.registry.document().map_err(storage)?;
@@ -37,7 +40,8 @@ impl SubAgents {
                     self.check_resumable(&live, parent, id, record)?;
                     let name = record["name"].as_str().unwrap_or_default();
                     let message = notice(NoticeType::AskOther, from_name, Some(name), &key, text);
-                    queue(record, &format!("{message}\n\n请使用 answer_other_agent 回答，question_id 为 {key}。"), None)?;
+                    queue(record, &format!("{message}\n\n请使用 answer_other_agent 回答，question_id 为 {key}。"), None)?
+                        ["rust_answer_question"] = json!({"id":key,"generation":generation});
                     push_notice(&mut doc, parent, message)?;
                     target = Some(id.to_owned());
                 }
@@ -45,7 +49,9 @@ impl SubAgents {
             }
             self.registry.store(&doc).map_err(storage)?;
             let (answer, receiver) = oneshot::channel();
-            live.questions.insert(key.clone(), Question { child: from.into(), target: target.clone(), answer });
+            live.questions.insert(key.clone(), Question {
+                child: from.into(), target: target.clone(), generation: generation.clone(), answer,
+            });
             if let Some(id) = target && let Err(error) = self.launch_locked(&mut live, &mut doc, parent, &id) {
                 live.questions.remove(&key);
                 return Err(error);
@@ -56,7 +62,9 @@ impl SubAgents {
             Some(deadline) => tokio::time::timeout_at(deadline, receiver).await.ok(),
             None => Some(receiver.await),
         };
-        if let Ok(mut live) = self.lock() { live.questions.remove(&key); }
+        if let Ok(mut live) = self.lock()
+            && live.questions.get(&key).is_some_and(|question| question.generation == generation)
+        { live.questions.remove(&key); }
         Ok(match outcome {
             Some(Ok(answer)) => json!({"success":true,"answer":answer,"question_id":key}),
             Some(Err(_)) => json!({"success":false,"error":"回答方已终结。","question_id":key}),

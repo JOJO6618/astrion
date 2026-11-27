@@ -144,18 +144,7 @@ impl Workspace {
     pub(in crate::tools) fn relative_path(&self, raw: &str) -> Result<PathBuf, String> {
         let raw = raw.trim();
         let path = Path::new(raw);
-        let relative = if raw == "/workspace" {
-            Path::new("")
-        } else if let Some(alias) = raw.strip_prefix("/workspace/") {
-            Path::new(alias)
-        } else if path.has_root() || matches!(path.components().next(), Some(Component::Prefix(_)))
-        {
-            path.strip_prefix(&self.startup_path)
-                .or_else(|_| path.strip_prefix(&self.canonical_path))
-                .map_err(|_| ACCESS_DENIED)?
-        } else {
-            path
-        };
+        let relative = native_or_workspace_relative(path, raw, &self.startup_path, &self.canonical_path)?;
         let mut path = PathBuf::new();
         for component in relative.components() {
             match component {
@@ -216,6 +205,31 @@ impl Workspace {
         parent.map_or_else(|| self.directory.try_clone(), Ok)
     }
 }
+
+fn native_or_workspace_relative<'a>(
+    path: &'a Path, raw: &'a str, startup: &Path, canonical: &Path,
+) -> Result<&'a Path, String> {
+    // This prefix can genuinely be the registered Host root (e.g.
+    // /workspace/project). Only use the virtual prefix when it is not already
+    // a native absolute path inside the bound root.
+    if let Ok(native) = path.strip_prefix(startup).or_else(|_| path.strip_prefix(canonical)) {
+        return Ok(native);
+    }
+    if raw == "/workspace" {
+        return Ok(Path::new(""));
+    }
+    if let Some(alias) = raw.strip_prefix("/workspace/") {
+        return Ok(Path::new(alias));
+    }
+    if path.has_root() || matches!(path.components().next(), Some(Component::Prefix(_))) {
+        return Err(ACCESS_DENIED.into());
+    }
+    Ok(path)
+}
+
+#[cfg(test)]
+#[path = "../../../../test/2026-11-27_Rust子智能体环境/native_workspace_paths.rs"]
+mod native_workspace_tests;
 
 pub(in crate::tools) fn file_options() -> OpenOptions {
     let mut options = OpenOptions::new();

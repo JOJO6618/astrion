@@ -284,7 +284,7 @@ impl Gateway {
         if self.runtime.bound_workspace(&entry.id)?.as_ref() == Some(&entry.path)
             && entry.path.is_dir()
         {
-            return Ok(());
+            return self.runtime.refresh_workspace_label(entry);
         }
         let tools = astrion_headless::tools::ToolSet::for_workspace(
             &entry.path,
@@ -294,7 +294,7 @@ impl Gateway {
             status: 409,
             message: e.to_string(),
         })?;
-        self.runtime.bind_registered_workspace(&entry.id, &entry.path, tools, || {
+        self.runtime.bind_named_workspace(entry, tools, || {
             let current = self.paths.catalog().map_err(|e| RuntimeError { status: 500, message: e.to_string() })?;
             if current.workspaces.iter().any(|ws| ws.id == entry.id && ws.path == entry.path) {
                 Ok(())

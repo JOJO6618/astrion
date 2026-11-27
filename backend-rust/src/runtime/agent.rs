@@ -433,7 +433,9 @@ async fn run_inner(
                     result
                 } else {
                     let active: &dyn AgentTools = rebound.as_ref().map(|tools| tools as &dyn AgentTools).unwrap_or(tools);
-                    active.execute(&call.name, arguments).await?
+                    let result = active.execute(&call.name, arguments).await?;
+                    if workflow { runtime.record_strict_guide_read(task_id, &call.name, &result)?; }
+                    result
                 }
             };
             if call.name == "browser_take_screenshot" && model.supports_images()

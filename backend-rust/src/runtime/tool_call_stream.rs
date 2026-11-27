@@ -41,6 +41,7 @@ struct StreamTool {
     name: String,
     intent: Option<String>,
     complete: bool,
+    prepared: bool,
 }
 
 impl Default for ToolCallStream {
@@ -57,7 +58,6 @@ impl ToolCallStream {
     /// Feed one accumulated tool call fragment and return the events to publish.
     pub(crate) fn push(&mut self, delta: ToolCallDelta<'_>) -> Vec<ToolStreamEvent> {
         let mut events = Vec::new();
-        let fresh = !self.tools.contains_key(&delta.index);
         let tool = self.tools.entry(delta.index).or_default();
         if !delta.id.is_empty() {
             tool.id = delta.id.to_owned();
@@ -70,19 +70,20 @@ impl ToolCallStream {
         } else {
             (None, false)
         };
-        if fresh {
+        if !tool.prepared {
             if let Some(intent) = &intent {
                 tool.intent = Some(intent.clone());
                 tool.complete = complete;
             }
             // Without an id the block would have nothing to key on; the next
             // fragment carries it and still opens the block before execution.
-            if !tool.id.is_empty() {
+            if !tool.id.is_empty() && !tool.name.is_empty() {
+                tool.prepared = true;
                 events.push(ToolStreamEvent::Preparing {
                     id: tool.id.clone(),
                     name: tool.name.clone(),
-                    intent,
-                    intent_complete: complete,
+                    intent: tool.intent.clone(),
+                    intent_complete: tool.complete,
                 });
             }
             return events;

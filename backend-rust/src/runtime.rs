@@ -1,6 +1,7 @@
 mod agent;
 pub(crate) mod adaptive_context;
 mod admission_recovery;
+mod strict_guides;
 mod approval;
 mod approval_display;
 pub(crate) mod automatic_title;
@@ -422,6 +423,20 @@ impl Runtime {
         &self, workspace_id: &str, project_path: impl AsRef<Path>, tools: ToolSet,
         verify_registration: impl FnOnce() -> Result<(), RuntimeError>,
     ) -> Result<(), RuntimeError> {
+        self.bind_catalog_workspace(workspace_id, project_path.as_ref(), None, tools, verify_registration)
+    }
+
+    pub fn bind_named_workspace(
+        &self, workspace: &RegisteredWorkspace, tools: ToolSet,
+        verify_registration: impl FnOnce() -> Result<(), RuntimeError>,
+    ) -> Result<(), RuntimeError> {
+        self.bind_catalog_workspace(&workspace.id, &workspace.path, Some(&workspace.label), tools, verify_registration)
+    }
+
+    fn bind_catalog_workspace(
+        &self, workspace_id: &str, project_path: &Path, label: Option<&str>, tools: ToolSet,
+        verify_registration: impl FnOnce() -> Result<(), RuntimeError>,
+    ) -> Result<(), RuntimeError> {
         validate_workspace(workspace_id)?;
         let path = fs::canonicalize(project_path).map_err(RuntimeError::storage)?;
         if !path.is_dir() {
@@ -442,7 +457,22 @@ impl Runtime {
             return Err(RuntimeError::new(409, "Workspace is already bound to a different project path"));
         }
         store.workspaces.insert(workspace_id.into(), path);
+        if let Some(label) = label {
+            store.workspace_labels.insert(workspace_id.into(), label.to_owned());
+        }
         store.workspace_tools.insert(workspace_id.into(), tools);
+        Ok(())
+    }
+
+    pub fn refresh_workspace_label(&self, workspace: &RegisteredWorkspace) -> Result<(), RuntimeError> {
+        let mut store = self.store()?;
+        if store.workspaces.get(&workspace.id) == Some(&workspace.path)
+            && store.workspace_labels.get(&workspace.id) == Some(&workspace.label)
+        {
+            return Ok(());
+        }
+        verify_workspace_binding(&store, &workspace.id, Some(&workspace.path))?;
+        store.workspace_labels.insert(workspace.id.clone(), workspace.label.clone());
         Ok(())
     }
 
@@ -464,6 +494,7 @@ impl Runtime {
         Self::close_process_scope(&mut store, workspace_id, None);
         store.workspaces.remove(workspace_id);
         store.workspace_tools.remove(workspace_id);
+        store.workspace_labels.remove(workspace_id);
         Ok(result)
     }
 
