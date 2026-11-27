@@ -146,13 +146,7 @@ impl Runtime {
         if self.poll_sub_agents(workspace, conversation, principal.clone(), catalog, fixed)?.is_some() {
             return Ok(());
         }
-        if self.process_notices_waiting(workspace, conversation)? {
-            let (document, _) = self.store()?.header(&workspace.id, conversation)?;
-            let model = notice_model(&document["metadata"], catalog, fixed)?;
-            let settings = resolve_task_approval_settings(principal, catalog)?;
-            self.dispatch_process_notice(workspace, conversation, model, settings)?;
-        }
-        Ok(())
+        self.poll_process_notices(workspace, conversation, principal, catalog, fixed)
     }
 
     pub fn dispatch_sub_agent_notices(&self, workspace: &RegisteredWorkspace, parent: &str,
@@ -194,7 +188,7 @@ impl Runtime {
     }
 }
 
-fn notice_model(metadata: &Value, catalog: &CatalogSource, fixed: Option<&ModelConfig>) -> Result<ModelConfig, RuntimeError> {
+pub(super) fn notice_model(metadata: &Value, catalog: &CatalogSource, fixed: Option<&ModelConfig>) -> Result<ModelConfig, RuntimeError> {
     if let Some(model) = fixed {
         return Ok(model.clone());
     }
