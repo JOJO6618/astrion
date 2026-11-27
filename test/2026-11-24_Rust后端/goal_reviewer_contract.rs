@@ -85,7 +85,8 @@ async fn goal_review_replays_reminder_and_settles_each_round_from_catalog_profil
     assert!(matches!(result, Verdict::Done(reason) if reason == "Fixture passed"));
     assert_eq!(progress.into_inner(), [json!(1), json!(2)]);
     let calls = calls.lock().unwrap();
-    assert_eq!(calls.len(), 2);
+    assert_eq!(calls.len(), 3);
+    assert_eq!(calls[0], calls[1]);
     for call in calls.iter() {
         assert_eq!(call["model"], "goal-upstream");
         assert_eq!(call["temperature"], 0.25);
@@ -96,11 +97,11 @@ async fn goal_review_replays_reminder_and_settles_each_round_from_catalog_profil
         assert_eq!(tools[0]["function"]["name"], "report_goal_status");
     }
     assert_eq!(
-        calls[1]["messages"][2]["content"],
+        calls[2]["messages"][2]["content"],
         "A verdict without a tool call"
     );
     assert!(
-        calls[1]["messages"][3]["content"]
+        calls[2]["messages"][3]["content"]
             .as_str()
             .unwrap()
             .contains("report_goal_status")
@@ -129,11 +130,12 @@ async fn review_response(
     let mut calls = calls.lock().unwrap();
     calls.push(body);
     let (delta, finish) = match calls.len() {
-        1 => (
+        1 => return ([(header::CONTENT_TYPE, "text/event-stream")], ": interrupted\n\n".into()),
+        2 => (
             json!({"role":"assistant","content":"A verdict without a tool call"}),
             "stop",
         ),
-        2 => (
+        3 => (
             json!({"role":"assistant","tool_calls":[{
                 "index":0,"id":"fixture-verdict","type":"function",
                 "function":{"name":"report_goal_status","arguments":"{\"status\":\"done\",\"message\":\"Fixture passed\"}"},

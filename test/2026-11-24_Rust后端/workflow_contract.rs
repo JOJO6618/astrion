@@ -679,6 +679,7 @@ async fn mock_full_workflow(
             .count()
     };
     match (model.as_str(), count) {
+        ("audit-upstream", 1) => ([("content-type", "text/event-stream")], ": interrupted\n\n".into()),
         ("audit-upstream", _) => tool_stream(
             "audit-done",
             "report_workflow_review",
@@ -827,7 +828,7 @@ async fn scoped_http_activation_runs_main_review_and_branch_and_records_the_acto
         StatusCode::CONFLICT
     );
     mock.first_main.notify_one();
-    let task = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+    let task = tokio::time::timeout(std::time::Duration::from_secs(20), async {
         loop {
             let snapshot = runtime.poll_task("main", task_id, 0).unwrap();
             if snapshot["data"]["status"] != "running" {
@@ -877,10 +878,13 @@ async fn scoped_http_activation_runs_main_review_and_branch_and_records_the_acto
     );
     assert_eq!(ledger["actors"]["main"]["requests"], 3);
     let received = mock.requests.lock().unwrap();
-    let review = received
+    let reviews: Vec<_> = received
         .iter()
-        .find(|request| request["model"] == "audit-upstream")
-        .unwrap();
+        .filter(|request| request["model"] == "audit-upstream")
+        .collect();
+    assert_eq!(reviews.len(), 2);
+    assert_eq!(reviews[0], reviews[1]);
+    let review = reviews[1];
     assert!(
         review["messages"][1]["content"]
             .as_str()

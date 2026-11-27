@@ -401,7 +401,7 @@ impl ChatMode {
         pending: Arc<Mutex<String>>,
         work: Option<&crate::runtime::thinking_auxiliary::ThinkingWork>,
     ) -> Outcome {
-        use crate::model::{RoundBudget, StreamDelta};
+        use crate::model::{RoundBudget, StreamDelta, retry::Attempt};
 
         if let Err(error) = self
             .storage(|paths| tree::consume_network_notices(paths, conversation_id, turn_id, now()))
@@ -421,75 +421,102 @@ impl ChatMode {
             .collect();
 
         for round in 0..MAX_MODEL_ROUNDS {
-            let response_message_id = format!("msg_{}", Uuid::new_v4().simple());
-            if !self.emit(task_id, "api_request_start", json!({"attempt":1,"max_attempts":1})) {
-                return Outcome::stopped();
-            }
-            let pending_text = pending.clone();
-            if let Ok(mut text) = pending_text.lock() {
-                text.clear();
-            }
-            let mut started = false;
-            let mut tool_stream = crate::runtime::tool_call_stream::ToolCallStream::default();
-            let mut thinking = crate::runtime::thinking::ThinkingStream::new(&self.runtime, task_id, &response_message_id, work);
-            let mut completion = match model
-                .complete_with_updates(&messages, &tools, &mut RoundBudget::default(), |update| {
-                    let delta = match update {
-                        StreamDelta::Thinking(delta) => { let _ = thinking.push(delta); return; }
-                        StreamDelta::NativeSummary(summary) => { thinking.native_summary(summary); return; }
-                        StreamDelta::Usage(_) => return,
-                        StreamDelta::ToolCall(update) => {
-                            let events = tool_stream.push(update);
-                            let _ = thinking.end();
-                            for event in &events {
-                                let _ = crate::runtime::tool_call_stream::publish(event, |kind, data| {
-                                    if self.emit(task_id, kind, data) { Ok(()) } else { Err("Chat task stopped".into()) }
-                                });
-                            }
-                            return;
-                        }
-                        StreamDelta::Text(delta) => delta,
-                    };
-                    let _ = thinking.end();
-                    if let Ok(mut text) = pending_text.lock() {
-                        text.push_str(delta);
-                    }
-                    if !started {
-                        started = true;
-                        let _ = self.emit(task_id, "text_start", json!({"response_message_id":response_message_id}));
-                    }
-                    let _ = self.emit(task_id, "text_chunk", json!({"content":delta}));
-                })
-                .await
-            {
-                Ok(completion) => completion,
-                Err(error) => {
-                    let partial = pending.lock().map(|text| text.clone()).unwrap_or_default();
-                    if !partial.trim().is_empty() {
-                        let _ = self.append_partial(conversation_id, turn_id, &partial);
-                    }
-                    return Outcome::failed(error);
-                }
-            };
-            if thinking.end().is_err() { return Outcome::stopped(); }
-            crate::tools::web::annotate(&mut completion.message, &messages);
-            if started {
-                let content = completion.message["content"].as_str().unwrap_or_default();
-                let mut event = json!({"full_content":content});
-                if let Some(citations) = completion.message["metadata"].get("citations") {
-                    event["citations"] = citations.clone();
-                }
-                if !self.emit(task_id, "text_end", event) {
+            let mut attempt = 0;
+            let (completion, stats) = loop {
+                attempt += 1;
+                let retry = Attempt::new(attempt, true);
+                let response_message_id = format!("msg_{}", Uuid::new_v4().simple());
+                let mut start = retry.start_event();
+                start["response_message_id"] = json!(response_message_id);
+                if !self.emit(task_id, "api_request_start", start) {
                     return Outcome::stopped();
                 }
-            }
-            let stats = completion.usage.as_ref().and_then(usage_statistics);
-            if let Err(error) = self.store_assistant(
-                conversation_id, turn_id, assistant_message(&completion.message, model.key(), &response_message_id), stats.as_ref(),
-            ) {
-                return Outcome::failed(error.message);
-            }
-            thinking.keep();
+                let pending_text = pending.clone();
+                if let Ok(mut text) = pending_text.lock() {
+                    text.clear();
+                }
+                let mut started = false;
+                let mut tool_started = false;
+                let mut tool_stream = crate::runtime::tool_call_stream::ToolCallStream::default();
+                let mut thinking = crate::runtime::thinking::ThinkingStream::new(&self.runtime, task_id, &response_message_id, work);
+                match model
+                    .complete_with_updates(&messages, &tools, &mut RoundBudget::default(), |update| {
+                        let delta = match update {
+                            StreamDelta::Thinking(delta) => { let _ = thinking.push(delta); return; }
+                            StreamDelta::NativeSummary(summary) => { thinking.native_summary(summary); return; }
+                            StreamDelta::Usage(_) => return,
+                            StreamDelta::ToolCall(update) => {
+                                let events = tool_stream.push(update);
+                                tool_started |= !events.is_empty();
+                                let _ = thinking.end();
+                                for event in &events {
+                                    let _ = crate::runtime::tool_call_stream::publish(event, |kind, data| {
+                                        if self.emit(task_id, kind, data) { Ok(()) } else { Err("Chat task stopped".into()) }
+                                    });
+                                }
+                                return;
+                            }
+                            StreamDelta::Text(delta) => delta,
+                        };
+                        let _ = thinking.end();
+                        if let Ok(mut text) = pending_text.lock() {
+                            text.push_str(delta);
+                        }
+                        if !started {
+                            started = true;
+                            let _ = self.emit(task_id, "text_start", json!({"response_message_id":response_message_id}));
+                        }
+                        let _ = self.emit(task_id, "text_chunk", json!({"content":delta}));
+                    })
+                    .await
+                {
+                    Ok(mut completion) => {
+                        if thinking.end().is_err() { return Outcome::stopped(); }
+                        crate::tools::web::annotate(&mut completion.message, &messages);
+                        if started {
+                            let content = completion.message["content"].as_str().unwrap_or_default();
+                            let mut event = json!({"full_content":content});
+                            if let Some(citations) = completion.message["metadata"].get("citations") {
+                                event["citations"] = citations.clone();
+                            }
+                            if !self.emit(task_id, "text_end", event) {
+                                return Outcome::stopped();
+                            }
+                        }
+                        let stats = completion.usage.as_ref().and_then(usage_statistics);
+                        if let Err(error) = self.store_assistant(
+                            conversation_id, turn_id, assistant_message(&completion.message, model.key(), &response_message_id), stats.as_ref(),
+                        ) {
+                            return Outcome::failed(error.message);
+                        }
+                        thinking.keep();
+                        break (completion, stats);
+                    }
+                    Err(error) if retry.should_retry(&error) => {
+                        let had_thinking = thinking.started();
+                        drop(thinking);
+                        if let Ok(mut text) = pending.lock() {
+                            text.clear();
+                        }
+                        if !self.emit(task_id, "error", retry.error_event(&error)) {
+                            return Outcome::stopped();
+                        }
+                        if (started || had_thinking || tool_started)
+                            && !self.emit(task_id, "stream_reset", retry.reset_event())
+                        {
+                            return Outcome::stopped();
+                        }
+                        retry.wait().await;
+                    }
+                    Err(error) => {
+                        let partial = pending.lock().map(|text| text.clone()).unwrap_or_default();
+                        if !partial.trim().is_empty() {
+                            let _ = self.append_partial(conversation_id, turn_id, &partial);
+                        }
+                        return Outcome::failed(error);
+                    }
+                }
+            };
             if let Ok(mut text) = pending.lock() {
                 text.clear();
             }
