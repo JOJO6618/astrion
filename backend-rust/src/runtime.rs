@@ -1,4 +1,5 @@
 mod agent;
+pub(crate) mod adaptive_context;
 mod admission_recovery;
 mod approval;
 pub(crate) mod automatic_title;
@@ -1003,7 +1004,7 @@ impl Runtime {
         Ok((!restricted).then(|| store.data_dir.clone()))
     }
 
-    fn record_usage(&self, id: &str, usage: &Value) -> Result<(), String> {
+    fn record_usage(&self, id: &str, usage: &Value, request_model: Option<&str>) -> Result<(), String> {
         let mut store = self.store().map_err(|error| error.message)?;
         let task = writable_task(&mut store, id)?;
         let workspace_id = task.workspace_id.clone();
@@ -1011,16 +1012,17 @@ impl Runtime {
         let (header, _) = store.header(&workspace_id, &conversation_id).map_err(|error| error.message)?;
         let mut stats = TokenStats::from_document(&header["token_statistics"]);
         if stats.record(usage) {
-            store.append_messages(&workspace_id, &conversation_id, Vec::new(), now(), Some(&stats), None)
-                .map_err(|error| error.message)?;
-            let threshold = crate::web_assets::personalization::automatic_deep_limit(&store.data_dir,&header["metadata"]).map_err(|e| e.to_string())?;
-            let task = writable_task(&mut store,id)?;
-            if task.kind=="chat" && task.compression_stage.is_none() && !task.compression_pending
-                && stats.current_context_tokens.zip(threshold).is_some_and(|(count,limit)| count>=limit) {
-                task.compression_pending=true;
-                task.auto_compression=true;
-            }
-            task.emit("token_update", stats.event_data());
+            let stamp = now();
+            let mut baseline = 0;
+            store.append_with_metadata(&workspace_id, &conversation_id, Vec::new(), stamp, Some(&stats), None, |metadata| {
+                if let Some(model) = request_model {
+                    adaptive_context::record(metadata, usage, model, stamp);
+                }
+                baseline = metadata["context_baseline_tokens"].as_u64().unwrap_or_default();
+            }).map_err(|error| error.message)?;
+            let mut event = stats.event_data();
+            event["context_baseline_tokens"] = json!(baseline);
+            writable_task(&mut store, id)?.emit("token_update", event);
         }
         Ok(())
     }
@@ -1134,7 +1136,8 @@ fn new_document_with_id(
             "execution_mode":"sandbox","pending_permission_mode":null,
             "pending_execution_mode":null,"frozen_system_prompt":null,
             "workspace_memory_enabled":true,"has_images":false,"has_videos":false,"total_messages":0,"total_tools":0,
-            "status":"active","compression_count":0,"deep_compression_records":[]
+            "status":"active","compression_count":0,"deep_compression_records":[],
+            "context_baseline_pending":true
         },
         "token_statistics":{}
     });

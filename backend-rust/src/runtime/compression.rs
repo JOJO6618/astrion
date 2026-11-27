@@ -10,15 +10,21 @@ use uuid::Uuid;
 
 const PROMPT: &str = include_str!("../../../prompts/deep_compression_summary.txt");
 
-pub(super) fn projection(task: Option<&Task>, id: &str, metadata: &Value) -> Value {
-    let task = task.filter(|task| task.status == Status::Running
-        && (task.kind == "compression" || task.compression_stage.is_some() || task.compression_pending));
-    let mode = task.map(|task| match (task.kind, task.auto_compression) {
+fn compression_mode(task: &Task) -> &'static str {
+    match (task.kind, task.auto_compression) {
         ("compression", _) => "manual",
         (_, true) => "auto",
         _ => "requested",
-    });
-    let stage = task.map(|task| task.compression_stage.unwrap_or(if task.kind == "compression" { "queued" } else { "waiting_for_tools" }));
+    }
+}
+
+pub(super) fn projection(task: Option<&Task>, id: &str, metadata: &Value) -> Value {
+    let task = task.filter(|task| task.status == Status::Running
+        && (task.kind == "compression" || task.compression_stage.is_some() || task.compression_pending));
+    let mode = task.map(compression_mode);
+    let stage = task.map(|task| task.compression_stage.unwrap_or(
+        if compression_mode(task) == "requested" { "waiting_for_tools" } else { "queued" },
+    ));
     json!({"conversation_id":id,"in_progress":task.is_some(),"mode":mode,"stage":stage,
         "job_id":task.map(|task| &task.start.id),"error":metadata["compression_error"],
         "count":metadata["compression_count"].as_u64().unwrap_or(0)})
@@ -103,6 +109,8 @@ impl Runtime {
             }
             task.compression_pending = true;
             task.auto_compression = false;
+            task.emit("compression_state", json!({"in_progress":true,"stage":"waiting_for_tools",
+                "job_id":task.start.id,"mode":"requested"}));
             return Ok(
                 json!({"success":true,"data":{"task_id":task.start.id,"conversation_id":id,"workspace_id":ws.id,"status":"running","queued":true,"task_type":task.kind}}),
             );
@@ -145,6 +153,30 @@ impl Runtime {
         Ok(
             json!({"success":true,"data":{"task_id":task_id,"conversation_id":id,"workspace_id":ws.id,"created_at":created_at,"status":"running","task_type":"compression"}}),
         )
+    }
+
+    // Check before the first ordinary request and again only at model-round
+    // boundaries, after any complete tool batch has been committed.
+    pub(super) fn queue_auto_compression(&self, task_id: &str) -> Result<(), String> {
+        let mut store = self.store().map_err(|error| error.message)?;
+        let task = super::writable_task(&mut store, task_id)?;
+        if task.kind != "chat" || task.compression_pending || task.compression_stage.is_some() {
+            return Ok(());
+        }
+        let (ws, id) = (task.workspace_id.clone(), task.conversation_id.clone());
+        let (header, _) = store.header(&ws, &id).map_err(|error| error.message)?;
+        let Some(current) = header["token_statistics"]["current_context_tokens"].as_u64()
+            .filter(|count| *count > 0) else { return Ok(()) };
+        let limit = crate::web_assets::personalization::automatic_deep_limit(&store.data_dir, &header["metadata"])
+            .map_err(|error| error.to_string())?;
+        if limit.is_some_and(|limit| current > limit) {
+            let task = super::writable_task(&mut store, task_id)?;
+            task.compression_pending = true;
+            task.auto_compression = true;
+            task.emit("compression_state", json!({"in_progress":true,"stage":"queued",
+                "job_id":task_id,"mode":"auto"}));
+        }
+        Ok(())
     }
 
     pub(super) async fn finish_agent_context(
@@ -192,7 +224,7 @@ impl Runtime {
             }
             task.compression_pending = false;
             task.compression_stage = Some("generating_summary");
-            task.emit("compression_state",json!({"in_progress":true,"stage":"generating_summary","job_id":task_id,"mode":if task.kind=="compression" {"manual"}else{"requested"}}));
+            task.emit("compression_state",json!({"in_progress":true,"stage":"generating_summary","job_id":task_id,"mode":compression_mode(task)}));
         }
         let result = self.summarize(task_id, model).await;
         if let Err(reason) = &result
@@ -237,13 +269,7 @@ impl Runtime {
             (
                 task.workspace_id.clone(),
                 task.conversation_id.clone(),
-                if task.kind == "compression" {
-                    "manual"
-                } else if task.auto_compression {
-                    "auto"
-                } else {
-                    "requested"
-                },
+                compression_mode(task),
                 root,
                 doc.into_raw(),
                 history,
@@ -316,7 +342,7 @@ impl Runtime {
                         .map_err(|e| e.to_string())?
                         && let Some(usage) = &reply.usage
                     {
-                        self.record_usage(task_id, usage)?;
+                        self.record_usage(task_id, usage, None)?;
                     }
                     if let Some(text) = reply.message["content"]
                         .as_str()
