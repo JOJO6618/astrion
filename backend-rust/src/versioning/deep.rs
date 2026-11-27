@@ -50,16 +50,6 @@ pub(super) struct Snapshot {
     pub summary: Map<String, Value>,
 }
 
-pub(super) fn baseline_tree(
-    store: &Store,
-    session: &Dir,
-    id: &str,
-    root: &Path,
-) -> Result<String, RuntimeError> {
-    let (path, _) = repository(store, session, id, root, true)?;
-    git_id(git(root, &path, ["write-tree"])?)
-}
-
 pub(super) fn checkpoint(
     store: &Store,
     session: &Dir,
