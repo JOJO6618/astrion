@@ -5,6 +5,9 @@ use cap_fs_ext::DirExt;
 use cap_std::fs::Dir;
 use serde_json::{Value, json};
 
+#[path = "media/image_compression.rs"]
+mod image_compression;
+
 use crate::{
     knowledge::storage::{open_canonical_dir, read_bytes},
     tools::read_file::ReadFile,
@@ -112,6 +115,7 @@ pub(crate) fn attach(document: &Value, history: &mut [Value], data: &Path, works
     let blobs = OnceCell::new();
     let execution_files = OnceCell::new();
     let workspace_files = OnceCell::new();
+    let compression = OnceCell::new();
     let aliases = &document["metadata"]["conversation_transfer"]["paths"];
     for (source, projected) in document["messages"]
         .as_array()
@@ -190,7 +194,13 @@ pub(crate) fn attach(document: &Value, history: &mut [Value], data: &Path, works
                     .and_then(|files| files.read_bytes(path).ok())
                     .filter(|b| !b.is_empty())
                 {
-                    let mut attachment = part(kind, mime, &bytes);
+                    let mut attachment = if kind == "image" {
+                        compression.get_or_init(|| image_compression::bounds(data))
+                            .and_then(|bounds| image_compression::resize(&bytes, bounds))
+                            .map_or_else(|| part(kind, mime, &bytes), |png| part(kind, "image/png", &png))
+                    } else {
+                        part(kind, mime, &bytes)
+                    };
                     if kind == "video" && !item["fps"].is_null() {
                         attachment["fps"] = item["fps"].clone();
                     }

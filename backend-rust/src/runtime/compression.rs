@@ -224,7 +224,9 @@ impl Runtime {
                 .read(&task.workspace_id, &task.conversation_id)
                 .map_err(|e| e.message)?
                 .into_raw();
-            system_prompt::freeze(&store, &task.workspace_id, &mut raw, model, true)
+            system_prompt::freeze(self, &store, &task.workspace_id, &mut raw, model, system_prompt::ToolContext {
+                writer: true, workflow: true, approval: task.approval.as_ref(),
+            })
                 .map_err(|e| e.message)?;
             let doc = LegacyDocument::from_value(raw).map_err(|e| e.message)?;
             let history = doc
@@ -441,7 +443,9 @@ impl Runtime {
             current["token_statistics"]["cache_cold_start_pending"] = json!(true);
             current["updated_at"] = json!(stamp);
             if mode != "manual" {
-                system_prompt::freeze(&store, &ws, &mut current, model, true)
+                system_prompt::freeze(self, &store, &ws, &mut current, model, system_prompt::ToolContext {
+                    writer: true, workflow: true, approval: store.tasks[task_id].approval.as_ref(),
+                })
                     .map_err(|e| e.message)?;
             }
             let doc = LegacyDocument::from_value(current).map_err(|e| e.message)?;

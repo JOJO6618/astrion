@@ -21,3 +21,18 @@ pub(crate) fn main_categories(data:&std::path::Path,workspace:&str) -> std::coll
     access::available(servers,&settings,Actor::Main,workspace,data,&Default::default())
         .iter().map(|server|registry::category(&server.id)).collect()
 }
+
+/// Discover the built-in list tool without connecting to any server.
+pub(crate) fn main_has_servers(
+    data: &std::path::Path, workspace: &str, overrides: &serde_json::Value,
+) -> bool {
+    let registry = Registry::for_data(data);
+    if !registry.enabled() {
+        return false;
+    }
+    let (servers, settings) = registry.settings();
+    let overrides = overrides.as_object().into_iter().flatten().filter_map(|(name, flag)| {
+        flag.as_bool().map(|flag| (name.clone(), flag))
+    }).collect();
+    !access::available(servers, &settings, Actor::Main, workspace, data, &overrides).is_empty()
+}

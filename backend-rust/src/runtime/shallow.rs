@@ -50,7 +50,9 @@ pub(super) fn after_batch(
             system_prompt::invalidate_after_compression(
                 meta.as_object_mut().ok_or("Invalid metadata")?,
             );
-            system_prompt::freeze(&store, &ws, header, model, true).map_err(|e| e.message)?;
+            system_prompt::freeze(runtime, &store, &ws, header, model, system_prompt::ToolContext {
+                writer: true, workflow: true, approval: store.tasks[id].approval.as_ref(),
+            }).map_err(|e| e.message)?;
             prompt = header["metadata"]["frozen_system_prompt"]
                 .as_str()
                 .map(str::to_owned);
