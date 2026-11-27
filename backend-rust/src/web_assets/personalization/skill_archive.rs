@@ -38,7 +38,7 @@ impl Personalization {
         source: &str,
     ) -> io::Result<Value> {
         let prefs = &self.preferences;
-        let _guard = prefs
+        let mut prepared = prefs
             .updates
             .lock()
             .map_err(|_| io::Error::other("Skill archive is unavailable"))?;
@@ -108,9 +108,20 @@ impl Personalization {
             }
             Err(error) => return Err(error),
         }
+        // A newly archived library entry must reach other workspaces on their
+        // next use, not only the current workspace copy.
+        prepared.clear();
         let mut result =
             json!({"success":true,"skill_name":id,"summary":format!("已归档技能 {id}。")});
         let mirrored = (|| -> io::Result<()> {
+            if self.workspace_skill_mirror {
+                let config = super::Store::open(data)?.read(&prefs.catalog.load())?;
+                let catalog = super::skills_catalog(&prefs.global_skills, &prefs.private_skills);
+                let (selected, _) = super::skill_selection(&config, &catalog);
+                let enabled = selected.into_iter().map(str::to_owned).collect::<Vec<_>>();
+                prefs.mirror(workspace, &enabled, &catalog)?;
+                return Ok(());
+            }
             let root = open_canonical_dir(workspace)?;
             let target = ensure_dir(&ensure_dir(&root, ".astrion")?, "skills")?;
             let source = private.open_dir_nofollow(id)?;
@@ -138,7 +149,7 @@ fn require_absent(parent: &Dir, name: &str) -> io::Result<()> {
     }
 }
 
-fn inspect_tree(
+pub(super) fn inspect_tree(
     source: &Dir,
     check: &impl Fn(&str) -> io::Result<()>,
 ) -> io::Result<Vec<(String, String)>> {
@@ -156,7 +167,7 @@ fn inspect_tree(
     Ok(snapshot)
 }
 
-fn copy_atomic(
+pub(super) fn copy_atomic(
     source: &Dir,
     target: &Dir,
     id: &str,

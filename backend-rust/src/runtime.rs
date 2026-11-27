@@ -638,6 +638,13 @@ impl Runtime {
             let scope = if admission.exclusive_workspace { "workspace" } else { "conversation" };
             return Err(RuntimeError::new(409, format!("A task is already running in this {scope}")));
         }
+        if approval.as_ref().is_some_and(|settings| settings.principal.workspace_id() != workspace_id) {
+            return Err(RuntimeError::new(403, "Task approval workspace does not match"));
+        }
+        let skill_sync_failed = admission.tools.allows_workflow()
+            && self.personalization.as_ref().is_some_and(|settings| {
+                settings.prepare_workspace_skills(&store.workspaces[workspace_id]).is_err()
+            });
         let created_at = now();
         let create = requested_id.is_none();
         let document = match requested_id {
@@ -689,9 +696,6 @@ impl Runtime {
             admission.tools
         };
         let worktree_notice = tools.allows_workflow().then(|| worktree::notice(&mut document["metadata"])).flatten();
-        if approval.as_ref().is_some_and(|settings| settings.principal.workspace_id() != workspace_id) {
-            return Err(RuntimeError::new(403, "Task approval workspace does not match"));
-        }
         let user = json!({"role":"user","content":message});
         let mut durable_user = user.clone();
         let message_source = optional_string(payload, "message_source")?.map(str::to_owned);
@@ -713,6 +717,10 @@ impl Runtime {
         task.max_iterations=payload["max_iterations"].as_u64().filter(|n| *n>0);
         task.completion = Some(completion.clone());
         task.execution_root = execution_root;
+        if skill_sync_failed {
+            task.emit("skill_sync_warning", json!({"message":
+                crate::web_assets::personalization::skill_mirror_warning(&store.data_dir)}));
+        }
         let mut prepared = None;
         self.goals.admit(crate::goals::Admission {
             conversation_id: &conversation_id, task_id: &task_id, message, request: &request, origin,

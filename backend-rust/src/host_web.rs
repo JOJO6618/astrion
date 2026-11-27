@@ -44,7 +44,8 @@ pub(crate) fn headless_workspace_routes(gateway: &Arc<Gateway>, data: &Path) -> 
     let scoped = web_status::headless_router(status_config(gateway, data))
         .merge(native.workspace_router())
         .merge(astrion_headless::project_git::workspace_router(gateway.runtime.clone()))
-        .merge(astrion_headless::knowledge::web::skills_router(data.to_owned()))
+        .merge(astrion_headless::knowledge::web::skills_router(data.to_owned())
+            .layer(axum::Extension(gateway.preferences.clone())))
         .merge(astrion_headless::worktree::router_with_scope(gateway.runtime.clone(), data.to_owned()))
         .route_layer(middleware::from_fn_with_state(gateway.clone(), crate::gateway::workspace_scope));
     scoped.merge(native.system_router())
@@ -106,7 +107,8 @@ pub fn routes(
         .merge(astrion_headless::runtime::versioning::mutation_router(gateway.runtime.clone()))
         .merge(astrion_headless::runtime::web_messages::router(gateway.runtime.clone()))
         .merge(astrion_headless::runtime::process_resources::browser_router(gateway.runtime.clone()))
-        .merge(astrion_headless::knowledge::web::scoped_router(data.to_owned()))
+        .merge(astrion_headless::knowledge::web::scoped_router(data.to_owned())
+            .layer(axum::Extension(gateway.preferences.clone())))
         .merge(astrion_headless::worktree::router_with_scope(gateway.runtime.clone(), data.to_owned()))
         .merge(gateway.children.browser_router())
         .merge(workflows::browser_scoped_router(

@@ -178,7 +178,13 @@ pub(super) fn workspace_menu(knowledge: &Knowledge) -> io::Result<Vec<Value>> {
     let Some(root) = Root::Astrion.open(knowledge)? else {
         return Ok(Vec::new());
     };
+    let saved;
+    let settings = if let Some(settings) = &knowledge.skill_settings { settings } else {
+        saved = SkillSettings::load(&knowledge.data)?;
+        &saved
+    };
     let mut ids = skill_ids(&root)?;
+    ids.retain(|id| settings.enabled(id));
     ids.sort_by_cached_key(|id| (id.to_ascii_lowercase(), id.clone()));
     Ok(ids.into_iter().filter_map(|id| {
         let file = document(knowledge, &root, &id).ok()?;

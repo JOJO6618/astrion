@@ -1085,9 +1085,7 @@ export const usePersonalizationStore = defineStore('personalization', {
         if (!resp.ok || !result.success) {
           throw new Error(result.error || t('stores.autoSaveFailed'));
         }
-        if (this.error) {
-          this.error = '';
-        }
+        this.error = typeof result.skill_sync_warning === 'string' ? result.skill_sync_warning : '';
         return { ok: true, result };
       } catch (error: any) {
         for (const [key, value] of patch) {

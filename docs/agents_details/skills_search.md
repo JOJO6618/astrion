@@ -16,6 +16,12 @@
 - 固定使用规则在 `prompts/main_agent/static.txt`「## Skills 使用规则」：产出型任务先检索、关键词带英文、命中后必须 read_skill 读全文、未命中不换同义词重试。
 - 旧模板 `prompts/skills_system.txt` 已删除（无引用）。
 
+## Rust Host：工作区技能准备
+
+- Web 设置保存只即时更新当前服务端解析的工作区；其它已登记工作区下次打开技能选择或发送 Agent 任务时，按同一账号的当前设置准备。直接发起的任务也会在生成新系统提示词前准备，不依赖先打开技能选择。
+- 软件内置库与个人库同名时以个人库为准，归档新技能会让其他工作区在下次使用时刷新。副本在工作区 `.astrion/skills`，不会改动 `.agents/skills`。
+- 只有 Host 记录且内容仍一致的副本会更新或清理。手工放入的目录和改过的副本保留原文件；已禁用技能不在输入栏和模型检索中列出。同步失败不替用户覆盖目录，设置与任务分别给出警告。
+
 ## 检索工具 `search_skills`
 
 - 定义唯一来源：`modules/skills_manager.py` 的 `SEARCH_SKILLS_DESCRIPTION` / `SEARCH_SKILLS_PARAMETERS`，主（`tools_definition/file_tools.py`）与子（`modules/sub_agent/toolkit.py`）共用，改文案只改一处。

@@ -207,6 +207,12 @@ export const lifecycleMethods = {
         this.handleTaskError(eventData, eventIdx);
         break;
 
+      case 'skill_sync_warning':
+        if (eventData?.message && this.isCurrentTaskEvent(eventData)) {
+          this.uiPushToast({ type: 'warning', message: eventData.message });
+        }
+        break;
+
       case 'token_update':
         this.handleTokenUpdate(eventData, eventIdx);
         break;
