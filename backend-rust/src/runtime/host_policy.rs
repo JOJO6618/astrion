@@ -345,6 +345,13 @@ pub(super) fn forbidden_path(path: &Path, policy: &Value, data: &Path, deploy: &
     denied_by_policy(path, policy)
 }
 
+fn platform_applicable(raw: &str) -> bool {
+    // A path form that cannot exist on this platform (a Unix absolute path in a
+    // Windows configuration, for example) must not disable the whole native
+    // file path check.
+    if cfg!(windows) { !raw.trim().starts_with("/") } else { true }
+}
+
 fn denied_by_policy(path: &Path, policy: &Value) -> Result<bool, RuntimeError> {
     let text = path.to_string_lossy().replace('\\', "/");
     let normalized = text.to_lowercase();
@@ -355,6 +362,7 @@ fn denied_by_policy(path: &Path, policy: &Value) -> Result<bool, RuntimeError> {
         blocked.extend(["SystemRoot", "ProgramFiles", "ProgramFiles(x86)"].into_iter().filter_map(|key| std::env::var(key).ok()));
     }
     for raw in blocked {
+        if !platform_applicable(&raw) { continue; }
         let root = expand(&raw).map_err(RuntimeError::storage)?;
         let root = root.to_string_lossy().replace('\\', "/").to_lowercase();
         let root = root.trim_end_matches('/');
@@ -368,6 +376,7 @@ fn denied_by_policy(path: &Path, policy: &Value) -> Result<bool, RuntimeError> {
         return Ok(true);
     }
     for regex in strings(policy.get("macos_deny_read_regexes")).map_err(RuntimeError::storage)? {
+        if cfg!(windows) { continue; }
         if regex != DEFAULT_DENY_REGEX && regex_matches(&regex, &text)? { return Ok(true); }
     }
     Ok(false)

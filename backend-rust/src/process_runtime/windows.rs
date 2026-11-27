@@ -7,7 +7,7 @@ use windows_sys::Win32::System::Threading::CREATE_NO_WINDOW;
 
 use super::{policy::{SandboxAccess, denied}, windows_plan};
 
-const NO_INTEROP: &str = "test ! -e /proc/sys/fs/binfmt_misc/WSLInterop || /bin/grep -qx disabled /proc/sys/fs/binfmt_misc/WSLInterop";
+const NO_INTEROP: &str = r#"if [ -e /proc/sys/fs/binfmt_misc/WSLInterop ] && ! /bin/grep -qx disabled /proc/sys/fs/binfmt_misc/WSLInterop 2>/dev/null; then if [ -x /mnt/c/Windows/System32/cmd.exe ] && timeout 3 /mnt/c/Windows/System32/cmd.exe /c exit >/dev/null 2>&1; then exit 1; fi; fi; exit 0"#;
 
 pub(crate) fn system_program(file: &str) -> Option<PathBuf> {
     let root = PathBuf::from(std::env::var_os("SystemRoot")?);
