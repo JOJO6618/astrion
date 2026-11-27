@@ -292,3 +292,7 @@ fn failure(status: StatusCode, message: &str) -> (StatusCode, Json<Value>) {
 #[cfg(test)]
 #[path = "../../test/2026-11-25_RustCrossPet/crosspet_contract.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../../test/2026-11-27_CrossPet后台状态/projection.rs"]
+mod background_tests;
