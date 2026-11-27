@@ -373,6 +373,7 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 9. **模型切换与重连**：Chat Completions 与 Responses 可互切；只向同一 Responses 连接回放加密推理。OAuth 重连验证账号身份并保留连接 ID，刷新目录后报告完成。目录暂缺时对话与设置保留原模型 key，无法使用的对话模型显示「未选择模型」。细则见 `AD/settings_and_providers.md`。
 10. **模型目录自动刷新**：`POST /api/providers/refresh-all` 刷全部已连接 + Codex，前端进入应用与每小时各调一次（挂在 `app/lifecycle.ts` 的 settingsRoute 分支之前），进程内每小时最多真跑一次、重复调用返回 `skipped`。**不要在 `start_background_jobs` 加后端定时器**（会变成应用关着也刷）。
 11. **Responses 请求形状（绕开 OpenAI 6.2 缓存回归）**：gpt-6.2 系**不缓存 `instructions`**（缓存缺口≈system 大小），`input` 前缀照常缓存；工具 schema 编译更严（`propertyNames` 直接 `invalid_json_schema`）。`translate.py` 两条硬约定：① OpenAI 系端点把 system 作为 `input` 首条 `role:"developer"` 发送且**完全不写 `instructions`**（第三方网关上的非 OpenAI 模型保持原形状）；② `flatten_tools()` 前必须过 `sanitize_json_schema()`（剥 `propertyNames`／`patternProperties`／`if-then-else`，参数名不动）。只做减法；`prompt_cache_key` 只对 codex_oauth／openai-api／第一方端点下发。**改前先确认 OpenAI 是否已修复**；回归 `test/2026-11-19_*`。
+12. **出站代理统一走 `net` 模块**（`backend-rust/src/net.rs`）：优先级 环境变量 → 显式配置（`codex_models.json` 的 `proxy`）→ 操作系统系统代理（macOS `SCDynamicStoreCopyProxies`，回退 CFNetwork；Windows 注册表 `Internet Settings` 的 `ProxyEnable/ProxyServer/ProxyOverride`）；`localhost/127.0.0.1/::1` 强制直连。所有对外客户端（模型请求 `chat.rs`、模型发现、Codex OAuth、额度、网页工具、参考数据）必须 `net::apply` + `net::resolve`，**不要再自建裸 `Client::builder()`**；本机通信（MCP transport、preview、native_browser、desktop_bridge）保持直连。绕过列表里**单独一项 `*`** 才是「全部直连」，`*.local` 这类通配不能判成全局绕过（否则代理被整个丢弃）。
 
 ## 16) 预览面板（Preview Panel）
 

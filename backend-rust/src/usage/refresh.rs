@@ -14,11 +14,14 @@ pub(super) struct ReferenceSource {
 impl ReferenceSource {
     pub(super) fn new(url: &str, max_bytes: usize) -> Self {
         Self {
-            client: reqwest::Client::builder()
-                .redirect(reqwest::redirect::Policy::none())
-                .timeout(Duration::from_secs(8))
-                .build()
-                .expect("reference data HTTP client"),
+            client: crate::net::apply(
+                reqwest::Client::builder()
+                    .redirect(reqwest::redirect::Policy::none())
+                    .timeout(Duration::from_secs(8)),
+                crate::net::resolve(None).as_ref(),
+            )
+            .build()
+            .expect("reference data HTTP client"),
             url: url.to_owned(),
             max_bytes,
         }

@@ -165,12 +165,15 @@ pub(super) fn http_url(raw: &str) -> Result<Url, String> {
 }
 
 pub(super) fn client() -> Result<Client, String> {
-    Client::builder()
-        .timeout(Duration::from_secs(45))
-        .user_agent("Astrion/1.0")
-        .redirect(reqwest::redirect::Policy::none())
-        .build()
-        .map_err(|_| "无法初始化网页服务".into())
+    crate::net::apply(
+        Client::builder()
+            .timeout(Duration::from_secs(45))
+            .user_agent("Astrion/1.0")
+            .redirect(reqwest::redirect::Policy::none()),
+        crate::net::resolve(None).as_ref(),
+    )
+    .build()
+    .map_err(|_| "无法初始化网页服务".into())
 }
 
 async fn response(request: RequestBuilder) -> Result<Vec<u8>, String> {

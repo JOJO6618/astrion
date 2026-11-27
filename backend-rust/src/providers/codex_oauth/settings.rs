@@ -15,12 +15,15 @@ fn text(value: &Value) -> Option<String> {
     (!trimmed.is_empty()).then(|| trimmed.to_owned())
 }
 
+/// 当前生效的代理：环境变量 > 配置文件 `proxy` > 系统代理。
+/// 界面用它显示实际使用的代理地址。
 pub(super) fn effective_proxy(settings: &Value) -> Option<String> {
-    ["HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy"]
-        .iter()
-        .filter_map(|key| std::env::var(key).ok())
-        .find_map(|raw| text(&Value::String(raw)))
-        .or_else(|| text(&settings["proxy"]))
+    crate::net::resolve(configured_proxy(settings).as_deref()).map(|proxy| proxy.url)
+}
+
+/// 只读配置文件里的 `proxy`，不做优先级判断（交给 `net::resolve`）。
+pub(super) fn configured_proxy(settings: &Value) -> Option<String> {
+    text(&settings["proxy"])
 }
 
 pub(super) fn version(settings: &Value) -> String {
