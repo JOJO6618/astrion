@@ -154,6 +154,32 @@ impl Database {
         }
         tx.commit().map_err(error)
     }
+    /// Keep the work bubble and Quick Window's file list in the same SQLite transaction.
+    pub(crate) fn record_edit_summary(
+        &mut self, id: &str, message_id: &str, summary: &Value, path: &str, op: &str, timestamp: &str,
+    ) -> Result<Value, String> {
+        let tx = self.conn.transaction_with_behavior(TransactionBehavior::Immediate).map_err(error)?;
+        write_edit_summary(&tx, id, message_id, summary).map_err(error)?;
+
+        let mut edited = tx.query_row(
+            "SELECT value FROM fields WHERE conversation=? AND scope='metadata' AND key='edited_files'",
+            [id], |row| row.get::<_, String>(0),
+        ).optional().map_err(error)?
+            .and_then(|text| serde_json::from_str::<Vec<Value>>(&text).ok()).unwrap_or_default();
+        edited.retain(|entry| entry["path"] != path);
+        edited.push(json!({"path":path,"op":op,"ts":timestamp}));
+        tx.execute("INSERT INTO fields VALUES(?,'metadata','edited_files',?)
+            ON CONFLICT(conversation,scope,key) DO UPDATE SET value=excluded.value",
+            params![id, Value::Array(edited.clone()).to_string()],
+        ).map_err(error)?;
+        tx.commit().map_err(error)?;
+        Ok(Value::Array(edited))
+    }
+    pub(crate) fn finish_edit_summary(&self, id: &str, message_id: &str, summary: &Value) -> Result<(), String> {
+        let tx = self.conn.unchecked_transaction().map_err(error)?;
+        write_edit_summary(&tx, id, message_id, summary).map_err(error)?;
+        tx.commit().map_err(error)
+    }
     pub fn delete(&mut self,id:&str)->Result<bool,String>{
         self.conn.execute("DELETE FROM conversations WHERE id=?",[id]).map(|n|n==1).map_err(error)
     }
@@ -205,6 +231,19 @@ fn exists(db:&Connection,id:&str)->rusqlite::Result<bool>{
     db.query_row("SELECT EXISTS(SELECT 1 FROM conversations WHERE id=?)",[id],|r|r.get(0))
 }
 fn tool_count(msg:&Value)->usize{if msg["role"]=="assistant"{msg["tool_calls"].as_array().map_or(0,Vec::len)}else{0}}
+fn write_edit_summary(db: &Connection, id: &str, message_id: &str, summary: &Value) -> Inner<()> {
+    let (seq, body): (usize, String) = db.query_row(
+        "SELECT seq,body FROM messages WHERE conversation=? AND message_id=? AND role='user'",
+        params![id, message_id],
+        |row| Ok((row.get(0)?, row.get(1)?)),
+    )?;
+    let mut body: Value = serde_json::from_str(&body)?;
+    if !body["metadata"].is_object() {
+        body["metadata"] = json!({});
+    }
+    body["metadata"]["edit_summary"] = summary.clone();
+    write_message(db, id, seq, &body)
+}
 fn write_message(db:&Connection,id:&str,seq:usize,msg:&Value)->Inner<()>{
     db.prepare_cached("INSERT INTO messages VALUES(?,?,?,?,?) ON CONFLICT(conversation,seq) DO UPDATE SET body=excluded.body,message_id=excluded.message_id,role=excluded.role WHERE messages.body<>excluded.body")?
         .execute(params![id,seq,msg["message_id"].as_str(),msg["role"].as_str(),msg.to_string()])?;

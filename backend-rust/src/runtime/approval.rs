@@ -310,9 +310,32 @@ impl Runtime {
         &self,
         writer: Arc<WorkspaceFileWriter>,
         task_id: &str,
+        request: ToolRequest,
+        history: &[Value],
+        batch: &[Value],
+    ) -> Result<Value, String> {
+        self.execute_workspace_write_inner(writer, task_id, request, history, batch, true).await
+    }
+
+    pub(super) async fn execute_generated_workspace_write(
+        &self,
+        writer: Arc<WorkspaceFileWriter>,
+        task_id: &str,
+        request: ToolRequest,
+        history: &[Value],
+        batch: &[Value],
+    ) -> Result<Value, String> {
+        self.execute_workspace_write_inner(writer, task_id, request, history, batch, false).await
+    }
+
+    async fn execute_workspace_write_inner(
+        &self,
+        writer: Arc<WorkspaceFileWriter>,
+        task_id: &str,
         mut request: ToolRequest,
         history: &[Value],
         batch: &[Value],
+        record_edit: bool,
     ) -> Result<Value, String> {
         let (approval, external_root) = {
             let mut store = self.store().map_err(|error| error.message)?;
@@ -404,6 +427,18 @@ impl Runtime {
                         && let Some(path) = request.arguments.get("file_path").and_then(Value::as_str)
                         && let Err(error) = super::versioning::track_edit(&store, &task_id, path) {
                         return Ok(tool_failure("versioning_backup_failed", &error.message));
+                    }
+                    if record_edit && external_root.is_none() {
+                        let (result, receipt) = writer.execute_recorded(authority, scope.conversation_id(), &messages);
+                        if let Some(receipt) = receipt
+                            && let Err(error) = super::modify_history::record(&mut store, &task_id, scope.workspace_root(), receipt,
+                                if request.tool_name == EDIT_NAME { "edit" } else { "write" })
+                        {
+                            if let Some(task) = store.tasks.get_mut(&task_id) {
+                                task.emit("edit_history_error", json!({"phase":"write","message":error.message}));
+                            }
+                        }
+                        return Ok(result);
                     }
                     let write = |injected| writer.execute_with_host_root(authority, scope.conversation_id(),
                         &messages, external_root.as_ref(), injected);

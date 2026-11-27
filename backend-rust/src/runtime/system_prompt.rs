@@ -54,7 +54,11 @@ pub(super) fn freeze(
             .filter(|prefs| prefs.as_object().is_some_and(|fields| !fields.is_empty()))
             .cloned().unwrap_or_else(|| knowledge.prompt_preferences());
         let recent = sections::recent_conversations(store, workspace_id, &conversation_id, &preferences);
-        let input = Inputs { root, created_at: &created_at, knowledge: &knowledge, preferences: &preferences, model, writer, recent, browser: store.native_browser.is_some() && writer };
+        let history_dir = if writer && crate::web_assets::personalization::modify_history_enabled(&store.data_dir) {
+            let active = super::Runtime::worktree_execution_root(store, workspace_id, &Value::Object(metadata.clone()))?;
+            Some(active.as_deref().unwrap_or(root).join(".astrion").join("modify_history").join(&conversation_id))
+        } else { None };
+        let input = Inputs { root, created_at: &created_at, knowledge: &knowledge, preferences: &preferences, model, writer, recent, browser: store.native_browser.is_some() && writer, history_dir };
         build(metadata, input)
     })
 }
@@ -116,10 +120,11 @@ struct Inputs<'a> {
     writer: bool,
     browser: bool,
     recent: String,
+    history_dir: Option<std::path::PathBuf>,
 }
 
 fn build(metadata: &mut Map<String, Value>, input: Inputs<'_>) -> Result<String, RuntimeError> {
-    let Inputs { root, created_at, knowledge, preferences, model, writer, recent, browser } = input;
+    let Inputs { root, created_at, knowledge, preferences, model, writer, recent, browser, history_dir } = input;
     let mut parts = vec![STATIC.trim().to_owned()];
     parts.extend(sections::personalization(preferences));
     for (name, enabled) in [("AGENTS.md", "agents_md_auto_inject"), ("CLAUDE.md", "claude_md_auto_inject")] {
@@ -173,6 +178,9 @@ fn build(metadata: &mut Map<String, Value>, input: Inputs<'_>) -> Result<String,
         ("resource_limit", &limits), ("conversation_start_time", &started),
         ("file_tree", &tree), ("recent_uploads", ""),
     ]));
+    if let Some(history) = history_dir {
+        parts.push(render(dynamic!("modify_history"), &[("modify_history_dir", &history.to_string_lossy())]));
+    }
     Ok(parts.join("\n\n"))
 }
 
