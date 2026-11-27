@@ -10,6 +10,7 @@ use super::{LEGACY_MEDIA, MAX_ASSETS, MAX_BYTES, archive::{Payloads, Resource, v
 
 pub(crate) const NAMESPACE: &str = ".astrion/conversation_assets";
 pub(crate) const MEDIA_INDEX: &str = "conversations/media_store";
+const COMPACT_RESULT: &str = ".astrion/compact_result/";
 
 pub(crate) fn components(relative: &str) -> io::Result<impl Iterator<Item = &str>> {
     if relative.is_empty() || relative.contains(['\\', ':', '\0']) || relative.split('/').any(|part| {
@@ -206,6 +207,9 @@ impl Assets {
                         if old.is_empty() { old.push(logical); }
                         collected.add(data, "material", None, None, old)?;
                     }
+                    Err(error) if error.kind() == ErrorKind::NotFound && optional_summary(relative)
+                        && aliases.iter().filter(|(_, value)| **value == mapping)
+                            .all(|(key, _)| logical_path(key).is_some_and(optional_summary)) => {}
                     Err(error) if error.kind() == ErrorKind::PermissionDenied && subdir(&project_dir, &actual, false).is_ok() => {}
                     Err(error) => return Err(io_error(error)),
                 }
@@ -213,7 +217,7 @@ impl Assets {
                 if project.is_some() && collected_dirs.insert(directory.to_owned()) {
                     collected.directory(&project_dir, root, directory)?;
                 }
-            } else if relative.starts_with(".astrion/compact_result/") {
+            } else if optional_summary(relative) {
                 match read(&project_dir, relative, MAX_BYTES) {
                     Ok(data) => collected.add(data, "material", None, None, vec![relative.into(), root.join(relative).to_string_lossy().into_owned()])?,
                     Err(error) if error.kind() == ErrorKind::NotFound => {},
@@ -298,12 +302,16 @@ fn mapped(path: &str) -> Result<String, RuntimeError> {
 pub(crate) fn logical_path(text: &str) -> Option<&str> {
     for (start, _) in text.match_indices(".astrion/") {
         let piece = &text[start..];
-        if ![".astrion/compact_result/", ".astrion/handoff/"].iter().any(|prefix| piece.starts_with(prefix)) { continue; }
+        if ![COMPACT_RESULT, ".astrion/handoff/"].iter().any(|prefix| piece.starts_with(prefix)) { continue; }
         let stop = piece.find(|c: char| c.is_whitespace() || "`<>\"'[])(（），。；;".contains(c)).unwrap_or(piece.len());
         let path = piece[..stop].trim_end_matches(['.', ',', ':']);
         if path.split('/').nth(2).is_some_and(|name| !name.is_empty()) { return Some(path); }
     }
     None
+}
+
+fn optional_summary(relative: &str) -> bool {
+    relative.starts_with(COMPACT_RESULT)
 }
 
 fn handoff_dir(relative: &str) -> Option<&str> {
@@ -360,10 +368,17 @@ pub(crate) fn verify_coverage(raw: &Value, resources: &[Resource], shared_media:
     let mut required_materials = BTreeSet::new();
     scan(&raw["messages"], &mut required_materials)?;
     scan(&raw["metadata"]["deep_compression_records"], &mut required_materials)?;
-    if required_materials.iter().any(|path| !material_paths.contains(path.as_str())
-        && !handoff_dirs.contains(path.as_str()))
-    {
-        return Err(bad("A referenced summary or handoff material is missing from the archive"));
+    for path in required_materials {
+        // Historical compact summaries are optional: the original message is
+        // preserved even when a previously generated file has been cleaned up.
+        if optional_summary(&path) {
+            let _ = components(&path).map_err(io_error)?;
+            continue;
+        }
+        if !material_paths.contains(path.as_str()) && !handoff_dirs.contains(path.as_str())
+        {
+            return Err(bad("A referenced handoff material is missing from the archive"));
+        }
     }
     for message in raw["messages"].as_array().expect("validated messages") {
         for reference in values(message, "media_refs") {
