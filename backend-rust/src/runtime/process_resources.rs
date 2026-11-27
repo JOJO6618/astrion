@@ -15,7 +15,8 @@ use serde_json::{Value, json};
 use uuid::Uuid;
 
 use crate::{
-    approval::{ApprovalType, ExecutionMode, PermissionMode, Status as ApprovalStatus, ToolRequest},
+    approval::{ApprovalPrincipal, ApprovalType, ExecutionMode, PermissionMode, Status as ApprovalStatus, ToolRequest},
+    catalog::CatalogSource,
     process_runtime::{self, Invocation, MonitorStage, Network, Owner, SandboxAccess, Scope, terminal_allowed, tools_category},
     tools::read_file::ReadFile,
 
@@ -25,7 +26,7 @@ use crate::{
 
 use super::{ModelConfig, Origin, Runtime, RuntimeError, Status, TaskAdmission, TaskApprovalSettings,
     approval::{claim_process_approval, create_process_approval, task_scope}, emit_user_message, goals::verify_conversation_root, iso_time, now,
-    store::Store, verify_workspace_binding, writable_task};
+    store::Store, sub_agent_execution::notice_model, resolve_task_approval_settings, verify_workspace_binding, writable_task};
 
 const HOST: &str = "host";
 const MONITOR_CHARS: usize = 60_000;
@@ -183,6 +184,47 @@ impl Runtime {
         Ok(store.process_resources.has_notices(&owner))
     }
 
+    /// Drive ready Host process notifications independently of browser polling.
+    /// The ownership comes from admitted processes, not from scanned documents
+    /// or user-supplied IDs. Admission and consumption are still atomic with
+    /// the inline and HTTP paths inside `dispatch_process_notice`.
+    pub fn poll_idle_process_notices(&self, catalog: &CatalogSource, fixed: Option<&ModelConfig>) -> Result<(), RuntimeError> {
+        let candidates = {
+            let store = self.store()?;
+            if store.shutting_down { return Ok(()); }
+            store.process_resources.ready_notice_owners().into_iter().filter(|owner| {
+                owner.user == HOST
+                    && store.workspaces.get(&owner.workspace_id) == Some(&owner.workspace)
+                    && !store.tasks.values().any(|task| task.workspace_id == owner.workspace_id
+                        && task.conversation_id == owner.conversation && task.status == Status::Running)
+            }).collect::<Vec<_>>()
+        };
+        for owner in candidates {
+            let principal = ApprovalPrincipal::new(HOST, &owner.workspace_id).map_err(RuntimeError::storage)?;
+            let workspace = RegisteredWorkspace {
+                id: owner.workspace_id, path: owner.workspace, label: String::new(),
+            };
+            // A stale scope, paused goal or currently unavailable model must
+            // not block delivery to other conversations. A later tick can retry.
+            let _ = self.poll_process_notices(&workspace, &owner.conversation, principal, catalog, fixed);
+        }
+        Ok(())
+    }
+
+    pub(super) fn poll_process_notices(
+        &self, workspace: &RegisteredWorkspace, conversation: &str, principal: ApprovalPrincipal,
+        catalog: &CatalogSource, fixed: Option<&ModelConfig>,
+    ) -> Result<(), RuntimeError> {
+        if principal.workspace_id() != workspace.id { return Err(RuntimeError::session_not_found()); }
+        if self.process_notices_waiting(workspace, conversation)? {
+            let (document, _) = self.store()?.header(&workspace.id, conversation)?;
+            let model = notice_model(&document["metadata"], catalog, fixed)?;
+            let settings = resolve_task_approval_settings(principal, catalog)?;
+            self.dispatch_process_notice(workspace, conversation, model, settings)?;
+        }
+        Ok(())
+    }
+
     pub(super) fn dispatch_process_notice(
         &self, workspace: &RegisteredWorkspace, conversation: &str, model: ModelConfig,
         approval: TaskApprovalSettings,
@@ -198,7 +240,7 @@ impl Runtime {
         let Some((notice, remaining)) = notices.split_first() else { return Ok(None); };
         let rest = notice_ids(remaining);
         store.process_resources.restore_notices(&owner, &rest);
-        let message = notice_message(notice, now());
+        let message = notice_message(notice, now(), false, crate::web_assets::personalization::english(&store.data_dir));
         let payload = json!({"conversation_id":owner.conversation,"message":message["content"],
             "model_key":model.key(),"message_source":"background_command"});
         let tools = store.workspace_tools.get(&workspace.id).unwrap_or(&self.tools).clone();
@@ -226,7 +268,8 @@ impl Runtime {
         let notices = store.process_resources.take_notices(&owner);
         if notices.is_empty() { return Ok(Vec::new()); }
         let timestamp = now();
-        let messages = notices.iter().map(|notice| notice_message(notice, timestamp)).collect::<Vec<_>>();
+        let english = crate::web_assets::personalization::english(&store.data_dir);
+        let messages = notices.iter().map(|notice| notice_message(notice, timestamp, true, english)).collect::<Vec<_>>();
         let durable = preceding.into_iter().chain(messages.iter().cloned()).collect();
         if let Err(error) = store.append_messages(&owner.workspace_id, &owner.conversation, durable, timestamp, None, None) {
             store.process_resources.restore_notices(&owner, &notice_ids(&notices));
@@ -319,17 +362,30 @@ fn readonly_command(command: &str) -> bool {
     })
 }
 
-fn notice_message(notice: &Value, timestamp: f64) -> Value {
+fn notice_message(notice: &Value, timestamp: f64, inline: bool, english: bool) -> Value {
+    use std::fmt::Write;
     let command = notice["command"].as_str().unwrap_or_default();
     let output = notice["output"].as_str().filter(|text| !text.is_empty()).unwrap_or("[no_output]");
-    let status = notice["status"].as_str().unwrap_or_default();
-    let mut content = format!("[系统通知|background_command]\n后台命令已结束\n\n命令：{command}\n状态：{status}");
-    if let Some(code) = notice["return_code"].as_i64() {
-        use std::fmt::Write;
-        let _ = write!(content, "\n退出码：{code}");
+    let mut content = String::from("[系统通知|background_command]\n");
+    if inline {
+        let header = if english { "[Background run_command finished]" } else { "[后台 run_command 完成]" };
+        let _ = write!(content, "{header}\n{output}");
+        content.truncate(content.trim_end().len());
+    } else {
+        let (header, command_label, exit_label, output_label) = if english {
+            ("Background commands finished.", "Command: ", "Exit code: ", "Output:")
+        } else {
+            ("后台指令已完成。", "命令：", "退出码：", "输出：")
+        };
+        content.push_str(header);
+        if !command.is_empty() {
+            let _ = write!(content, "\n\n{command_label}{command}");
+        }
+        if let Some(code) = notice["return_code"].as_i64() {
+            let _ = write!(content, "\n{exit_label}{code}");
+        }
+        let _ = write!(content, "\n\n{output_label}\n{output}");
     }
-    content.push_str("\n\n输出：\n");
-    content.push_str(output);
     let id = format!("background_notice_{}", notice["command_id"].as_str().unwrap_or_default());
     json!({"role":"user","content":content,"message_id":id,"metadata":{
         "message_id":id,"message_source":"background_command","auto_message_type":"background_command",
@@ -580,3 +636,7 @@ async fn blocking(run: impl FnOnce() -> Result<Value, RuntimeError> + Send + 'st
 #[cfg(test)]
 #[path = "../../../test/2026-11-26_Rust运行资源/process_resources.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../../../test/2026-11-27_Rust后台完成通知/notice_message.rs"]
+mod notice_message_tests;

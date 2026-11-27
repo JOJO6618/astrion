@@ -174,10 +174,10 @@ async fn serve() -> io::Result<()> {
         children,
         paths: paths.clone(),
         workspace,
-        catalog,
+        catalog: catalog.clone(),
         workflows,
         preferences,
-        fixed_model: config.model,
+        fixed_model: config.model.clone(),
         token,
         web,
     });
@@ -224,7 +224,7 @@ async fn serve() -> io::Result<()> {
         "Astrion Rust server listening on {}",
         listener.local_addr()?
     );
-    let result = lifecycle::serve(listener, router, runtime, schedules).await;
+    let result = lifecycle::serve(listener, router, runtime, schedules, catalog, config.model).await;
     crosspet.shutdown();
     result
 }

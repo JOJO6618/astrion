@@ -284,6 +284,13 @@ impl ProcessResources {
         })
     }
 
+    /// Only existing process owners can be candidates for server-side notice delivery.
+    pub(crate) fn ready_notice_owners(&self) -> Vec<Owner> {
+        self.conversations.keys().filter(|owner| {
+            owner.actor.is_none() && self.has_notices(owner)
+        }).cloned().collect()
+    }
+
     pub(crate) fn background_detail(&self, owner: &Owner, id: &str) -> io::Result<Value> {
         Ok(json!({"success":true,"data":self.background(owner, id)?.project(owner, true)}))
     }
