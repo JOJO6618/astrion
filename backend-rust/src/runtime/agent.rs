@@ -1,21 +1,18 @@
-use std::{collections::HashSet, time::Duration};
+use std::collections::HashSet;
 
 use serde_json::{Value, json};
 use tokio::sync::oneshot;
 
 use super::conversation_review::agent_tools as conversation_tools;
 use super::{AgentTools, ModelConfig, Runtime, approval::workspace_write_request, billing::{BillingScope, ModelPrice, RequestBilling}};
-use crate::{chat::Completion, goals::{GoalFailure, INTERACTION_DENIED}, process_runtime::MonitorStage};
-use crate::model::RoundBudget;
+use crate::{chat::Completion, goals::INTERACTION_DENIED, process_runtime::MonitorStage};
+use crate::model::{RoundBudget, retry::Attempt};
 use crate::tools::{easter_egg, media, vlm};
 use crate::web_assets::personalization;
 use crate::tools::write_file::{EDIT_NAME, WRITE_NAME, edit_file_tool, write_file_tool};
 
 
 pub(super) mod tool_menu;
-
-const GOAL_API_ATTEMPTS: u16 = 5;
-const GOAL_API_RETRY_DELAY: Duration = Duration::from_secs(10);
 
 pub(super) async fn run(
     runtime: &Runtime,
@@ -117,23 +114,20 @@ async fn run_inner(
             attempt += 1;
             let goal_active = goal.as_ref().map(|run| runtime.goals.is_active(run)).transpose()
                 .map_err(|error| error.message)?.unwrap_or(false);
-            let max_attempts = if goal_active { GOAL_API_ATTEMPTS } else { 1 };
+            let retry = Attempt::new(attempt, goal.is_none() || goal_active);
             let bill = runtime.billing.begin(billing_scope.clone(), ModelPrice {
                 model_key: model.key(), model_id: &model.model, identity: &model.price_identity, responses,
             }).await;
-            runtime.emit(task_id, "api_request_start", json!({"attempt":attempt,"max_attempts":max_attempts}))?;
+            runtime.emit(task_id, "api_request_start", retry.start_event())?;
             let (result, bill, stream) = stream_completion(runtime, task_id, &model, &request, &round_schemas, &mut budget, bill, workflow, thinking).await?;
             match result {
                 Ok(completion) => break (completion, bill, stream),
-                Err(error) if attempt < max_attempts && GoalFailure::from_message(&error).reason() == "retryable" => {
-                    runtime.emit(task_id, "error", json!({
-                        "message":error,"retry":true,"fatal":false,"retry_in":GOAL_API_RETRY_DELAY.as_secs(),
-                        "attempt":attempt,"max_attempts":max_attempts,
-                    }))?;
-                    if stream.text_started || stream.thinking_started {
-                        runtime.emit(task_id, "stream_reset", json!({"reason":"stream_disconnected","attempt":attempt + 1}))?;
+                Err(error) if retry.should_retry(&error) => {
+                    runtime.emit(task_id, "error", retry.error_event(&error))?;
+                    if stream.text_started || stream.thinking_started || stream.tool_started {
+                        runtime.emit(task_id, "stream_reset", retry.reset_event())?;
                     }
-                    tokio::time::sleep(GOAL_API_RETRY_DELAY).await;
+                    retry.wait().await;
                 }
                 Err(error) => return Err(error),
             }
@@ -501,6 +495,7 @@ fn emit_tool_start(runtime: &Runtime, task_id: &str, call: &ToolCall, execution_
 struct StreamProgress {
     text_started: bool,
     thinking_started: bool,
+    tool_started: bool,
 }
 
 async fn stream_completion(
@@ -513,7 +508,9 @@ async fn stream_completion(
     let response_id = format!("msg_{}", uuid::Uuid::new_v4().simple());
     let mut thinking = super::thinking::ThinkingStream::new(runtime, task_id, &response_id, work);
     let mut preview = track_preview.then(super::preview_tracking::ModelText::default);
+    let mut proposed_targets = Vec::new();
     let mut tool_stream = super::tool_call_stream::ToolCallStream::default();
+    let mut tool_started = false;
     let (abort, failed) = oneshot::channel();
     let mut abort = Some(abort);
     let mut completion = tokio::select! {
@@ -527,6 +524,7 @@ async fn stream_completion(
                 StreamDelta::Usage(_) => Ok(()),
                 StreamDelta::ToolCall(update) => {
                     let events = tool_stream.push(update);
+                    tool_started |= !events.is_empty();
                     // Arguments are streaming: the reasoning display closes before
                     // the preparing blocks open, matching the previous backend.
                     thinking.end().and_then(|()| {
@@ -540,7 +538,7 @@ async fn stream_completion(
                     thinking.end().and_then(|()| emit_text(runtime, task_id, &response_id, &mut text_started, delta))
                         .and_then(|()| {
                             if let Some(preview) = preview.as_mut() {
-                                runtime.record_preview_targets(task_id, preview.feed(delta, false))?;
+                                proposed_targets.extend(preview.feed(delta, false));
                             }
                             Ok(())
                         })
@@ -558,9 +556,10 @@ async fn stream_completion(
         completion.message["message_id"] = json!(response_id);
     }
     if completion.is_ok() && let Some(mut preview) = preview {
-        runtime.record_preview_targets(task_id, preview.feed("", true))?;
+        proposed_targets.extend(preview.feed("", true));
+        runtime.record_preview_targets(task_id, proposed_targets)?;
     }
-    Ok((completion, bill, StreamProgress { text_started, thinking_started: thinking.started() }))
+    Ok((completion, bill, StreamProgress { text_started, thinking_started: thinking.started(), tool_started }))
 }
 
 fn emit_text(runtime: &Runtime, id: &str, response_id: &str, started: &mut bool, delta: &str) -> Result<(), String> {
