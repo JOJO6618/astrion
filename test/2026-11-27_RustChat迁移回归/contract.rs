@@ -1,5 +1,11 @@
 use super::*;
 
+#[path = "../2026-11-27_RustChat深压缩/contract.rs"]
+mod compression;
+
+#[path = "../2026-11-27_RustChat停止保留/contract.rs"]
+mod stopped_response;
+
 impl MockModel {
     fn serve_script(self, deltas: Vec<Value>) -> thread::JoinHandle<Vec<Value>> {
         self.serve_streams(deltas.into_iter().map(|mut delta| {

@@ -294,12 +294,18 @@ impl LegacyDocument {
         self.project_chat_history(tree::chat_turn_path(&self.raw, turn_id)?)
     }
 
-    pub(crate) fn chat_turn_history_with_media(
-        &self, turn_id: &str, account: &Path,
+    pub(crate) fn chat_turn_path(&self, turn_id: &str) -> Result<Vec<Value>, LegacyError> {
+        self.require_chat()?;
+        tree::chat_turn_path(&self.raw, turn_id)
+    }
+
+    pub(crate) fn chat_path_history_with_media(
+        &self, path: Vec<Value>, account: &Path, include_frozen: bool,
     ) -> Result<Vec<Value>, LegacyError> {
         self.require_chat()?;
-        let path = self.complete_interrupted_chat_batches(tree::chat_turn_path(&self.raw, turn_id)?);
-        let frozen = self.raw["metadata"]["frozen_system_prompt"].as_str().filter(|prompt| !prompt.trim().is_empty());
+        let path = self.complete_interrupted_chat_batches(path);
+        let frozen = self.raw["metadata"]["frozen_system_prompt"].as_str()
+            .filter(|prompt| include_frozen && !prompt.trim().is_empty());
         let mut history = agent::project_history(&path, frozen, true, true)
             .map_err(|reason| LegacyError::unsupported(&[reason]))?;
         media::attach_chat_blobs(&path, &mut history[usize::from(frozen.is_some())..], account)

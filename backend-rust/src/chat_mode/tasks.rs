@@ -351,7 +351,6 @@ impl ChatMode {
         message: String,
         mut cancel: oneshot::Receiver<()>,
     ) {
-        let pending = Arc::new(Mutex::new(String::new()));
         let thinking = crate::runtime::thinking_auxiliary::ThinkingWork::for_task(&self.runtime, &task_id, &model);
         let outcome = tokio::select! {
             biased;
@@ -363,7 +362,6 @@ impl ChatMode {
                 &turn_id,
                 &model,
                 message,
-                pending.clone(),
                 thinking.as_ref(),
                 ).await;
                 if result.status == "succeeded" && let Some(thinking) = &thinking { thinking.finish().await; }
@@ -371,22 +369,21 @@ impl ChatMode {
             } => result,
         };
 
-        if outcome.status == "stopped" {
-            let partial = pending.lock().map(|text| text.clone()).unwrap_or_default();
-            if !partial.trim().is_empty() {
-                let _ = self.append_partial(&conversation_id, &turn_id, &partial);
-            }
-        }
         let tree_status = match outcome.status {
             "succeeded" => "complete",
             status => status,
+        };
+        let partial = if tree_status == "complete" {
+            None
+        } else {
+            self.runtime.chat_partial_response(&task_id, tree_status).ok().flatten()
         };
         let durable = self
             .storage(|paths| {
                 if tree_status == "complete" {
                     tree::finish(paths, &conversation_id, &turn_id, tree_status, now())
                 } else {
-                    tree::recover(paths, &conversation_id, &turn_id, tree_status, now())
+                    tree::recover_with_partial(paths, &conversation_id, &turn_id, tree_status, now(), partial)
                 }
             })
             .map(|_| ());
@@ -411,7 +408,6 @@ impl ChatMode {
         turn_id: &str,
         model: &ModelConfig,
         _message: String,
-        pending: Arc<Mutex<String>>,
         work: Option<&crate::runtime::thinking_auxiliary::ThinkingWork>,
     ) -> Outcome {
         use crate::model::{RoundBudget, StreamDelta};
@@ -421,18 +417,11 @@ impl ChatMode {
         {
             return Outcome::failed(error.message);
         }
-        let (mut messages, _network) = match self.model_messages(conversation_id, turn_id) {
+        let (mut messages, mut used_ids) = match self.model_messages(conversation_id, turn_id) {
             Ok(value) => value,
             Err(error) => return Outcome::failed(error.message),
         };
         let tools = definitions();
-        let mut used_ids: std::collections::HashSet<String> = messages
-            .iter()
-            .filter_map(|message| message["tool_calls"].as_array())
-            .flatten()
-            .filter_map(|call| call["id"].as_str().map(str::to_owned))
-            .collect();
-
         for round in 0..MAX_MODEL_ROUNDS {
             if round > 0 {
                 match self.storage(|paths| tree::consume_network_notices(paths, conversation_id, turn_id, now())) {
@@ -446,15 +435,24 @@ impl ChatMode {
                     Err(error) => return Outcome::failed(error.message),
                 }
             }
+            match self.compress_before_request(task_id, conversation_id, turn_id, model, &messages).await {
+                Ok(true) => {
+                    if let Err(error) = self.storage(|paths| tree::consume_network_notices(paths, conversation_id, turn_id, now())) {
+                        return Outcome::failed(error.message);
+                    }
+                    match self.model_messages(conversation_id, turn_id) {
+                        Ok((updated, _)) => messages = updated,
+                        Err(error) => return Outcome::failed(error.message),
+                    }
+                }
+                Ok(false) => (),
+                Err(error) => return Outcome::failed(error.message),
+            }
             let response_message_id = format!("msg_{}", Uuid::new_v4().simple());
             if !self.emit(task_id, "api_request_start", json!({
                 "attempt":1,"max_attempts":1,"response_message_id":response_message_id,
             })) {
                 return Outcome::stopped();
-            }
-            let pending_text = pending.clone();
-            if let Ok(mut text) = pending_text.lock() {
-                text.clear();
             }
             let mut started = false;
             let mut tool_stream = crate::runtime::tool_call_stream::ToolCallStream::default();
@@ -478,9 +476,6 @@ impl ChatMode {
                         StreamDelta::Text(delta) => delta,
                     };
                     let _ = thinking.end();
-                    if let Ok(mut text) = pending_text.lock() {
-                        text.push_str(delta);
-                    }
                     if !started {
                         started = true;
                         let _ = self.emit(task_id, "text_start", json!({"response_message_id":response_message_id}));
@@ -490,13 +485,7 @@ impl ChatMode {
                 .await
             {
                 Ok(completion) => completion,
-                Err(error) => {
-                    let partial = pending.lock().map(|text| text.clone()).unwrap_or_default();
-                    if !partial.trim().is_empty() {
-                        let _ = self.append_partial(conversation_id, turn_id, &partial);
-                    }
-                    return Outcome::failed(error);
-                }
+                Err(error) => return Outcome::failed(error),
             };
             if thinking.end().is_err() { return Outcome::stopped(); }
             crate::tools::web::annotate(&mut completion.message, &messages);
@@ -525,9 +514,6 @@ impl ChatMode {
                 return Outcome::failed(error.message);
             }
             thinking.keep();
-            if let Ok(mut text) = pending.lock() {
-                text.clear();
-            }
             if let Some(stats) = stats {
                 let _ = self.emit(task_id, "token_update", stats);
             }
@@ -597,17 +583,33 @@ impl ChatMode {
         &self,
         conversation_id: &str,
         turn_id: &str,
-    ) -> Result<(Vec<Value>, bool), ChatError> {
+    ) -> Result<(Vec<Value>, std::collections::HashSet<String>), ChatError> {
         let document = self.storage(|paths| paths.read_document(conversation_id))?;
         let raw = document.raw();
-        let mut messages = document.chat_turn_history_with_media(turn_id, &self.root)?;
+        let mut path = document.chat_turn_path(turn_id)?;
+        let used_ids = path.iter()
+            .filter_map(|message| message["tool_calls"].as_array())
+            .flatten()
+            .filter_map(|call| call["id"].as_str().map(str::to_owned))
+            .collect();
+        let summary = super::compression::select_summary(raw, &path)
+            .map(|(count, content)| (count, content.to_owned()));
+        if let Some((count, _)) = &summary {
+            path.drain(..*count);
+        }
+        let mut messages = document.chat_path_history_with_media(path, &self.root, true)?;
         if messages.first().is_none_or(|message| message["role"] != "system") {
             messages.insert(0, json!({
                 "role": "system",
                 "content": self.system_prompt(raw)?,
             }));
         }
-        Ok((messages, raw["metadata"]["network_enabled"] == true))
+        if let Some((_, content)) = summary {
+            messages.insert(1, json!({
+                "role":"system","content":format!("前文对话摘要（以当前系统设置为准）：\n{content}"),
+            }));
+        }
+        Ok((messages, used_ids))
     }
 
     pub(super) fn system_prompt(&self, raw: &Value) -> Result<String, ChatError> {
@@ -687,24 +689,7 @@ impl ChatMode {
         })
     }
 
-    fn append_partial(
-        &self,
-        conversation_id: &str,
-        turn_id: &str,
-        partial: &str,
-    ) -> Result<(), ChatError> {
-        let message = json!({
-            "message_id": format!("msg_{}", Uuid::new_v4().simple()),
-            "role": "assistant",
-            "content": partial,
-            "metadata": {"stopped": true},
-        });
-        self.storage(|paths| {
-            tree::append(paths, conversation_id, turn_id, message, now(), None).map(|_| ())
-        })
-    }
-
-    fn emit(&self, task_id: &str, kind: &str, data: Value) -> bool {
+    pub(super) fn emit(&self, task_id: &str, kind: &str, data: Value) -> bool {
         self.runtime.emit_chat_event(task_id, kind, data).is_ok()
     }
 }
