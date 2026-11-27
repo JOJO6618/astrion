@@ -7,7 +7,7 @@ use crate::{
     approval::ExecutionMode,
     process_runtime::policy::{DEFAULT_DENY_PATHS, DEFAULT_DENY_REGEX, WINDOWS_DENY_PATHS,
         blocking_config, blocking_patch, blocking_path, expand, read_object, strings},
-    tools::read_file::ReadFile,
+    tools::read_file::HostFileRoot,
     workspace_catalog::RegisteredWorkspace,
 };
 
@@ -35,17 +35,80 @@ impl Runtime {
         let raw = raw.to_owned();
         let args = args.clone();
         tokio::task::spawn_blocking(move || {
-            let reader = {
+            let (reader, memory) = {
                 let store = runtime.store().map_err(|error| error.message)?;
-                let root = match native_path_root(&store, &task_id, &raw, false) {
+                let root = match native_file_root(&store, &task_id, &raw, false) {
                     Ok(Some(root)) => root,
                     Ok(None) => return Ok(None),
                     Err(error) => return Ok(Some(json!({"success":false,"error":error}))),
                 };
-                ReadFile::open(&root, &store.data_dir).map_err(|error| error.to_string())?
+                match root.open(&store.data_dir, false) {
+                    Ok(reader) => (reader, matches!(root, HostFileRoot::ProjectMemory { .. })),
+                    Err(error) => return Ok(Some(json!({"success":false,"error":error.to_string()}))),
+                }
             };
-            Ok(Some(reader.execute(&args)))
+            let mut result = reader.execute(&args);
+            if memory && result["success"] == true {
+                result["path"] = json!(raw);
+            }
+            Ok(Some(result))
         }).await.map_err(|_| "Host file reader interrupted".to_owned())?
+    }
+}
+
+/// The built-in memory capability belongs to native file tools, not browser uploads
+/// or user-configurable path grants.
+pub(super) fn native_file_root(store: &Store, task_id: &str, raw: &str, write: bool) -> Result<Option<HostFileRoot>, String> {
+    let path = Path::new(raw);
+    let memory = store.data_dir.join("memory");
+    if path.starts_with(&memory) {
+        let (scope, settings) = task_scope(store, task_id)?;
+        settings.process_modes().ok_or("Invalid Host file authority")?;
+        let workspace = store.workspaces.get(scope.principal().workspace_id()).ok_or("The workspace is not bound")?;
+        return project_memory_root(&store.data_dir, store.process_resources.deployment(), workspace, path).map(Some);
+    }
+    native_path_root(store, task_id, raw, write).map(|root| root.map(HostFileRoot::Authorized))
+}
+
+fn project_memory_root(data: &Path, deploy: Option<&Path>, workspace: &Path, path: &Path) -> Result<HostFileRoot, String> {
+    let namespace = crate::knowledge::workspace_namespace(workspace).map_err(|error| error.to_string())?;
+    let root = data.join("memory").join(namespace);
+    if let Ok(relative) = path.strip_prefix(&root)
+        && !relative.as_os_str().is_empty()
+        && relative.components().all(|part| matches!(part, Component::Normal(_)))
+        && let Some(deploy) = deploy {
+        let target: PathBuf = root.components().chain(relative.components()).collect();
+        let policy = load_paths(deploy).map_err(|error| error.message)?;
+        if !target.starts_with(deploy) && !denied_by_policy(&target, &policy).map_err(|error| error.message)? {
+            return Ok(HostFileRoot::ProjectMemory { workspace: workspace.to_owned() });
+        }
+    }
+    Err("The path is protected by the Host sandbox".into())
+}
+
+#[cfg(test)]
+#[path = "../../../test/2026-11-27_项目记忆文件授权/native_memory.rs"]
+mod native_memory_tests;
+
+impl Runtime {
+    pub(crate) fn read_child_project_memory(&self, id: &str, workspace: &Path, args: &Value) -> Option<Value> {
+        let raw = args["path"].as_str()?;
+        let path = Path::new(raw);
+        let store = match self.store() {
+            Ok(store) => store,
+            Err(error) => return Some(json!({"success":false,"error":error.message})),
+        };
+        if !path.starts_with(store.data_dir.join("memory")) { return None; }
+        let result = verify_workspace_binding(&store, id, Some(workspace)).map_err(|e| e.message)
+            .and_then(|()| project_memory_root(&store.data_dir, store.process_resources.deployment(), workspace, path))
+            .and_then(|root| root.open(&store.data_dir, false).map_err(|e| e.to_string()));
+        drop(store);
+        let mut result = match result {
+            Ok(reader) => reader.execute(args),
+            Err(error) => json!({"success":false,"error":error}),
+        };
+        if result["success"] == true { result["path"] = json!(raw); }
+        Some(result)
     }
 }
 
@@ -279,6 +342,10 @@ pub(super) fn forbidden_path(path: &Path, policy: &Value, data: &Path, deploy: &
     if path.starts_with(data) || path.starts_with(deploy) {
         return Ok(true);
     }
+    denied_by_policy(path, policy)
+}
+
+fn denied_by_policy(path: &Path, policy: &Value) -> Result<bool, RuntimeError> {
     let text = path.to_string_lossy().replace('\\', "/");
     let normalized = text.to_lowercase();
     let mut blocked = strings(policy.get("macos_deny_read_paths")).map_err(RuntimeError::storage)?;

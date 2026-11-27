@@ -294,7 +294,7 @@ impl Worker<'_> {
                 let result = match name.as_str() {
                     read_file::NAME if allowed_args(args) => {
                         context.add_stat("files_read");
-                        scope.read(args.clone())
+                        scope.read(&self.app.runtime, args.clone())
                     }
                     WRITE_NAME | EDIT_NAME if allowed_args(args) => {
                         context.add_stat(if name == WRITE_NAME { "write_files" } else { "edit_files" });

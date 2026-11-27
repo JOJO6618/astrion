@@ -636,9 +636,14 @@ export class ViewManager {
       return;
     }
     const root = this.window.contentView;
-    // Re-adding an existing child always raises it. Detach it before inserting at index 0.
-    root.removeChildView(this.chromeView);
-    root.addChildView(this.chromeView, 0);
+    // Lower chrome without detaching the view that received the dismissing click.
+    // Raise the other views in their existing order, including any native browser.
+    const children = root.children;
+    if (children[0] !== this.chromeView) {
+      for (const child of children) {
+        if (child !== this.chromeView) root.addChildView(child);
+      }
+    }
     const content = this.getActiveView();
     if (this.activeKey !== this.chromeOverlayStartKey && this.window.isFocused() && alive(content)) {
       content.webContents.focus();

@@ -323,11 +323,12 @@ impl Runtime {
                 request.approval_type = ApprovalType::DirectExecution;
             }
             let raw = request.arguments.get("file_path").and_then(Value::as_str).unwrap_or_default();
-            let external_root = match super::host_policy::native_path_root(&store, task_id, raw, true) {
+            let external_root = match super::host_policy::native_file_root(&store, task_id, raw, true) {
                 Ok(root) => root,
                 Err(error) => return Ok(tool_failure("file_authority_denied", &error)),
             };
-            let approval = match settings.native_write_route(&scope, &request, external_root.is_some()) {
+            let external_grant = matches!(&external_root, Some(crate::tools::read_file::HostFileRoot::Authorized(_)));
+            let approval = match settings.native_write_route(&scope, &request, external_grant) {
                 Err(reason) => return Ok(tool_failure("readonly_denied", reason)),
                 Ok(WriteRoute::Exempt) => None,
                 Ok(WriteRoute::Approval) => {
@@ -367,12 +368,13 @@ impl Runtime {
             let mut store = runtime.store().map_err(|error| error.message)?;
             let (scope, settings) = task_scope(&store, &task_id)?;
             let raw = request.arguments.get("file_path").and_then(Value::as_str).unwrap_or_default();
-            if !super::host_policy::native_path_root(&store, &task_id, raw, true)
+            if !super::host_policy::native_file_root(&store, &task_id, raw, true)
                 .is_ok_and(|root| root == external_root)
             {
                 return Ok(tool_failure("file_authority_denied", "Host file authorization changed before launch"));
             }
-            let authority = match (settings.native_write_route(&scope, &request, external_root.is_some()), resolved) {
+            let external_grant = matches!(&external_root, Some(crate::tools::read_file::HostFileRoot::Authorized(_)));
+            let authority = match (settings.native_write_route(&scope, &request, external_grant), resolved) {
                 (Ok(WriteRoute::Exempt), None) => exempt_workspace_write(&scope, &request),
                 (Ok(WriteRoute::Approval), Some(item)) => {
                     let fingerprint = item
@@ -399,7 +401,14 @@ impl Runtime {
                         && let Err(error) = super::versioning::track_edit(&store, &task_id, path) {
                         return Ok(tool_failure("versioning_backup_failed", &error.message));
                     }
-                    Ok(writer.execute_with_host_root(authority, scope.conversation_id(), &messages, external_root.as_deref()))
+                    let write = |injected| writer.execute_with_host_root(authority, scope.conversation_id(),
+                        &messages, external_root.as_ref(), injected);
+                    if let Some(crate::tools::read_file::HostFileRoot::ProjectMemory { workspace }) = &external_root {
+                        let result = super::knowledge_tools::write_workspace_memory(&store, scope.principal().workspace_id(),
+                            workspace, scope.conversation_id(), std::path::Path::new(raw), write);
+                        return Ok(result.unwrap_or_else(|error| tool_failure("workspace_memory_error", &error)));
+                    }
+                    Ok(write(false))
                 }
                 Err(error) => Ok(tool_failure(
                     "approval_authority_denied",

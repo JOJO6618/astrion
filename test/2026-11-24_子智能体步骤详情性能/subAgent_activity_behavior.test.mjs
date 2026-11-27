@@ -131,9 +131,9 @@ async function compileRunner() {
     '@/components/common/CloseButton.vue': {
       default: defineComponent({ render: () => h('button') })
     },
-    './ActivityPager.vue': {
-      default: defineComponent({ render: () => h('div') })
-    },
+    '@/composables/useSubAgentActivityScroll': await server.ssrLoadModule(
+      '/static/src/composables/useSubAgentActivityScroll.ts'
+    ),
     './subAgentToolText': toolTextMod
   };
   return new Function('__deps', js)(deps);
@@ -439,7 +439,7 @@ test('conversation switch invalidates an in-flight response', async () => {
   sub.closeSubAgent();
 });
 
-test('history view keeps receiving live steps and exposes them on return to latest', async () => {
+test('older and live batches extend the same timeline from opposite ends', async () => {
   const { sub } = freshStores();
   installFetch((call) => {
     const params = queryFromUrl(call.url);
@@ -465,23 +465,22 @@ test('history view keeps receiving live steps and exposes them on return to late
 
   await sub.fetchSubAgentActivity(AGENT.task_id, 'older');
   await flush();
-  assert.equal(sub.historyPage?.entries.length, 200);
+  assert.equal(sub.activityEntries.length, 400);
   assert.equal(sub.activityStart, 0);
+  assert.equal(sub.activityEntries[200].content, 'live-200');
   assert.equal(sub.activityEntries[0].content, 'old-0');
 
   await runTimer(2000);
   await flush();
   assert.equal(sub.liveOffset, 410);
-  assert.equal(sub.livePages.length, 2, 'live page must accumulate behind history');
-  assert.equal(sub.historyPage?.entries.length, 200);
+  assert.equal(sub.livePages.length, 3);
   assert.equal(
     sub.activityEntries[0].content,
     'old-0',
     'history page stays visible while browsing history'
   );
 
-  sub.historyPage = null;
-  assert.equal(sub.activityEntries.length, 210, 'returning to latest must include live steps');
+  assert.equal(sub.activityEntries.length, 410);
   assert.equal(sub.activityEntries.at(-1).content, 'new-409');
   sub.closeSubAgent();
 });

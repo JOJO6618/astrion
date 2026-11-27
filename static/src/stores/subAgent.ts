@@ -23,6 +23,7 @@ interface SubAgent {
 }
 
 interface SubAgentActivityEntry {
+  activityKey: string;
   id?: string;
   tool?: string;
   status?: string;
@@ -40,7 +41,7 @@ const PAGE_SIZE = 200;
 /** 详情面板可见条目上限：实时页最多两页，兼容旧后端一次性返回全量时也只保留尾部一页。 */
 const VISIBLE_ENTRY_LIMIT = PAGE_SIZE * 2;
 const activityRequests = new WeakMap<object, AbortController>();
-type ActivityDirection = 'live' | 'older' | 'newer';
+type ActivityDirection = 'live' | 'older';
 
 interface SubAgentState {
   subAgents: SubAgent[];
@@ -51,7 +52,7 @@ interface SubAgentState {
   stoppingTaskIds: Record<string, boolean>;
   livePages: ActivityPage[];
   liveOffset: number | null;
-  historyPage: (ActivityPage & { end: number }) | null;
+  readingHistory: boolean;
   activityLoading: boolean;
   activityError: string | null;
 }
@@ -68,18 +69,16 @@ export const useSubAgentStore = defineStore('subAgent', {
     stoppingTaskIds: {},
     livePages: [],
     liveOffset: null,
-    historyPage: null,
+    readingHistory: false,
     activityLoading: false,
     activityError: null
   }),
   getters: {
     activityEntries(state): SubAgentActivityEntry[] {
-      const entries = state.historyPage?.entries ?? state.livePages.flatMap((page) => page.entries);
-      // 防御性上界：任何仍未按页裁剪的旧返回也不能把 20 万条直接交给模板渲染。
-      return entries.length > VISIBLE_ENTRY_LIMIT ? entries.slice(-VISIBLE_ENTRY_LIMIT) : entries;
+      return state.livePages.flatMap((page) => page.entries);
     },
     activityStart(state): number {
-      return state.historyPage?.start ?? state.livePages[0]?.start ?? 0;
+      return state.livePages[0]?.start ?? 0;
     }
   },
   actions: {
@@ -148,7 +147,7 @@ export const useSubAgentStore = defineStore('subAgent', {
       this.silentActivityTaskId = null;
       this.livePages = [];
       this.liveOffset = null;
-      this.historyPage = null;
+      this.readingHistory = false;
       this.activityError = null;
       this.activityLoading = false;
     },
@@ -166,18 +165,12 @@ export const useSubAgentStore = defineStore('subAgent', {
       const selected = () => (this.activeAgent?.task_id || this.silentActivityTaskId) === taskId;
       if (!taskId || !selected() || activityRequests.has(this)) return;
       if (direction === 'older' && !this.activityStart) return;
-      if (direction === 'newer' && !this.historyPage) return;
       if (this.activityTimer) clearTimeout(this.activityTimer);
       this.activityTimer = null;
       const controller = new AbortController();
       activityRequests.set(this, controller);
       const owns = beginAuxiliaryStoreRequest(this, 'sub-activity', undefined, selected);
-      const cursor =
-        direction === 'older'
-          ? this.activityStart
-          : direction === 'newer'
-            ? this.historyPage!.end
-            : this.liveOffset;
+      const cursor = direction === 'older' ? this.activityStart : this.liveOffset;
       this.activityLoading = true;
       let delay = 2000;
       try {
@@ -212,23 +205,31 @@ export const useSubAgentStore = defineStore('subAgent', {
           // 单页响应一律只保留尾部 PAGE_SIZE 条。新后端按 200 分页时等价于原数组；
           // 旧后端/异常返回一次给出 20 万条时，只保留最新 200 条，DOM 不再无界。
           const entries = received.length > PAGE_SIZE ? received.slice(-PAGE_SIZE) : received;
-          const page = { start, entries };
+          const page = {
+            start,
+            entries: entries.map((entry: SubAgentActivityEntry, index: number) => ({
+              ...entry,
+              activityKey: `${start}:${index}`
+            }))
+          };
           if (data.data.reset === true || cursor === null || !safeEnd) {
             this.livePages = [page];
             this.liveOffset = safeEnd ? end : null;
-            this.historyPage = null;
+            this.readingHistory = false;
           } else if (direction === 'live') {
             if (legacyPayload) {
               this.livePages = [page];
             } else if (entries.length && end > (this.liveOffset ?? -1)) {
               this.livePages.push(page);
-              let count = this.livePages.reduce((n, p) => n + p.entries.length, 0);
-              while (count > VISIBLE_ENTRY_LIMIT) count -= this.livePages.shift()!.entries.length;
+              if (!this.readingHistory) {
+                let count = this.livePages.reduce((n, p) => n + p.entries.length, 0);
+                while (count > VISIBLE_ENTRY_LIMIT) count -= this.livePages.shift()!.entries.length;
+              }
             }
             this.liveOffset = end;
-          } else {
-            this.historyPage =
-              direction === 'newer' && end >= (this.liveOffset ?? end) ? null : { ...page, end };
+          } else if (start < cursor && end === cursor) {
+            this.readingHistory = true;
+            this.livePages.unshift(page);
           }
           this.activityError = null;
           if (direction === 'live' && data.data.has_more_after && end > (cursor ?? 0)) delay = 0;

@@ -82,7 +82,7 @@ export function clipBounds(rect, mainBounds) {
 // 与后端对话路由一致（server/app_legacy.py ConversationIdConverter）：
 // 对话页是裸路径 /<id>，旧式 /conv_<id> 仍兼容。
 export function browserRoute(pathname) {
-  return /^\/(?:$|new\/?$|(?:conv_)?\d{8}_\d{6}_\d{3}\/?$|chat(?:\/[^/]+)?\/?$)/.test(pathname);
+  return /^\/(?:$|new\/?$|(?:conv_)?(?:\d{8}_\d{6}_\d{3}|import_[0-9a-f]{32})\/?$|chat(?:\/[^/]+)?\/?$)/.test(pathname);
 }
 export function trustedFrame(event, view, origin, route = browserRoute) {
   try {

@@ -378,6 +378,10 @@ const blockGroups = computed(() => {
     if (action.type === 'thinking' || action.type === 'tool') {
       currentGroup.push(action);
     } else if (action.type === 'text' || action.type === 'system') {
+      // A streaming text placeholder only separates steps once it has visible content.
+      if (action.type === 'text' && (typeof action.content !== 'string' || !action.content.trim())) {
+        return;
+      }
       // 先保存当前的 thinking/tool 组
       if (currentGroup.length > 0) {
         // 使用第一个 action 的 id 作为 group id，保证稳定性
@@ -392,15 +396,11 @@ const blockGroups = computed(() => {
         currentGroup = [];
       }
       if (action.type === 'text') {
-        const text = typeof action.content === 'string' ? action.content : '';
-        if (!text.trim()) {
-          return;
-        }
         // 添加 text 组
         groups.push({
           type: 'text',
           id: action.id || `text-${idx}`,
-          content: text,
+          content: action.content,
           streaming: action.streaming,
           responseMessageId: action.responseMessageId
         });

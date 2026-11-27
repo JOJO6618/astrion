@@ -380,7 +380,8 @@ async fn new_conversation_settings(
         let settings = prefs.draft_settings(&app.catalog.load(), &previous["metadata"]);
         Ok(success(json!({
             "workspace": app.workspace(), "settings": settings,
-            "execution_mode_enabled": false, "network_permission_enabled": false,
+            "execution_mode_enabled": app.runtime.host_direct_execution_available(),
+            "network_permission_enabled": app.runtime.host_network_permissions_available(),
         })))
     })
     .await

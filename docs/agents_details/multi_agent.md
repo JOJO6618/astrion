@@ -40,6 +40,7 @@
 
 `modules/sub_agent/persistence.py` 的注册表按工作区 data_dir 共享：tasks、instances、running、states 共同属于同一 RuntimeRegistry。查询不能从磁盘重新覆盖运行实例所持的记录；恢复串行化，启动前完成实例／任务句柄和回调登记。
 
+- 子智能体详情打开时取最近 200 条活动并定位到最新进展。用户向上滚到已加载记录顶部时，再取前 200 条并保持阅读位置；停在底部时跟随新的活动。
 - Python Host 的状态在 `<工作区 data_dir>/sub_agent_runtime.json`（version=1），子上下文与活动在 `<工作区 data_dir>/sub_agent_tasks/<task_id>/`。
 - Rust Host 在 `<DATA_DIR>/sub_agents.sqlite3` 保存按任务 ID 隔离的记录、上下文、统计、结果、活动，以及按主对话 ID 归属的协作队列。建档、接受引导、结束任务时同步提交上下文与注册表。活动分页保留旧日志的字节边界，完整事件追加后才对查询可见。
 - Rust 的旧目录和 v1 注册表仅由迁移作业读取。迁移按主对话提交，保留原文件，通过已导入标记避免重复导入或覆盖当前记录。每条子消息单独存入 `child_message`，新工具结果与上下文头在同一事务中提交。达到压缩阈值后保留最近八条及完整工具配对，刷新冻结提示词中的项目记忆段，重新开始计算上下文 token。原工作区、任务 ID 和终结状态继续约束恢复。

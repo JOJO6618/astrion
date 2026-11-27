@@ -286,6 +286,10 @@ async fn known_entry_routes_gate_sessions_and_effective_terminal_policy() {
         "/chat/conv_20261124_120001_123",
         "/20261124_120001_123",
         "/conv_20261124_120001_123",
+        "/import_0123456789abcdef0123456789abcdef",
+        "/conv_import_0123456789abcdef0123456789abcdef",
+        "/chat/import_0123456789abcdef0123456789abcdef",
+        "/chat/conv_import_0123456789abcdef0123456789abcdef",
         "/settings",
         "/settings/tools/mcp",
         "/git",
@@ -347,6 +351,8 @@ async fn known_entry_routes_gate_sessions_and_effective_terminal_policy() {
         "/unknown",
         "/chat/no-conversation",
         "/chat/conv_20261124_120001_12",
+        "/import_012345",
+        "/chat/import_0123456789abcdef0123456789abcdeg",
         "/api/not-present",
     ] {
         assert_eq!(

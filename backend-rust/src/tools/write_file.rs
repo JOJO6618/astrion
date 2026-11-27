@@ -96,11 +96,12 @@ impl WorkspaceFileWriter {
         conversation_id: &str,
         messages: &[Value],
     ) -> Value {
-        self.execute_with_host_root(scope, conversation_id, messages, None)
+        self.execute_with_host_root(scope, conversation_id, messages, None, false)
     }
 
     pub(crate) fn execute_with_host_root(
-        &self, scope: ExecutionScope, conversation_id: &str, messages: &[Value], host_root: Option<&Path>,
+        &self, scope: ExecutionScope, conversation_id: &str, messages: &[Value],
+        host_root: Option<&super::read_file::HostFileRoot>, injected_memory: bool,
     ) -> Value {
         if !matches!(scope.access(), ExecutionAccess::SandboxWrite | ExecutionAccess::Direct) {
             return failure(NO_AUTHORITY);
@@ -110,12 +111,16 @@ impl WorkspaceFileWriter {
             if task.conversation_id() != conversation_id || !self.reader.0.matches_root(task.workspace_root()) {
                 return failure(NO_AUTHORITY);
             }
-            let reader = match ReadFile::open(root, &self.reader.0.data_path) {
+            let reader = match root.open(&self.reader.0.data_path, true) {
                 Ok(reader) => reader,
                 Err(error) => return failure(error.to_string()),
             };
-            return self.mutate(&reader.0, &scope.call().tool_name, &scope.call().arguments, messages)
+            let mut result = self.mutate(&reader.0, &scope.call().tool_name, &scope.call().arguments, messages, injected_memory)
                 .unwrap_or_else(failure);
+            if matches!(root, super::read_file::HostFileRoot::ProjectMemory { .. }) && result["success"] == true {
+                result["path"] = scope.call().arguments["file_path"].clone();
+            }
+            return result;
         }
         self.execute_call(scope.task(), scope.call(), conversation_id, messages)
     }
@@ -133,7 +138,7 @@ impl WorkspaceFileWriter {
         {
             return failure(NO_AUTHORITY);
         }
-        self.mutate(workspace, &call.tool_name, &call.arguments, messages)
+        self.mutate(workspace, &call.tool_name, &call.arguments, messages, false)
             .unwrap_or_else(failure)
     }
 
@@ -147,6 +152,7 @@ impl WorkspaceFileWriter {
         tool: &str,
         args: &Map<String, Value>,
         messages: &[Value],
+        injected_memory: bool,
     ) -> Result<Value, String> {
         let operation = Operation::parse(tool, args)?;
         let raw = args
@@ -160,7 +166,7 @@ impl WorkspaceFileWriter {
         let _lock = self.mutations.lock().map_err(|_| "文件写入状态不可用")?;
         let append = matches!(operation, Operation::Write { append: true, .. });
         let is_edit = matches!(operation, Operation::Edit(_));
-        let require_read=self.requires_read()?;
+        let require_read = !injected_memory && self.requires_read()?;
         if require_read && is_edit && !was_visited(workspace, &path, messages) {
             return Ok(pre_read(tool, raw));
         }
@@ -272,8 +278,7 @@ fn was_visited(workspace: &Workspace, target: &Path, messages: &[Value]) -> bool
                 };
                 if result["success"] == true
                     && let Some(path) = result["path"].as_str()
-                    && let Ok(path) = workspace.relative_path(path)
-                    && path == target
+                    && workspace.matches_read_result(path, target)
                 {
                     return true;
                 }

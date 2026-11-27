@@ -20,8 +20,15 @@
           <CloseButton :label="$t('common.close')" :title="$t('common.close')" @click="close" />
         </span>
       </header>
-      <ActivityPager v-if="effectiveDetail?.kind === 'agent'" />
-      <div ref="bodyRef" class="qd-detail__body" :class="{ 'body-fade': bodyFading }">
+      <div
+        ref="bodyRef"
+        class="qd-detail__body"
+        :class="{ 'body-fade': bodyFading }"
+        @scroll.passive="activityScroll.onScroll"
+        @wheel.passive="activityScroll.onWheel"
+        @touchstart.passive="activityScroll.onTouchStart"
+        @touchend.passive="activityScroll.onTouchEnd"
+      >
         <!-- 子智能体：工具调用 + 文本输出时间线 -->
         <template v-if="effectiveDetail?.kind === 'agent'">
           <div v-if="subAgentStore.activityError" class="qd-detail__empty" role="status">
@@ -113,7 +120,7 @@ import { useSubAgentStore } from '@/stores/subAgent';
 import { useBackgroundCommandStore } from '@/stores/backgroundCommand';
 import { useUiStore } from '@/stores/ui';
 import CloseButton from '@/components/common/CloseButton.vue';
-import ActivityPager from './ActivityPager.vue';
+import { useSubAgentActivityScroll } from '@/composables/useSubAgentActivityScroll';
 import { buildSubAgentToolParts } from './subAgentToolText';
 
 /**
@@ -183,6 +190,9 @@ const entering = ref(false);
 const leaving = ref(false);
 const bodyFading = ref(false);
 const bodyRef = ref<HTMLElement | null>(null);
+const activityScroll = useSubAgentActivityScroll(bodyRef, () =>
+  detail.value?.kind === 'agent' ? detail.value.id : null
+);
 const rootRef = ref<HTMLElement | null>(null);
 
 /* ---------------- 面板水平定位：跟随快捷栏实际位置 ----------------
@@ -411,7 +421,7 @@ const timelineItems = computed<(ToolTimelineItem | OutputTimelineItem | Compress
       }
     };
 
-    entries.forEach((entry: any, index: number) => {
+    entries.forEach((entry: any) => {
       if (
         entry?.type === 'progress' &&
         entry?.subtype === 'output' &&
@@ -423,7 +433,7 @@ const timelineItems = computed<(ToolTimelineItem | OutputTimelineItem | Compress
         // 尾部连续的非终态工具条目（同一条 assistant 消息发起的调用）之前
         const outputItem: OutputTimelineItem = {
           kind: 'output',
-          key: `output-${entry.ts || index}`,
+          key: `output-${entry.activityKey}`,
           content: entry.content
         };
         let cut = rawItems.length;
@@ -444,7 +454,7 @@ const timelineItems = computed<(ToolTimelineItem | OutputTimelineItem | Compress
         flushToolGroup();
         rawItems.push({
           kind: 'compression',
-          key: `compression-${entry.ts || index}`,
+          key: `compression-${entry.activityKey}`,
           round: Number(entry.round) || 0
         });
         return;
@@ -454,7 +464,7 @@ const timelineItems = computed<(ToolTimelineItem | OutputTimelineItem | Compress
         return;
       }
 
-      const baseKey = entry.id || `${entry.tool}-${entry.ts || index}`;
+      const baseKey = entry.id || `${entry.tool}-${entry.activityKey}`;
       if (
         currentToolGroup &&
         (currentToolGroup.entry.id === entry.id || currentToolGroup.key === baseKey) &&
@@ -554,7 +564,7 @@ watch(
     }
     const newKeys = keys.filter((k) => !seenFeedKeys.has(k));
     seenFeedKeys = new Set(keys);
-    if (subAgentStore.historyPage || !newKeys.length) {
+    if ((detail.value?.kind === 'agent' && subAgentStore.readingHistory) || !newKeys.length) {
       return;
     }
     newKeys.forEach((k) => seenFeedKeys.add(k));
@@ -664,7 +674,7 @@ function maybeAutoScroll() {
   }
   // 首次填充由 feed watch 瞬间定位到底，不走平滑滚动；
   // 平滑滚动只用于「已在底部时新步骤出现」的场景
-  if (!feedHydrated || subAgentStore.historyPage) {
+  if (!feedHydrated || detail.value?.kind === 'agent') {
     return;
   }
   const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;

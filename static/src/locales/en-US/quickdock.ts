@@ -24,9 +24,6 @@ export default {
   copiedRelativePath: 'Relative path copied',
 
   // —— Runner detail panel ——
-  olderSteps: 'Previous page',
-  newerSteps: 'Next page',
-  latestSteps: 'Back to latest',
   noProgress: 'No progress yet',
   noOutput: 'No output yet',
   statusIdle: 'Idle',

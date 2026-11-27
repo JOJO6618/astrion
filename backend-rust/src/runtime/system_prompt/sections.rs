@@ -141,16 +141,15 @@ pub(super) fn recent_conversations(store: &Store, workspace: &str, conversation:
 
 pub(super) fn start_time(value: &str) -> String {
     let value = value.trim();
-    if let Ok(time) = OffsetDateTime::parse(value, &Rfc3339).or_else(|_| OffsetDateTime::parse(value, &Iso8601::DEFAULT)) {
-        let offset = time.offset().whole_seconds();
-        let seconds = offset.unsigned_abs();
-        let sign = if offset < 0 { '-' } else { '+' };
-        return format!("{:04}/{:02}/{:02} {:02}:{:02}:{:02}（时区：UTC{sign}{:02}:{:02}）", time.year(), time.month() as u8, time.day(), time.hour(), time.minute(), time.second(), seconds / 3600, seconds % 3600 / 60);
-    }
-    if let Ok(local) = value.parse::<DateTime>()
-        && let Ok(time) = local.to_zoned(TimeZone::system())
-    {
-        return time.strftime("%Y/%m/%d %H:%M:%S（时区：UTC%:z）").to_string();
-    }
-    "未记录（时区未知）".into()
+    let zone = TimeZone::system();
+    let instant = OffsetDateTime::parse(value, &Rfc3339)
+        .or_else(|_| OffsetDateTime::parse(value, &Iso8601::DEFAULT))
+        .ok()
+        .and_then(|time| Timestamp::from_second(time.unix_timestamp()).ok());
+    let local = match instant {
+        Some(time) => Some(time.to_zoned(zone)),
+        None => value.parse::<DateTime>().ok().and_then(|time| time.to_zoned(zone).ok()),
+    };
+    local.map(|time| time.strftime("%Y/%m/%d %H:%M:%S（时区：UTC%:z）").to_string())
+        .unwrap_or_else(|| "未记录（时区未知）".into())
 }

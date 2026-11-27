@@ -31,9 +31,6 @@ export default {
   copiedRelativePath: '已复制相对路径',
 
   // —— 运行详情面板（RunnerDetailPanel） ——
-  olderSteps: '上一页',
-  newerSteps: '下一页',
-  latestSteps: '回到最新',
   noProgress: '暂无进度',
   noOutput: '暂无输出',
   statusIdle: '空闲',

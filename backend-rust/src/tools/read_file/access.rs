@@ -60,6 +60,24 @@ pub(in crate::tools) struct Workspace {
 }
 
 impl Workspace {
+    pub(super) fn open_project_memory(project: &Path, data_dir: &Path, create: bool) -> io::Result<Self> {
+        let namespace = crate::knowledge::workspace_namespace(project)?;
+        let data_path = data_dir.to_path_buf();
+        let data = open_startup_directory(&data_path)?;
+        let private_identity = Identity::of(&data.dir_metadata()?);
+        let mut directory = data;
+        for name in ["memory", namespace.as_str()] {
+            directory = if create {
+                crate::knowledge::storage::ensure_dir(&directory, name)?
+            } else {
+                directory.open_dir_nofollow(name)?
+            };
+        }
+        let canonical_path = data_path.join("memory").join(namespace);
+        Ok(Self { directory, startup_path: canonical_path.clone(), canonical_path, data_path,
+            private_path: None, private_identity })
+    }
+
     pub fn open(workspace: &Path, data_dir: &Path) -> io::Result<Self> {
         let startup_path = std::path::absolute(workspace)?;
         let canonical_path = startup_path.canonicalize()?;
@@ -112,6 +130,15 @@ impl Workspace {
                 open_startup_directory(root).and_then(|dir| dir.dir_metadata())
                     .is_ok_and(|current| Identity::of(&saved) == Identity::of(&current))
             })
+    }
+
+    pub(in crate::tools) fn matches_read_result(&self, raw: &str, target: &Path) -> bool {
+        // External memory results are absolute. A relative workspace result can
+        // have the same suffix without referring to this file.
+        if self.canonical_path.starts_with(&self.data_path) && !Path::new(raw).is_absolute() {
+            return false;
+        }
+        self.relative_path(raw).is_ok_and(|path| path == target)
     }
 
     pub(in crate::tools) fn relative_path(&self, raw: &str) -> Result<PathBuf, String> {

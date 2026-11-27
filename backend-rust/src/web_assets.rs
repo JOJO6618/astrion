@@ -157,13 +157,15 @@ async fn conversation(
     method: Method,
     session: Option<Extension<BrowserSession>>,
 ) -> Response {
-    let id = id.strip_prefix("conv_").unwrap_or(&id).as_bytes();
-    if id.len() != 19
-        || !id.iter().enumerate().all(|(index, byte)| match index {
-            8 | 15 => *byte == b'_',
+    let id = id.strip_prefix("conv_").unwrap_or(&id);
+    let valid = match id.strip_prefix("import_") {
+        Some(hash) => hash.len() == 32 && hash.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)),
+        None => id.len() == 19 && id.bytes().enumerate().all(|(index, byte)| match index {
+            8 | 15 => byte == b'_',
             _ => byte.is_ascii_digit(),
-        })
-    {
+        }),
+    };
+    if !valid {
         return StatusCode::NOT_FOUND.into_response();
     }
     match method {

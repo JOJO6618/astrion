@@ -604,11 +604,11 @@ impl ChatMode {
         } else {
             "关闭"
         };
-        let now = time::OffsetDateTime::now_utc();
+        let now = jiff::Zoned::now();
         parts.push(format!(
-            "当前时间：{}；时区：UTC；联网：{network}。",
-            now.format(&time::format_description::well_known::Rfc3339)
-                .unwrap_or_default()
+            "当前时间：{}；时区：UTC{}；联网：{network}。",
+            now.strftime("%Y-%m-%dT%H:%M%:z"),
+            now.strftime("%:z")
         ));
         Ok(parts.join("\n\n"))
     }

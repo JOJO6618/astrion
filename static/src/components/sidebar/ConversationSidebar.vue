@@ -377,86 +377,83 @@
                                 :aria-label="$t('common.moreActions')"
                                 :data-action-trigger="conv.id"
                                 :aria-expanded="openActionMenuId === conv.id"
-                                @click="toggleActionMenu(conv.id)"
+                                @click="toggleActionMenu(conv.id, $event)"
                               >
                                 <span aria-hidden="true"></span>
                               </button>
                               <Teleport to="body">
-                                <div
-                                  v-if="shouldShowActionMenu(conv.id)"
-                                  class="conversation-actions-menu conversation-actions-menu--fixed"
-                                  :class="{ open: openActionMenuId === conv.id }"
-                                  :style="{
-                                    top: actionMenuPosition.top + 'px',
-                                    right: actionMenuPosition.right + 'px'
-                                  }"
-                                >
-                                  <button
-                                    type="button"
-                                    @click="
-                                      openActionMenuId = null;
-                                      $emit('duplicate', conv.id, String(ws.workspace_id || ''));
-                                    "
+                                <Transition name="conversation-actions" @enter="positionActionMenu">
+                                  <div
+                                    v-if="shouldShowActionMenu(conv.id)"
+                                    class="conversation-actions-menu conversation-actions-menu--fixed"
                                   >
-                                    <span
-                                      class="icon icon-sm"
-                                      :style="iconStyle('copy')"
-                                      aria-hidden="true"
-                                    ></span>
-                                    <span>{{ $t('common.copy') }}</span>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    @click="
-                                      openActionMenuId = null;
-                                      copyConversationId(conv.id);
-                                    "
-                                  >
-                                    <span
-                                      class="icon icon-sm"
-                                      :style="iconStyle('hash')"
-                                      aria-hidden="true"
-                                    ></span>
-                                    <span>{{ $t('sidebar.copyId') }}</span>
-                                  </button>
-                                  <ConversationTransferMenu
-                                    :chat-mode="chatMode"
-                                    :project="workspaceKind === 'project'"
-                                    :icon-style="iconStyle"
-                                    @export="
-                                      openActionMenuId = null;
-                                      transferDialog?.startExport(
-                                        conv.id,
-                                        String(ws.workspace_id || '')
-                                      );
-                                    "
-                                    @migrate="
-                                      openActionMenuId = null;
-                                      transferDialog?.openMigration(
-                                        conv.id,
-                                        String(ws.workspace_id || '')
-                                      );
-                                    "
-                                  />
-                                  <button
-                                    type="button"
-                                    class="danger"
-                                    @click="
-                                      openActionMenuId = null;
-                                      $emit('delete', {
-                                        id: conv.id,
-                                        workspaceId: String(ws.workspace_id || '')
-                                      });
-                                    "
-                                  >
-                                    <span
-                                      class="icon icon-sm"
-                                      :style="iconStyle('trash')"
-                                      aria-hidden="true"
-                                    ></span>
-                                    <span>{{ $t('common.delete') }}</span>
-                                  </button>
-                                </div>
+                                    <button
+                                      type="button"
+                                      @click="
+                                        openActionMenuId = null;
+                                        $emit('duplicate', conv.id, String(ws.workspace_id || ''));
+                                      "
+                                    >
+                                      <span
+                                        class="icon icon-sm"
+                                        :style="iconStyle('copy')"
+                                        aria-hidden="true"
+                                      ></span>
+                                      <span>{{ $t('common.copy') }}</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      @click="
+                                        openActionMenuId = null;
+                                        copyConversationId(conv.id);
+                                      "
+                                    >
+                                      <span
+                                        class="icon icon-sm"
+                                        :style="iconStyle('hash')"
+                                        aria-hidden="true"
+                                      ></span>
+                                      <span>{{ $t('sidebar.copyId') }}</span>
+                                    </button>
+                                    <ConversationTransferMenu
+                                      :chat-mode="chatMode"
+                                      :project="workspaceKind === 'project'"
+                                      :icon-style="iconStyle"
+                                      @export="
+                                        openActionMenuId = null;
+                                        transferDialog?.startExport(
+                                          conv.id,
+                                          String(ws.workspace_id || '')
+                                        );
+                                      "
+                                      @migrate="
+                                        openActionMenuId = null;
+                                        transferDialog?.openMigration(
+                                          conv.id,
+                                          String(ws.workspace_id || '')
+                                        );
+                                      "
+                                    />
+                                    <button
+                                      type="button"
+                                      class="danger"
+                                      @click="
+                                        openActionMenuId = null;
+                                        $emit('delete', {
+                                          id: conv.id,
+                                          workspaceId: String(ws.workspace_id || '')
+                                        });
+                                      "
+                                    >
+                                      <span
+                                        class="icon icon-sm"
+                                        :style="iconStyle('trash')"
+                                        aria-hidden="true"
+                                      ></span>
+                                      <span>{{ $t('common.delete') }}</span>
+                                    </button>
+                                  </div>
+                                </Transition>
                               </Teleport>
                             </div>
                           </div>
@@ -557,86 +554,83 @@
                             :aria-label="$t('common.moreActions')"
                             :data-action-trigger="conv.id"
                             :aria-expanded="openActionMenuId === conv.id"
-                            @click="toggleActionMenu(conv.id)"
+                            @click="toggleActionMenu(conv.id, $event)"
                           >
                             <span aria-hidden="true"></span>
                           </button>
                           <Teleport to="body">
-                            <div
-                              v-if="shouldShowActionMenu(conv.id)"
-                              class="conversation-actions-menu conversation-actions-menu--fixed"
-                              :class="{ open: openActionMenuId === conv.id }"
-                              :style="{
-                                top: actionMenuPosition.top + 'px',
-                                right: actionMenuPosition.right + 'px'
-                              }"
-                            >
-                              <button
-                                type="button"
-                                @click="
-                                  openActionMenuId = null;
-                                  $emit('duplicate', conv.id, String(group.workspace_id || ''));
-                                "
+                            <Transition name="conversation-actions" @enter="positionActionMenu">
+                              <div
+                                v-if="shouldShowActionMenu(conv.id)"
+                                class="conversation-actions-menu conversation-actions-menu--fixed"
                               >
-                                <span
-                                  class="icon icon-sm"
-                                  :style="iconStyle('copy')"
-                                  aria-hidden="true"
-                                ></span>
-                                <span>{{ $t('common.copy') }}</span>
-                              </button>
-                              <button
-                                type="button"
-                                @click="
-                                  openActionMenuId = null;
-                                  copyConversationId(conv.id);
-                                "
-                              >
-                                <span
-                                  class="icon icon-sm"
-                                  :style="iconStyle('hash')"
-                                  aria-hidden="true"
-                                ></span>
-                                <span>{{ $t('sidebar.copyId') }}</span>
-                              </button>
-                              <ConversationTransferMenu
-                                :chat-mode="chatMode"
-                                :project="workspaceKind === 'project'"
-                                :icon-style="iconStyle"
-                                @export="
-                                  openActionMenuId = null;
-                                  transferDialog?.startExport(
-                                    conv.id,
-                                    String(group.workspace_id || '')
-                                  );
-                                "
-                                @migrate="
-                                  openActionMenuId = null;
-                                  transferDialog?.openMigration(
-                                    conv.id,
-                                    String(group.workspace_id || '')
-                                  );
-                                "
-                              />
-                              <button
-                                type="button"
-                                class="danger"
-                                @click="
-                                  openActionMenuId = null;
-                                  $emit('delete', {
-                                    id: conv.id,
-                                    workspaceId: String(group.workspace_id || '')
-                                  });
-                                "
-                              >
-                                <span
-                                  class="icon icon-sm"
-                                  :style="iconStyle('trash')"
-                                  aria-hidden="true"
-                                ></span>
-                                <span>{{ $t('common.delete') }}</span>
-                              </button>
-                            </div>
+                                <button
+                                  type="button"
+                                  @click="
+                                    openActionMenuId = null;
+                                    $emit('duplicate', conv.id, String(group.workspace_id || ''));
+                                  "
+                                >
+                                  <span
+                                    class="icon icon-sm"
+                                    :style="iconStyle('copy')"
+                                    aria-hidden="true"
+                                  ></span>
+                                  <span>{{ $t('common.copy') }}</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  @click="
+                                    openActionMenuId = null;
+                                    copyConversationId(conv.id);
+                                  "
+                                >
+                                  <span
+                                    class="icon icon-sm"
+                                    :style="iconStyle('hash')"
+                                    aria-hidden="true"
+                                  ></span>
+                                  <span>{{ $t('sidebar.copyId') }}</span>
+                                </button>
+                                <ConversationTransferMenu
+                                  :chat-mode="chatMode"
+                                  :project="workspaceKind === 'project'"
+                                  :icon-style="iconStyle"
+                                  @export="
+                                    openActionMenuId = null;
+                                    transferDialog?.startExport(
+                                      conv.id,
+                                      String(group.workspace_id || '')
+                                    );
+                                  "
+                                  @migrate="
+                                    openActionMenuId = null;
+                                    transferDialog?.openMigration(
+                                      conv.id,
+                                      String(group.workspace_id || '')
+                                    );
+                                  "
+                                />
+                                <button
+                                  type="button"
+                                  class="danger"
+                                  @click="
+                                    openActionMenuId = null;
+                                    $emit('delete', {
+                                      id: conv.id,
+                                      workspaceId: String(group.workspace_id || '')
+                                    });
+                                  "
+                                >
+                                  <span
+                                    class="icon icon-sm"
+                                    :style="iconStyle('trash')"
+                                    aria-hidden="true"
+                                  ></span>
+                                  <span>{{ $t('common.delete') }}</span>
+                                </button>
+                              </div>
+                            </Transition>
                           </Teleport>
                         </div>
                       </div>
@@ -722,81 +716,74 @@
                     :aria-label="$t('common.moreActions')"
                     :data-action-trigger="conv.id"
                     :aria-expanded="openActionMenuId === conv.id"
-                    @click="toggleActionMenu(conv.id)"
+                    @click="toggleActionMenu(conv.id, $event)"
                   >
                     <span aria-hidden="true"></span>
                   </button>
                   <Teleport to="body">
-                    <div
-                      v-if="
-                        !isConversationActive(conv.id) &&
-                        !isConversationCompleted(conv.id) &&
-                        openActionMenuId === conv.id
-                      "
-                      class="conversation-actions-menu conversation-actions-menu--fixed"
-                      :class="{ open: openActionMenuId === conv.id }"
-                      :style="{
-                        top: actionMenuPosition.top + 'px',
-                        right: actionMenuPosition.right + 'px'
-                      }"
-                    >
-                      <button
-                        type="button"
-                        @click="
-                          openActionMenuId = null;
-                          $emit('duplicate', conv.id);
-                        "
+                    <Transition name="conversation-actions" @enter="positionActionMenu">
+                      <div
+                        v-if="shouldShowActionMenu(conv.id)"
+                        class="conversation-actions-menu conversation-actions-menu--fixed"
                       >
-                        <span
-                          class="icon icon-sm"
-                          :style="iconStyle('copy')"
-                          aria-hidden="true"
-                        ></span>
-                        <span>{{ $t('common.copy') }}</span>
-                      </button>
-                      <button
-                        type="button"
-                        @click="
-                          openActionMenuId = null;
-                          copyConversationId(conv.id);
-                        "
-                      >
-                        <span
-                          class="icon icon-sm"
-                          :style="iconStyle('hash')"
-                          aria-hidden="true"
-                        ></span>
-                        <span>{{ $t('sidebar.copyId') }}</span>
-                      </button>
-                      <ConversationTransferMenu
-                        :chat-mode="chatMode"
-                        :project="workspaceKind === 'project'"
-                        :icon-style="iconStyle"
-                        @export="
-                          openActionMenuId = null;
-                          transferDialog?.startExport(conv.id, currentWorkspaceId);
-                        "
-                        @migrate="
-                          openActionMenuId = null;
-                          transferDialog?.openMigration(conv.id, currentWorkspaceId);
-                        "
-                      />
-                      <button
-                        type="button"
-                        class="danger"
-                        @click="
-                          openActionMenuId = null;
-                          $emit('delete', conv.id);
-                        "
-                      >
-                        <span
-                          class="icon icon-sm"
-                          :style="iconStyle('trash')"
-                          aria-hidden="true"
-                        ></span>
-                        <span>{{ $t('common.delete') }}</span>
-                      </button>
-                    </div>
+                        <button
+                          type="button"
+                          @click="
+                            openActionMenuId = null;
+                            $emit('duplicate', conv.id);
+                          "
+                        >
+                          <span
+                            class="icon icon-sm"
+                            :style="iconStyle('copy')"
+                            aria-hidden="true"
+                          ></span>
+                          <span>{{ $t('common.copy') }}</span>
+                        </button>
+                        <button
+                          type="button"
+                          @click="
+                            openActionMenuId = null;
+                            copyConversationId(conv.id);
+                          "
+                        >
+                          <span
+                            class="icon icon-sm"
+                            :style="iconStyle('hash')"
+                            aria-hidden="true"
+                          ></span>
+                          <span>{{ $t('sidebar.copyId') }}</span>
+                        </button>
+                        <ConversationTransferMenu
+                          :chat-mode="chatMode"
+                          :project="workspaceKind === 'project'"
+                          :icon-style="iconStyle"
+                          @export="
+                            openActionMenuId = null;
+                            transferDialog?.startExport(conv.id, currentWorkspaceId);
+                          "
+                          @migrate="
+                            openActionMenuId = null;
+                            transferDialog?.openMigration(conv.id, currentWorkspaceId);
+                          "
+                        />
+                        <button
+                          type="button"
+                          class="danger"
+                          @click="
+                            openActionMenuId = null;
+                            $emit('delete', conv.id);
+                          "
+                        >
+                          <span
+                            class="icon icon-sm"
+                            :style="iconStyle('trash')"
+                            aria-hidden="true"
+                          ></span>
+                          <span>{{ $t('common.delete') }}</span>
+                        </button>
+                      </div>
+                    </Transition>
                   </Teleport>
                 </div>
               </div>
@@ -1311,7 +1298,7 @@ const toggleWorkspaceSwitcher = () => {
   workspaceSwitcherOpen.value = true;
 };
 const openActionMenuId = ref<string | null>(null);
-const actionMenuPosition = ref<{ top: number; right: number }>({ top: 0, right: 0 });
+let actionMenuTrigger: HTMLElement | null = null;
 /* 切换工作区重排期间为 true：禁用子对话 FLIP 位移与分组展开折叠过渡，
    使分组头与子对话全部瞬间移动（不影响新建/复制/删除动画） */
 const workspaceSwitchInstant = ref(false);
@@ -1329,34 +1316,22 @@ watch(renameWorkspaceId, async (id) => {
   }
 });
 
-const updateActionMenuPosition = (conversationId: string) => {
-  if (typeof document === 'undefined') return;
-  const trigger = document.querySelector(
-    `[data-action-trigger="${conversationId}"]`
-  ) as HTMLElement | null;
-  if (!trigger) return;
-  const rect = trigger.getBoundingClientRect();
-  actionMenuPosition.value = {
-    top: rect.bottom + 6,
-    right: (typeof window !== 'undefined' ? window.innerWidth : 0) - rect.right
-  };
+const toggleActionMenu = (conversationId: string, event: MouseEvent) => {
+  actionMenuTrigger = event.currentTarget as HTMLElement;
+  openActionMenuId.value = openActionMenuId.value === conversationId ? null : conversationId;
 };
 
-const toggleActionMenu = (conversationId: string) => {
-  if (openActionMenuId.value === conversationId) {
-    openActionMenuId.value = null;
-  } else {
-    updateActionMenuPosition(conversationId);
-    openActionMenuId.value = conversationId;
-  }
+const positionActionMenu = (element: Element) => {
+  if (!actionMenuTrigger) return;
+  const menu = element as HTMLElement;
+  const rect = actionMenuTrigger.getBoundingClientRect();
+  const below = window.innerHeight - rect.bottom;
+  const above = below < menu.offsetHeight + 6 && rect.top > below;
+  menu.style.top = `${above ? Math.max(0, rect.top - menu.offsetHeight - 6) : rect.bottom + 6}px`;
+  menu.style.right = `${Math.max(0, Math.min(window.innerWidth - menu.offsetWidth, window.innerWidth - rect.right))}px`;
+  menu.style.transformOrigin = above ? 'bottom right' : 'top right';
+  menu.style.setProperty('--conversation-menu-offset', above ? '4px' : '-4px');
 };
-
-watch(openActionMenuId, async (id) => {
-  if (id) {
-    await nextTick();
-    updateActionMenuPosition(id);
-  }
-});
 
 const shouldShowActionMenu = (conversationId: string) => {
   return (
@@ -1375,7 +1350,11 @@ const lockLeaveItemPosition = (el: Element) => {
   item.style.top = `${item.offsetTop}px`;
 };
 
-const closeActionMenu = () => {
+const closeActionMenuOutside = (event: MouseEvent) => {
+  if (!openActionMenuId.value) return;
+  const target = event.target;
+  if (target instanceof Node && actionMenuTrigger?.contains(target)) return;
+  if (target instanceof Element && target.closest('.conversation-actions-menu--fixed')) return;
   openActionMenuId.value = null;
 };
 
@@ -1747,7 +1726,7 @@ const loadMoreWorkspaceConversations = (workspaceId: string) => {
 };
 
 onMounted(() => {
-  document.addEventListener('click', closeActionMenu);
+  document.addEventListener('click', closeActionMenuOutside, true);
   document.addEventListener('click', closeWorkspaceMenu);
   document.addEventListener('click', closePersonalMenu);
   fetchSessionUsername();
@@ -1765,7 +1744,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
-  document.removeEventListener('click', closeActionMenu);
+  document.removeEventListener('click', closeActionMenuOutside, true);
   document.removeEventListener('click', closeWorkspaceMenu);
   document.removeEventListener('click', closePersonalMenu);
 });

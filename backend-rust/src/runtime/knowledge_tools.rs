@@ -13,6 +13,47 @@ use super::{Runtime, approval::task_scope, writable_task};
 
 const FIELD: &str = "project_memory_reads";
 
+/// The caller holds the runtime store lock across the version check, native write and checkpoint.
+pub(super) fn write_workspace_memory(
+    store: &super::store::Store, workspace_id: &str, workspace: &std::path::Path,
+    conversation: &str, path: &std::path::Path, write: impl FnOnce(bool) -> Value,
+) -> Result<Value, String> {
+    let namespace = knowledge::workspace_namespace(workspace).map_err(|e| e.to_string())?;
+    let directory = store.data_dir.join("memory").join(namespace);
+    if path.starts_with(directory.join("topics")) {
+        let _lock = knowledge::lock_topics()?;
+        return Ok(write(false));
+    }
+    let memory = directory.join("MEMORY.md");
+    if path != memory {
+        if path.parent() == memory.parent() && path.file_name().and_then(|s| s.to_str())
+            .is_some_and(|name| name.eq_ignore_ascii_case("MEMORY.md")) {
+            return Ok(json!({"success":false,"error":"请使用当前工作区记忆的路径。","path":memory}));
+        }
+        return Ok(write(false));
+    }
+    let db_path = store.conversation_path(workspace_id, conversation).map_err(|e| e.message)?;
+    let mut db = Database::open(db_path.parent().expect("conversation directory"))?;
+    let snapshot = db.field(conversation, "metadata", "workspace_memory_snapshot")?.unwrap_or(Value::Null);
+    if snapshot["path"].as_str().map(std::path::Path::new) != Some(path) || !snapshot["version"].is_string() {
+        return Ok(write(false));
+    }
+    let knowledge = Knowledge::open(workspace, &store.data_dir).map_err(|e| e.to_string())?;
+    let current = knowledge.prompt_workspace_memory().map_err(|e| e.to_string())?;
+    let known = db.field(conversation, "metadata", "workspace_memory_write_version")?;
+    if known.as_ref().and_then(Value::as_str).or(snapshot["version"].as_str()) != current.record["version"].as_str() {
+        db.set_field(conversation, "metadata", "workspace_memory_write_version", &current.record["version"])?;
+        return Ok(json!({"success":false,"enforcement":"workspace_memory_conflict","path":path,
+            "error":"MEMORY.md 已被其他对话修改，请基于最新内容合并后重试。","current_content":current.text}));
+    }
+    let result = write(true);
+    if result["success"] == true {
+        let updated = knowledge.prompt_workspace_memory().map_err(|e| e.to_string())?;
+        db.set_field(conversation, "metadata", "workspace_memory_write_version", &updated.record["version"])?;
+    }
+    Ok(result)
+}
+
 pub(super) fn write_schemas() -> impl Iterator<Item = Value> {
     knowledge::definitions(KnowledgeAccess::ReadWrite)
         .into_iter()

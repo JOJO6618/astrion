@@ -23,6 +23,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 pub use skills::SkillSettings;
+pub(crate) use topics::{lock as lock_topics, workspace_namespace};
 pub(crate) use skills::valid_id as valid_skill_id;
 
 pub const SEARCH_SKILLS: &str = "search_skills";

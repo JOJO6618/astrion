@@ -31,8 +31,14 @@
           </button>
           <span v-if="stopError" class="subagent-activity-error">{{ stopError }}</span>
         </div>
-        <ActivityPager />
-        <div class="subagent-activity-body">
+        <div
+          ref="bodyRef"
+          class="subagent-activity-body"
+          @scroll.passive="activityScroll.onScroll"
+          @wheel.passive="activityScroll.onWheel"
+          @touchstart.passive="activityScroll.onTouchStart"
+          @touchend.passive="activityScroll.onTouchEnd"
+        >
           <div v-if="activityError" class="subagent-activity-error">{{ activityError }}</div>
           <div v-if="!activityError && !timelineItems.length" class="subagent-activity-empty">
             {{ activityLoading ? $t('overlay.readingActivity') : $t('overlay.noActivity') }}
@@ -70,11 +76,12 @@ import { computed, ref } from 'vue';
 import { storeToRefs } from 'pinia';
 import { t, currentLocale } from '@/locales';
 import CloseButton from '@/components/common/CloseButton.vue';
-import ActivityPager from '@/components/chat/quickdock/ActivityPager.vue';
+import { useSubAgentActivityScroll } from '@/composables/useSubAgentActivityScroll';
 import { useSubAgentStore } from '@/stores/subAgent';
 import { buildSubAgentToolText } from '@/components/chat/quickdock/subAgentToolText';
 
 type ActivityEntry = {
+  activityKey: string;
   type?: string;
   id?: string;
   tool?: string;
@@ -89,6 +96,8 @@ type ActivityEntry = {
 const subAgentStore = useSubAgentStore();
 const { activeAgent, activityEntries, activityLoading, activityError, stoppingTaskIds } =
   storeToRefs(subAgentStore);
+const bodyRef = ref<HTMLElement | null>(null);
+const activityScroll = useSubAgentActivityScroll(bodyRef, () => activeAgent.value?.task_id ?? null);
 const stopError = ref('');
 const expandedOutputs = ref<Set<string>>(new Set());
 
@@ -161,7 +170,7 @@ const timelineItems = computed(() => {
     }
   };
 
-  entries.forEach((entry: ActivityEntry, index: number) => {
+  entries.forEach((entry: ActivityEntry) => {
     if (
       entry?.type === 'progress' &&
       entry?.subtype === 'output' &&
@@ -173,7 +182,7 @@ const timelineItems = computed(() => {
       // 尾部连续的非终态工具条目（同一条 assistant 消息发起的调用）之前
       const outputItem = {
         kind: 'output' as const,
-        key: `output-${entry.ts || index}`,
+        key: `output-${entry.activityKey}`,
         content: entry.content,
         isFinal: !!entry.is_final
       };
@@ -192,7 +201,7 @@ const timelineItems = computed(() => {
 
     if (!entry || entry.type !== 'progress' || !entry.tool) return;
 
-    const baseKey = entry.id || `${entry.tool}-${entry.ts || index}`;
+    const baseKey = entry.id || `${entry.tool}-${entry.activityKey}`;
     if (
       currentToolGroup &&
       (currentToolGroup.entry.id === entry.id || currentToolGroup.key === baseKey) &&

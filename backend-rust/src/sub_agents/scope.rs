@@ -186,9 +186,12 @@ impl ChildScope {
         Ok(path.to_string_lossy().into_owned())
     }
 
-    pub(super) fn read(&self, mut args: Value) -> Result<Value, String> {
+    pub(super) fn read(&self, runtime: &crate::runtime::Runtime, mut args: Value) -> Result<Value, String> {
         self.check()?;
         args["path"] = json!(self.path(&args["path"])?);
+        if let Some(result) = runtime.read_child_project_memory(self.task.principal().workspace_id(), &self.workspace, &args) {
+            return Ok(result);
+        }
         let mut result = self.reader.execute(&args);
         absolute_result(&mut result, &self.workspace);
         Ok(result)

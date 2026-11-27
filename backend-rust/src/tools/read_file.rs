@@ -6,7 +6,7 @@ mod text;
 pub(super) use text::normalize_newlines;
 
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use serde_json::{Value, json};
 
@@ -70,6 +70,21 @@ pub fn schema() -> Value {
 /// A read-only capability bound to one workspace at startup.
 #[derive(Debug)]
 pub struct ReadFile(pub(super) Workspace);
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum HostFileRoot {
+    Authorized(PathBuf),
+    ProjectMemory { workspace: PathBuf },
+}
+
+impl HostFileRoot {
+    pub(crate) fn open(&self, data: &Path, create: bool) -> io::Result<ReadFile> {
+        match self {
+            Self::Authorized(root) => ReadFile::open(root, data),
+            Self::ProjectMemory { workspace } => Workspace::open_project_memory(workspace, data, create).map(ReadFile),
+        }
+    }
+}
 
 impl ReadFile {
     /// Open the trusted startup workspace and exclude the initialized runtime data directory.

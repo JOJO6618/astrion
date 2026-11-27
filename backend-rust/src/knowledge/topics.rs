@@ -17,7 +17,7 @@ const MIGRATION_NOTICE: &str = "00_READ_ME_项目记忆已迁移.md";
 // The version check and atomic publication share a lock across in-process tool instances.
 static TOPIC_IO: Mutex<()> = Mutex::new(());
 
-pub(super) fn workspace_namespace(project: &Path) -> io::Result<String> {
+pub(crate) fn workspace_namespace(project: &Path) -> io::Result<String> {
     let name = project
         .file_name()
         .and_then(|name| name.to_str())
@@ -49,7 +49,7 @@ pub(super) fn workspace_namespace(project: &Path) -> io::Result<String> {
     Ok(format!("{slug}-{}", &hash[..16]))
 }
 
-fn lock() -> Result<MutexGuard<'static, ()>, String> {
+pub(crate) fn lock() -> Result<MutexGuard<'static, ()>, String> {
     TOPIC_IO.lock().map_err(|_| "项目记忆暂时无法访问。".into())
 }
 

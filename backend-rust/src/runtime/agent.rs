@@ -110,7 +110,7 @@ async fn run_inner(
         let request = media::model_messages(with_instructions.as_deref().unwrap_or(&messages), &media_data, images, videos);
         let request = crate::mcp::model_messages(&request, images);
         let mut attempt = 0;
-        let (completion, bill, text_started) = loop {
+        let (completion, bill, stream) = loop {
             attempt += 1;
             let goal_active = goal.as_ref().map(|run| runtime.goals.is_active(run)).transpose()
                 .map_err(|error| error.message)?.unwrap_or(false);
@@ -119,15 +119,15 @@ async fn run_inner(
                 model_key: model.key(), model_id: &model.model, identity: &model.price_identity, responses,
             }).await;
             runtime.emit(task_id, "api_request_start", json!({"attempt":attempt,"max_attempts":max_attempts}))?;
-            let (result, bill, text_started) = stream_completion(runtime, task_id, &model, &request, &round_schemas, &mut budget, bill, workflow, thinking).await?;
+            let (result, bill, stream) = stream_completion(runtime, task_id, &model, &request, &round_schemas, &mut budget, bill, workflow, thinking).await?;
             match result {
-                Ok(completion) => break (completion, bill, text_started),
+                Ok(completion) => break (completion, bill, stream),
                 Err(error) if attempt < max_attempts && GoalFailure::from_message(&error).reason() == "retryable" => {
                     runtime.emit(task_id, "error", json!({
                         "message":error,"retry":true,"fatal":false,"retry_in":GOAL_API_RETRY_DELAY.as_secs(),
                         "attempt":attempt,"max_attempts":max_attempts,
                     }))?;
-                    if text_started {
+                    if stream.text_started || stream.thinking_started {
                         runtime.emit(task_id, "stream_reset", json!({"reason":"stream_disconnected","attempt":attempt + 1}))?;
                     }
                     tokio::time::sleep(GOAL_API_RETRY_DELAY).await;
@@ -141,8 +141,8 @@ async fn run_inner(
         let settled = bill.settle_success(completion.usage.as_ref(), completion.responses_duration_ms)
             .await.map_err(|error| format!("Could not persist model usage: {error}"))?;
         budget.observe_usage(completion.usage.as_ref());
-        if text_started {
-            let content = completion.message["content"].as_str().unwrap_or_default();
+        let content = completion.message["content"].as_str().unwrap_or_default();
+        if stream.text_started || (stream.thinking_started && !content.is_empty()) {
             let mut event = json!({"full_content":content});
             if let Some(citations) = completion.message["metadata"].get("citations") {
                 event["citations"] = citations.clone();
@@ -498,10 +498,15 @@ fn emit_tool_start(runtime: &Runtime, task_id: &str, call: &ToolCall, execution_
     runtime.emit(task_id, "tool_start", event)
 }
 
+struct StreamProgress {
+    text_started: bool,
+    thinking_started: bool,
+}
+
 async fn stream_completion(
     runtime: &Runtime, task_id: &str, model: &ModelConfig, request: &[Value], schemas: &[Value],
     budget: &mut RoundBudget, mut bill: RequestBilling, track_preview: bool, work: Option<&super::thinking_auxiliary::ThinkingWork>,
-) -> Result<(Result<Completion, String>, RequestBilling, bool), String> {
+) -> Result<(Result<Completion, String>, RequestBilling, StreamProgress), String> {
     use crate::model::StreamDelta;
 
     let mut text_started = false;
@@ -544,7 +549,7 @@ async fn stream_completion(
     if completion.is_ok() && let Some(mut preview) = preview {
         runtime.record_preview_targets(task_id, preview.feed("", true))?;
     }
-    Ok((completion, bill, text_started || thinking.started()))
+    Ok((completion, bill, StreamProgress { text_started, thinking_started: thinking.started() }))
 }
 
 fn emit_text(runtime: &Runtime, id: &str, response_id: &str, started: &mut bool, delta: &str) -> Result<(), String> {
