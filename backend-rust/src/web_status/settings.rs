@@ -469,17 +469,7 @@ fn update_model(settings: &Settings, id: Option<&str>, body: &Value) -> Result<V
     }
     let prefs = Personalization::load(&settings.app.data_dir);
     settings.edit(id, |metadata| {
-        let previous = metadata.get("model_key").and_then(Value::as_str);
-        if previous.is_some_and(|key| key != model) {
-            for key in [
-                "context_baseline_tokens",
-                "context_baseline_model_key",
-                "context_baseline_at",
-            ] {
-                metadata.insert(key.into(), Value::Null);
-            }
-            metadata.insert("context_baseline_pending".into(), json!(true));
-        }
+        crate::runtime::adaptive_context::invalidate_if_model_changed(metadata, model);
         let current = metadata
             .get("run_mode")
             .map_or(prefs.run_mode, |value| run_mode(value, prefs.run_mode));

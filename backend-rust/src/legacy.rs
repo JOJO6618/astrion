@@ -602,6 +602,11 @@ fn merge_statistics(document: &mut Value, statistics: &Value, updated_at: &str) 
             original.insert(key.into(), value);
         }
     }
+    if let Some(pending) = current.get("cache_cold_start_pending").and_then(Value::as_bool) {
+        let value = Value::Bool(pending);
+        changed |= original.get("cache_cold_start_pending") != Some(&value);
+        original.insert("cache_cold_start_pending".into(), value);
+    }
     if changed {
         if let Some(total) = original
             .get("total_input_tokens")

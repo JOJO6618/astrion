@@ -94,6 +94,9 @@ test('a long Agent tool run completes, compresses in place, and continues from i
   assert.equal((await queuedReply.json()).data.queued,true);
   gate.resume();
   await queued.until('queued summary and resumed reply',row=>row.status==='succeeded');
+  assert.deepEqual(queued.events.filter(e=>e.type==='compression_state').map(e=>[e.data.stage,e.data.mode]),[
+    ['waiting_for_tools','requested'],['generating_summary','requested'],
+  ]);
   assert.equal(queued.events.filter(e=>e.type==='compression_finished').length,1);
   assert.match(mock.requests.at(-1).body.messages.at(-1).content,/当前运行时状态/);
   assert.equal(mock.requests.at(-1).summarizing,false);

@@ -70,6 +70,13 @@ async fn run_inner(
     let mut batch_sequence = 0;
     loop {
         rounds += 1;
+        if workflow {
+            runtime.queue_auto_compression(task_id)?;
+            if let Some(compacted) = runtime.compress_turn(task_id, &model).await? {
+                messages = compacted;
+                budget = RoundBudget::new(None);
+            }
+        }
         if workflow && runtime.task_has_approval_scope(task_id)? && let Some(notice) = runtime.apply_browser_settings(task_id)? {
             messages.push(notice);
         }
@@ -78,10 +85,6 @@ async fn run_inner(
             for notice in runtime.apply_pending_host_modes(task_id, rounds == 1)? {
                 messages.push(json!({"role": "user", "content": notice["content"].clone()}));
             }
-        }
-        if workflow && let Some(compacted) = runtime.compress_turn(task_id, &model).await? {
-            messages=compacted;
-            budget=RoundBudget::new(None);
         }
         let tool_menu::ToolMenu {complete_schemas, round_schemas, browser_names, interaction_names, process_names, disabled, mcp, mcp_snapshot, mut deferred} =
             tool_menu::for_round(runtime, task_id, tools, &model).await?;
@@ -150,13 +153,14 @@ async fn run_inner(
             let runtime = runtime.clone();
             let id = task_id.to_owned();
             let goal = goal.clone();
+            let model_key = model.key().to_owned();
             tokio::task::spawn_blocking(move || {
                 if let Some(goal) = goal
                     && let Some(tokens) = crate::usage::normalize_usage(&usage)
                 {
                     runtime.goals.record_usage(&goal, &request_id, tokens.total_tokens).map_err(|error| error.message)?;
                 }
-                runtime.record_usage(&id, &usage)
+                runtime.record_usage(&id, &usage, Some(&model_key))
             })
                 .await
                 .map_err(|_| "Usage writer exited unexpectedly".to_owned())??;

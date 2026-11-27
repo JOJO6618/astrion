@@ -19,11 +19,8 @@ impl Database {
         let tokens = header["token_statistics"]["current_context_tokens"]
             .as_u64()
             .unwrap_or(0);
-        let baseline = header["metadata"]["context_baseline_tokens"]
-            .as_u64()
-            .unwrap_or(0);
         if header["metadata"]["is_long_conversation"] != true
-            && tokens <= baseline.saturating_add(settings.threshold)
+            && tokens <= settings.threshold
         {
             return Ok(Vec::new());
         }
