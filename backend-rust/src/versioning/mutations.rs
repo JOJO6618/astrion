@@ -47,6 +47,7 @@ pub(super) fn configure(
     id: &str,
     enabled: bool,
     requested: Option<&str>,
+    initial_full_backup: Option<bool>,
 ) -> Result<Value, RuntimeError> {
     let (header, _) = store.header(workspace, id)?;
     let document = LegacyDocument::from_value(header).map_err(legacy_error)?;
@@ -55,7 +56,7 @@ pub(super) fn configure(
     let _lock = files::lock(&record.session).map_err(storage)?;
     let current = document.raw();
     let config = &current["metadata"]["versioning"];
-    let full = is_full(config);
+    let full = initial_full_backup.unwrap_or_else(|| is_full(config));
     let tracking = if full {
         requested.map_or_else(
             || tracking_mode(&config["tracking_mode"]),
@@ -68,9 +69,13 @@ pub(super) fn configure(
     let mut rows = rows(&record.session)?;
     let mut previous_meta = meta(&record.session)?;
     let mut initial = None;
+    let mut initial_index = None;
     if enabled && !rows.iter().any(|row| sequence(row) == 0) {
         let tree = if tracking == WORKSPACE_AND_CONVERSATION && full {
-            deep::baseline_tree(store, &record.session, id, &root)?
+            // A full initial restore must reflect files that already exist, not an empty tree.
+            let baseline = deep::checkpoint(store, &record.session, id, &root, EMPTY_TREE)?;
+            initial_index = Some(baseline.index);
+            baseline.tree
         } else {
             EMPTY_TREE.into()
         };
@@ -90,6 +95,9 @@ pub(super) fn configure(
     let versioning = next_config(config, enabled, full, tracking, seq, &tree, &timestamp);
     set_meta(&mut previous_meta, &versioning, &tree);
     let mut tx = Transaction::for_versioning(&record.session, &record.records, workspace, id, config, &versioning)?;
+    if let Some(index) = initial_index {
+        tx.put(&format!("{id}/git/index"), index).map_err(storage)?;
+    }
     if let Some(initial) = initial {
         put_json(&mut tx, id, "snapshots/0.json", &initial)?;
         put_rows(&mut tx, id, &rows)?;

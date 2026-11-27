@@ -216,6 +216,54 @@ async fn request(
 }
 
 #[tokio::test]
+async fn web_creation_applies_default_flag_and_full_workspace_baseline() {
+    let f = Fixture::new();
+    let workspace = RegisteredWorkspace {
+        id: WORKSPACE.into(),
+        path: f.work.clone(),
+        label: "Fixture".into(),
+    };
+    let preferences = f.data.join("personalization.json");
+    let create = || {
+        f.runtime.create_web_conversation(&workspace, Default::default()).unwrap()
+            ["conversation_id"].as_str().unwrap().to_owned()
+    };
+
+    fs::write(&preferences, json!({"versioning_enabled_by_default":false,"versioning_backup_mode":"full"}).to_string()).unwrap();
+    let off = create();
+    assert!(f.document(&off)["metadata"]["versioning"].is_null());
+    assert!(!f.data.join("save").join(&off).exists());
+
+    fs::write(&preferences, "{}").unwrap(); // Defaults on, shallow.
+    let shallow = create();
+    let config = f.document(&shallow)["metadata"]["versioning"].clone();
+    assert_eq!(config["enabled"], true);
+    assert_eq!(config["backup_mode"], "shallow");
+    assert_eq!(config["tracking_mode"], "conversation_only");
+    assert!(f.data.join("save").join(&shallow).join("snapshots/0.json").is_file());
+
+    fs::write(&preferences, json!({"versioning_enabled_by_default":true,"versioning_backup_mode":"full"}).to_string()).unwrap();
+    fs::write(f.work.join("notes.txt"), b"present before the chat\n").unwrap();
+    let full = create();
+    let config = f.document(&full)["metadata"]["versioning"].clone();
+    assert_eq!(config["enabled"], true);
+    assert_eq!(config["backup_mode"], "full");
+    assert_eq!(config["tracking_mode"], "workspace_and_conversation");
+    assert_eq!(config["last_input_seq"], 0);
+    assert!(f.data.join("save").join(&full).join("git/index").is_file());
+
+    // An ordinary command (not a single-file editing tool) changes the initial workspace.
+    fs::write(f.work.join("notes.txt"), b"edited outside the tool\n").unwrap();
+    fs::write(f.work.join("later.txt"), b"created outside the tool\n").unwrap();
+    request(&f, "POST", &full, "/restore", json!({"seq":0}), StatusCode::OK).await;
+    assert_eq!(fs::read(f.work.join("notes.txt")).unwrap(), b"present before the chat\n");
+    assert!(!f.work.join("later.txt").exists());
+    assert_eq!(f.document(&full)["messages"], json!([]));
+    // Changing preferences doesn't silently change existing conversations.
+    assert_eq!(f.document(&shallow)["metadata"]["versioning"]["backup_mode"], "shallow");
+}
+
+#[tokio::test]
 async fn toggle_and_finished_agent_checkpoint_use_python_layout_and_respect_active_tasks() {
     let f = Fixture::new();
     f.insert(ID, Value::Null, vec![]);

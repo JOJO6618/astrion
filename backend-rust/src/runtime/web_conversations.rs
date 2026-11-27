@@ -1,7 +1,7 @@
 mod drafts;
 mod search;
 mod statistics;
-use super::{LegacyDocument, Runtime, RuntimeError, legacy_error, new_document, now};
+use super::{LegacyDocument, Runtime, RuntimeError, legacy_error, new_document, now, versioning};
 use crate::workspace_catalog::RegisteredWorkspace;
 use serde_json::{Map, Value, json};
 
@@ -99,6 +99,7 @@ impl Runtime {
         let doc = LegacyDocument::from_value(raw).map_err(legacy_error)?;
         let id = doc.source_id().to_owned();
         store.persist(&workspace.id, doc, true)?;
+        versioning::set_enabled_on_create(&store, &workspace.id, &id)?;
         Ok(json!({"success":true,"conversation_id":id}))
     }
 }

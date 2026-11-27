@@ -243,10 +243,19 @@ pub(crate) fn automatic_deep_limit(data: &Path, metadata: &Value) -> io::Result<
     };
     Ok(Some(configured.saturating_add(baseline)))
 }
-pub(crate) fn versioning_default(data: &Path) -> io::Result<bool> {
-    Ok(store::read_object(&data.join("personalization.json"))?
-        .and_then(|config| config.get("versioning_enabled_by_default").and_then(Value::as_bool))
-        .unwrap_or(true))
+pub(crate) struct VersioningDefaults {
+    pub enabled: bool,
+    pub full_backup: bool,
+}
+
+pub(crate) fn versioning_defaults(data: &Path) -> io::Result<VersioningDefaults> {
+    let config = store::read_object(&data.join("personalization.json"))?.unwrap_or_default();
+    Ok(VersioningDefaults {
+        enabled: config.get("versioning_enabled_by_default") != Some(&Value::Bool(false)),
+        full_backup: config.get("versioning_backup_mode")
+            .and_then(Value::as_str)
+            .is_some_and(|mode| mode.trim().eq_ignore_ascii_case("full")),
+    })
 }
 
 pub(crate) fn english(data: &Path) -> bool {
