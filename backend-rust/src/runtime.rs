@@ -617,6 +617,8 @@ impl Runtime {
         let conversation_id = document.source_id().to_owned();
         let workspace = &store.workspaces[workspace_id];
         goals::verify_conversation_root(workspace, document.raw())?;
+        let skill_messages = crate::knowledge::composer_skill_messages(workspace, &store.data_dir, &payload["skill_refs"])
+            .map_err(RuntimeError::bad_request)?;
         if !matches!(origin, Origin::Passive) {
             goals::verify_goal_identity(store, workspace_id, &conversation_id)?;
         }
@@ -731,6 +733,10 @@ impl Runtime {
             let input_index = prior_count + durable.len();
             durable.extend(submitted);
             let mut model_input = model_input;
+            for skill in skill_messages {
+                model_input.push(json!({"role":"user","content":skill["content"]}));
+                durable.push(skill);
+            }
             if let Some(notice) = hidden_user_notice {
                 let model_notice = json!({"role":"user","content":notice});
                 let mut durable_notice = model_notice.clone();
@@ -1200,10 +1206,6 @@ fn required_message(payload: &Value) -> Result<&str, RuntimeError> {
     }
     if message.chars().count() > 200_000 {
         return Err(RuntimeError::bad_request("message is too long"));
-    }
-    let skills = &payload["skill_refs"];
-    if !skills.is_null() && !skills.as_array().is_some_and(Vec::is_empty) {
-        return Err(RuntimeError::bad_request("skill_refs are unsupported by this runtime"));
     }
     Ok(message)
 }

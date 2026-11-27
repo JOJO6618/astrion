@@ -1,6 +1,7 @@
 use std::{
     collections::{BTreeSet, HashMap},
     io,
+    path::Path,
 };
 
 use cap_fs_ext::DirExt;
@@ -173,6 +174,77 @@ pub(super) fn workspace_menu(knowledge: &Knowledge) -> io::Result<Vec<Value>> {
         let name = if meta.name.is_empty() { &id } else { meta.name };
         Some(json!({"name": name, "description": meta.description, "path": Root::Astrion.path(&id)}))
     }).collect())
+}
+
+/// Resolve only explicit composer selections, using the same confined root as /api/skills.
+/// These are user-authored references, not model tool calls or changes to the skill catalog.
+pub(crate) fn composer_messages(workspace: &Path, data: &Path, references: &Value) -> Result<Vec<Value>, String> {
+    const MAX_REFS: usize = 10;
+    const MAX_BYTES: u64 = 1024 * 1024;
+    if references.is_null() {
+        return Ok(Vec::new());
+    }
+    let references = references.as_array().ok_or("skill_refs 必须是数组。")?;
+    if references.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let workspace_prefix = composer_path(&workspace.to_string_lossy());
+    let mut seen = BTreeSet::new();
+    let mut ids = Vec::new();
+    for reference in references {
+        let path = reference["path"].as_str().ok_or("技能引用必须提供 path。")?;
+        let path = composer_path(path.trim());
+        // Older saved messages contain absolute workspace paths. Strip the known
+        // prefix lexically; never open any directory named by an incoming ref.
+        let relative = path.strip_prefix(workspace_prefix.as_str())
+            .and_then(|tail| tail.strip_prefix('/')).unwrap_or(&path);
+        let id = relative.strip_prefix(".astrion/skills/")
+            .and_then(|tail| tail.strip_suffix("/SKILL.md"))
+            .filter(|id| valid_id(id))
+            .ok_or("技能引用必须指向当前工作区的 .astrion/skills/<id>/SKILL.md。")?;
+        let identity = if cfg!(windows) { id.to_ascii_lowercase() } else { id.to_owned() };
+        if seen.insert(identity) {
+            ids.push(id.to_owned());
+            if ids.len() > MAX_REFS {
+                return Err(format!("单次最多可附加 {MAX_REFS} 个技能。"));
+            }
+        }
+    }
+
+    let knowledge = Knowledge::open(workspace, data).map_err(display_io)?;
+    let root = Root::Astrion.open(&knowledge).map_err(display_io)?
+        .ok_or("工作区的技能目录不存在。")?;
+    let mut available = MAX_BYTES;
+    ids.into_iter().map(|id| {
+        let path = Root::Astrion.path(&id);
+        let file = (|| {
+            let folder = root.open_dir_nofollow(&id)?;
+            reject_data(&knowledge, &folder)?;
+            Document::open_bounded(&folder, "SKILL.md", available)
+        })().map_err(|error| format!("{path}：{}", display_io(error)))?;
+        available -= file.size as u64;
+        let meta = Frontmatter::parse(&file.text, true);
+        let name = if meta.name.is_empty() { &id } else { meta.name };
+        Ok(json!({
+            "role": "user", "content": format!("[系统通知|skill]\n{}", file.text),
+            "metadata": {"source":"skill","message_source":"skill","visibility":"hidden",
+                "starts_work":false,"hidden":true,"skill_name":name,"skill_path":path}
+        }))
+    }).collect()
+}
+
+fn composer_path(path: &str) -> String {
+    let path = path.replace('\\', "/");
+    #[cfg(windows)]
+    {
+        if let Some(unc) = path.strip_prefix("//?/UNC/") {
+            return format!("//{unc}");
+        }
+        path.strip_prefix("//?/").unwrap_or(&path).to_owned()
+    }
+    #[cfg(not(windows))]
+    path
 }
 
 fn catalog<'a>(knowledge: &Knowledge, query: Option<&Query<'a>>) -> Result<Vec<Skill<'a>>, String> {

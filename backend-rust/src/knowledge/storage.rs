@@ -86,13 +86,17 @@ pub(crate) fn read_bytes(dir: &Dir, name: &str, limit: u64) -> io::Result<Vec<u8
 
 pub(super) struct Document {
     pub text: String,
-    size: usize,
+    pub(super) size: usize,
     pub version: String,
 }
 
 impl Document {
     pub fn open(dir: &Dir, name: &str) -> io::Result<Self> {
-        let bytes = read_bytes(dir, name, MAX_BYTES)?;
+        Self::open_bounded(dir, name, MAX_BYTES)
+    }
+
+    pub fn open_bounded(dir: &Dir, name: &str, limit: u64) -> io::Result<Self> {
+        let bytes = read_bytes(dir, name, limit)?;
         let size = bytes.len();
         let version = version(&bytes);
         let text = String::from_utf8(bytes)

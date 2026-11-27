@@ -25,6 +25,7 @@ use serde_json::{Value, json};
 pub use skills::SkillSettings;
 pub(crate) use topics::{lock as lock_topics, workspace_namespace};
 pub(crate) use skills::valid_id as valid_skill_id;
+pub(crate) use skills::composer_messages as composer_skill_messages;
 
 pub const SEARCH_SKILLS: &str = "search_skills";
 pub const READ_SKILL: &str = "read_skill";
