@@ -280,10 +280,10 @@ impl Runtime {
         task_id: &'a str,
         name: &'a str,
         args: &'a Value,
-        history: &'a [Value],
+        pending_batch: &'a [Value],
     ) -> super::ToolFuture<'a> {
         Box::pin(async move {
-            match self.workflow_tool(task_id, name, args, history).await {
+            match self.workflow_tool(task_id, name, args, pending_batch).await {
                 Ok(value) => Ok(value),
                 Err(error) => Ok(json!({"success":false, "error":error.message})),
             }
@@ -295,14 +295,10 @@ impl Runtime {
         task_id: &str,
         name: &str,
         args: &Value,
-        history: &[Value],
+        pending_batch: &[Value],
     ) -> Result<Value> {
         let workflow = self.workflow_service()?;
         let argument = |key: &str| args[key].as_str().unwrap_or_default();
-        let history = match history.first() {
-            Some(message) if message["_frozen_system_prompt"] == true => &history[1..],
-            _ => history,
-        };
         let (conversation_id, workspace, advance) = {
             let mut store = self.store().map_err(map_runtime)?;
             let task = writable_task(&mut store, task_id).map_err(stopped)?;
@@ -313,7 +309,14 @@ impl Runtime {
                 .get(&workspace_id)
                 .cloned()
                 .ok_or_else(|| unavailable("工作区不可用。"))?;
-            let _ = verified_document(&store, &workspace_id, &conversation_id)?;
+            let document = verified_document(&store, &workspace_id, &conversation_id)?;
+            // Workflow cursors count durable messages (including the hidden
+            // prefix after deep compression), not the provider's projection.
+            // The current tool batch has not yet been committed, so add its
+            // assistant call and any already completed results exactly once.
+            let mut raw = document.into_raw();
+            let history = raw["messages"].as_array_mut().expect("verified Agent messages");
+            history.extend_from_slice(pending_batch);
             let states = &workflow.states;
             let advance = match name {
                 "activate_workflow" => {

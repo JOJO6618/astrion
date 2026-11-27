@@ -426,8 +426,7 @@ async fn run_inner(
                 }
                 result
             } else if workflow && runtime.validate_workflow_tool(&call.name, &call.arguments).is_some() {
-                let history = messages.iter().chain(&batch).cloned().collect::<Vec<_>>();
-                runtime.execute_workflow_tool(task_id, &call.name, &call.arguments, &history).await?
+                runtime.execute_workflow_tool(task_id, &call.name, &call.arguments, &batch).await?
             } else {
                 let arguments = super::transfer::read_arguments(&call.name, call.arguments, &transfer_paths);
                 if workflow && call.name == crate::tools::read_file::NAME
