@@ -63,6 +63,39 @@ impl WorkspaceRegistry {
         Ok(HostCatalog::load(&self.path, &self.resources)?.unwrap_or_default())
     }
 
+    /// Register Default on the first Web launch only. The marker and the
+    /// registration are committed together, and deleting the last workspace
+    /// sets the same marker so later launches respect that choice.
+    pub fn ensure_default_workspace(&self) -> Result<(), RegistryError> {
+        self.update(|raw| {
+            if raw["auto_default_workspace"].as_bool() == Some(true)
+                || raw.get("workspaces").is_some_and(|entries| {
+                    entries.as_array().is_none_or(|entries| !entries.is_empty())
+                })
+            {
+                return Ok((Value::Null, false));
+            }
+            let Some(directory) = super::default_workspace_path() else {
+                return Ok((Value::Null, false));
+            };
+            let directory = directory.to_str().ok_or(RegistryError::Invalid(
+                "Default workspace path is not valid Unicode",
+            ))?;
+            let directory = resolve_path(directory, &self.resources)?;
+            fs::create_dir_all(&directory)?;
+            let workspace = RegisteredWorkspace {
+                id: "default".into(),
+                label: "Default".into(),
+                path: directory,
+            };
+            entries_mut(raw).push(workspace_json(&workspace));
+            raw["default_workspace_id"] = workspace.id.into();
+            raw["auto_default_workspace"] = true.into();
+            Ok((Value::Null, true))
+        })?;
+        Ok(())
+    }
+
     pub fn create(
         &self,
         path: &str,

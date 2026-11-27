@@ -9,6 +9,17 @@ use std::{
     path::{Path, PathBuf},
 };
 
+/// The initial workspace and Chat handoff share the same local directory.
+pub fn default_workspace_path() -> Option<PathBuf> {
+    let home = std::env::home_dir().filter(|path| path.is_absolute())?;
+    let desktop = ["Desktop", "OneDrive/Desktop", "OneDrive/桌面"]
+        .into_iter()
+        .map(|path| home.join(path))
+        .find(|path| path.is_dir())
+        .unwrap_or(home);
+    Some(desktop.join("Astrion").join("Default"))
+}
+
 #[derive(Clone, Debug)]
 pub struct RegisteredWorkspace {
     pub id: String,

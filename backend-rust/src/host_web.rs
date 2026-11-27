@@ -1,7 +1,7 @@
 mod client_debug;
 
 use crate::{gateway::Gateway, host_paths::HostPaths};
-use astrion_headless::workspace_catalog::RegisteredWorkspace;
+use astrion_headless::workspace_catalog::{RegisteredWorkspace, default_workspace_path};
 use astrion_headless::{
     project_git::ProjectGit,
     storage_stats, usage,
@@ -26,13 +26,6 @@ use std::{
     sync::{Arc, Mutex},
     time::{SystemTime, UNIX_EPOCH},
 };
-
-fn default_handoff_workspace() -> Option<PathBuf> {
-    let home = std::env::home_dir().filter(|path| path.is_absolute())?;
-    let desktop = ["Desktop", "OneDrive/Desktop", "OneDrive/桌面"].into_iter()
-        .map(|path| home.join(path)).find(|path| path.is_dir()).unwrap_or(home);
-    Some(desktop.join("Astrion/Default"))
-}
 
 fn status_config(gateway: &Gateway, data: &Path) -> WebStatusConfig {
     WebStatusConfig {
@@ -130,7 +123,7 @@ pub fn routes(
         gateway.runtime.clone(), data, &paths.resources, gateway.catalog.clone(),
     ).map_err(io::Error::other)?
         .with_personalization(gateway.preferences.clone());
-    let chat = match default_handoff_workspace() {
+    let chat = match default_workspace_path() {
         Some(path) => chat.with_handoff_workspace(registry.clone(), path),
         None => chat,
     };
