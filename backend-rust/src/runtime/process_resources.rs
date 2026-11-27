@@ -331,7 +331,7 @@ fn notice_message(notice: &Value, timestamp: f64) -> Value {
     let id = format!("background_notice_{}", notice["command_id"].as_str().unwrap_or_default());
     json!({"role":"user","content":content,"message_id":id,"metadata":{
         "message_id":id,"message_source":"background_command","auto_message_type":"background_command",
-        "visibility":"chat","starts_work":false,"command_id":notice["command_id"],
+        "starts_work":false,"command_id":notice["command_id"],
         "sub_agent_notice":true,"background_command_notice":true,"timestamp":iso_time(timestamp),
     }})
 }
