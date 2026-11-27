@@ -234,7 +234,14 @@ pub(crate) fn automatic_deep_limit(data: &Path, metadata: &Value) -> io::Result<
     if prefs.get("auto_deep_compress_enabled")==Some(&Value::Bool(false)){ return Ok(None); }
     let configured=metadata["compress_limit_tokens"].as_u64()
         .or_else(||prefs.get("deep_compress_trigger_tokens").and_then(Value::as_u64)).unwrap_or(250000);
-    Ok(Some(configured.saturating_add(metadata["context_baseline_tokens"].as_u64().unwrap_or(0))))
+    let baseline = if prefs.get("adaptive_compress_enabled") == Some(&Value::Bool(true))
+        && metadata["context_baseline_model_key"] == metadata["model_key"]
+    {
+        metadata["context_baseline_tokens"].as_u64().unwrap_or(0)
+    } else {
+        0
+    };
+    Ok(Some(configured.saturating_add(baseline)))
 }
 pub(crate) fn versioning_default(data: &Path) -> io::Result<bool> {
     Ok(store::read_object(&data.join("personalization.json"))?

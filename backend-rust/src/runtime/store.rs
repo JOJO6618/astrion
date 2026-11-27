@@ -126,6 +126,8 @@ pub(crate) struct TokenStats {
     pub total_cached_input_tokens: Option<u64>,
     pub cache_exempt_input_tokens: Option<u64>,
     pub current_context_tokens: Option<u64>,
+    #[serde(skip)]
+    cache_cold_start_pending: Option<bool>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -504,6 +506,9 @@ pub(super) fn append_document(
     };
     let usage = usage.map(|stats| {
         let mut value = json!(stats);
+        if let Some(pending) = stats.cache_cold_start_pending {
+            value["cache_cold_start_pending"] = json!(pending);
+        }
         value
             .as_object_mut()
             .expect("token statistics object")
@@ -530,6 +535,9 @@ pub(super) fn append_document(
         raw["title"] = json!(title);
     }
     if let Some(model_key) = model_key {
+        super::adaptive_context::invalidate_if_model_changed(
+            raw["metadata"].as_object_mut().expect("validated conversation metadata"), model_key,
+        );
         raw["metadata"]["model_key"] = json!(model_key);
     }
     LegacyDocument::from_value(raw).map_err(legacy_error)
@@ -776,6 +784,7 @@ impl TokenStats {
             total_cached_input_tokens: value["total_cached_input_tokens"].as_u64(),
             cache_exempt_input_tokens: value["cache_exempt_input_tokens"].as_u64(),
             current_context_tokens: value["current_context_tokens"].as_u64(),
+            cache_cold_start_pending: value["cache_cold_start_pending"].as_bool(),
         }
     }
 
@@ -786,7 +795,17 @@ impl TokenStats {
             .as_u64()
             .or_else(|| usage["cached_input_tokens"].as_u64());
         let context = usage["current_context_tokens"].as_u64().or(prompt);
-        let exempt = usage["cache_exempt_input_tokens"].as_u64();
+        let mut exempt = usage["cache_exempt_input_tokens"].as_u64();
+        if let Some(input) = prompt.filter(|tokens| *tokens > 0)
+            && (self.total_input_tokens.unwrap_or_default() == 0 || self.cache_cold_start_pending == Some(true))
+        {
+            // Only a miss on the first request for this prefix initializes a cache.
+            // A warm result proves that the provider reused its prefix normally.
+            if cached.unwrap_or_default() == 0 {
+                exempt = exempt.or(Some(input));
+            }
+            self.cache_cold_start_pending = Some(false);
+        }
         add_usage(&mut self.total_input_tokens, prompt);
         add_usage(&mut self.total_output_tokens, completion);
         add_usage(&mut self.total_cached_input_tokens, cached);
@@ -800,7 +819,10 @@ impl TokenStats {
     }
 
     pub fn event_data(&self) -> Value {
+        let total = self.total_input_tokens.zip(self.total_output_tokens)
+            .map(|(input, output)| input.saturating_add(output));
         json!({"cumulative_input_tokens":self.total_input_tokens,"cumulative_output_tokens":self.total_output_tokens,
+            "cumulative_total_tokens":total,
             "cumulative_cached_input_tokens":self.total_cached_input_tokens,"cache_exempt_input_tokens":self.cache_exempt_input_tokens,
             "current_context_tokens":self.current_context_tokens})
     }
