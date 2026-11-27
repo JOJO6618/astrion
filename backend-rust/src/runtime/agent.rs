@@ -331,7 +331,7 @@ async fn run_inner(
                     Ok(review) => match review.save {
                         Some(arguments) => if let Some(writer) = &writer {
                             let request = workspace_write_request(&call.id, WRITE_NAME, arguments)?;
-                            let written = runtime.execute_workspace_write(writer.clone(), task_id, request, &messages, &batch).await?;
+                            let written = runtime.execute_generated_workspace_write(writer.clone(), task_id, request, &messages, &batch).await?;
                             if written["success"] == true { review.result } else { written }
                         } else {
                             json!({"success":false,"error":"当前对话没有回顾文件写入权限。"})
@@ -387,7 +387,7 @@ async fn run_inner(
                     (Some(writer), Some(data)) if runtime.can_edit_settings(task_id).unwrap_or(false) => match crate::tools::web::prepare_save(&data, &call.arguments).await {
                         Ok(save) => {
                             let request = workspace_write_request(&call.id, WRITE_NAME, save.arguments.clone())?;
-                            let written = runtime.execute_workspace_write(writer.clone(), task_id, request, &messages, &batch).await?;
+                            let written = runtime.execute_generated_workspace_write(writer.clone(), task_id, request, &messages, &batch).await?;
                             save.result(written)
                         }
                         Err(result) => result,

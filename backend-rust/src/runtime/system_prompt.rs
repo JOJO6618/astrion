@@ -93,9 +93,15 @@ pub(super) fn freeze(
         } else {
             (String::new(), None)
         };
+        let history_dir = if can_write && crate::web_assets::personalization::modify_history_enabled(&store.data_dir) {
+            let active = Runtime::worktree_execution_root(store, workspace_id, &settings)?;
+            Some(active.as_deref().unwrap_or(root).join(".astrion").join("modify_history").join(&conversation_id))
+        } else {
+            None
+        };
         let input = Inputs {
             root, created_at: &created_at, knowledge: &knowledge, preferences: &preferences, model,
-            modes, recent, browser: store.native_browser.is_some() && can_write, catalog, disabled,
+            modes, recent, browser: store.native_browser.is_some() && can_write, catalog, disabled, history_dir,
         };
         build(metadata, input)
     })
@@ -160,10 +166,11 @@ struct Inputs<'a> {
     recent: String,
     catalog: String,
     disabled: Option<String>,
+    history_dir: Option<std::path::PathBuf>,
 }
 
 fn build(metadata: &mut Map<String, Value>, input: Inputs<'_>) -> Result<String, RuntimeError> {
-    let Inputs { root, created_at, knowledge, preferences, model, modes, recent, browser, catalog, disabled } = input;
+    let Inputs { root, created_at, knowledge, preferences, model, modes, recent, browser, catalog, disabled, history_dir } = input;
     let mut parts = vec![STATIC.trim().to_owned()];
     parts.extend(sections::personalization(preferences));
     for (name, enabled) in [("AGENTS.md", "agents_md_auto_inject"), ("CLAUDE.md", "claude_md_auto_inject")] {
@@ -210,6 +217,9 @@ fn build(metadata: &mut Map<String, Value>, input: Inputs<'_>) -> Result<String,
     }
     if !recent.is_empty() {
         parts.push(render(dynamic!("recent_conversations"), &[("recent_conversations", &recent)]));
+    }
+    if let Some(history) = history_dir {
+        parts.push(render(dynamic!("modify_history"), &[("modify_history_dir", &history.to_string_lossy())]));
     }
     let started = sections::start_time(created_at);
     let tree = format!("（以下为工作区根目录的部分文件和文件夹）\n{}", knowledge.prompt_tree());

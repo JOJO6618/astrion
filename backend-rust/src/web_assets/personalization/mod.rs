@@ -274,6 +274,11 @@ pub(crate) fn versioning_defaults(data: &Path) -> io::Result<VersioningDefaults>
     })
 }
 
+pub(crate) fn modify_history_enabled(data: &Path) -> bool {
+    store::read_object(&data.join("personalization.json")).ok().flatten()
+        .is_none_or(|settings| settings.get("modify_history_enabled") != Some(&Value::Bool(false)))
+}
+
 pub(crate) fn english(data: &Path) -> bool {
     store::english(data)
 }

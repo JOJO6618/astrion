@@ -1434,12 +1434,24 @@ const editSummarySegmentEnds = computed<Map<number, any>>(() => {
   // 显示时机（个人空间「编辑摘要实时显示」，默认关闭）：
   // 关闭时仅在锚 user 消息的工作计时完成后显示卡片；开启后运行期间实时显示。
   const liveDisplay = !!personalization.form.edit_summary_live_display;
+  let currentWork = -1;
+  if (!liveDisplay && props.streamingMessage) {
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      if (messages[i]?.role === 'user' && messageStartsWork(messages[i])) {
+        currentWork = i;
+        break;
+      }
+    }
+  }
   for (let i = 0; i < messages.length; i += 1) {
     const msg = messages[i];
     if (!msg || msg.role !== 'user' || !messageStartsWork(msg)) continue;
     const summary = msg.metadata?.edit_summary;
     if (!summary || !Array.isArray(summary.files) || summary.files.length === 0) continue;
     if (!liveDisplay) {
+      // Rust writes the summary before the turn finishes. Honor the display switch
+      // without relying on a timer; after a crash the last saved summary is still readable.
+      if (summary.in_progress === true && i === currentWork) continue;
       const timerStatus = msg.metadata?.work_timer?.status;
       // 工作进行中（working）不显示；无 timer 视为已完成（防御）
       if (timerStatus && timerStatus !== 'completed') continue;

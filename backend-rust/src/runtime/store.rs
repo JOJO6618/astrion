@@ -73,6 +73,7 @@ pub(super) enum Status {
 pub(super) struct Task {
     pub start: TaskStart,
     pub(super) version_message_id: Option<String>,
+    pub(super) edit_history: super::modify_history::EditHistory,
     pub(super) kind: &'static str,
     pub(super) max_iterations: Option<u64>,
     pub(super) auto_compression: bool,
@@ -452,6 +453,7 @@ impl Store {
         if let Err(error) = super::host_modes::apply_pending_to_task(self, id, false) {
             self.tasks.get_mut(id).expect("existing task").emit("runtime_mode_error", json!({"message":error.message}));
         }
+        super::modify_history::finish(self, id, ts);
         let task = self.tasks.get_mut(id).expect("existing task");
         task.guidance_closed = true;
         task.guidance_count = 0;
@@ -595,6 +597,7 @@ impl Task {
         Self {
             updated_at: start.created_at,
             version_message_id: None,
+            edit_history: Default::default(),
             kind: "chat",
             max_iterations: None,
             auto_compression: false,
