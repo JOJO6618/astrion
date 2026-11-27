@@ -100,30 +100,60 @@ pub(super) fn modes(metadata: &Map<String, Value>, prefs: &Value, writer: bool) 
     let mode = |key: &str, default: &str| {
         metadata.get(key).and_then(Value::as_str).or_else(|| prefs[default].as_str())
     };
-    let (permission, label, detail) = match (writer, mode("permission_mode", "default_permission_mode")) {
-        (true, Some("unrestricted")) => ("unrestricted", "完全权限", "可以在当前运行方式允许时使用已提供的工作区文件修改工具。"),
-        (true, Some("auto_approval")) => ("auto_approval", "自动审核", "文件工具按当前任务的能力及自动审核结果执行。"),
-        (true, None | Some("approval")) => ("approval", "人工审批", "文件修改须由当前任务的审批流程批准。"),
+    let permission = match (writer, mode("permission_mode", "default_permission_mode")) {
+        (true, Some("unrestricted")) => "unrestricted",
+        (true, Some("auto_approval")) => "auto_approval",
+        (true, None | Some("approval")) => "approval",
+        _ => "readonly",
+    };
+    let permission = permission_section(permission);
+    let execution = execution_section("sandbox");
+    let work = match mode("work_mode", "default_work_mode") {
+        Some("ask") => "ask",
+        Some("execute") => "execute",
+        _ => "plan",
+    };
+    let work = work_section(work);
+    [permission, execution, work]
+}
+
+/// 权限模式段落。系统提示词首次冻结与运行期切换通知共用同一份模板，避免两处规则漂移。
+pub(crate) fn permission_section(mode: &str) -> String {
+    let (mode, label, detail) = match mode {
+        "unrestricted" => ("unrestricted", "完全权限", "可以在当前运行方式允许时使用已提供的工作区文件修改工具。"),
+        "auto_approval" => ("auto_approval", "自动审核", "文件工具按当前任务的能力及自动审核结果执行。"),
+        "approval" => ("approval", "人工审批", "文件修改须由当前任务的审批流程批准。"),
         _ => ("readonly", "只读", "请使用当前提供的只读工具，文件修改受当前任务能力限制。"),
     };
-    let permission = render(include_str!("../../../../prompts/permission_mode.txt"), &[
-        ("permission_mode", permission), ("permission_mode_label", label), ("mode_description", ""), ("detailed_rules", detail),
-    ]);
-    let execution = if cfg!(windows) { include_str!("../../../../prompts/execution_mode/windows.txt") } else { include_str!("../../../../prompts/execution_mode/macos.txt") };
-    let execution = render(execution, &[
-        ("execution_mode", "sandbox"), ("execution_mode_label", "受限执行"),
-        ("environment_rules", ""), ("rules", "仅在当前任务提供的能力范围内操作。"),
+    render(include_str!("../../../../prompts/permission_mode.txt"), &[
+        ("permission_mode", mode), ("permission_mode_label", label), ("mode_description", ""), ("detailed_rules", detail),
+    ])
+}
+
+/// 执行环境段落。sandbox 分支与系统提示词一致；direct 供切换通知使用。
+pub(crate) fn execution_section(mode: &str) -> String {
+    let (mode, label, rules) = match mode {
+        "direct" => ("direct", "完全访问", "直接在宿主机执行，拥有用户的完整权限。保持最小化命令范围，操作尽量限制在工作区内；涉及删除、覆盖或系统级变更前先说明风险。"),
+        _ => ("sandbox", "受限执行", "仅在当前任务提供的能力范围内操作。"),
+    };
+    let template = if cfg!(windows) { include_str!("../../../../prompts/execution_mode/windows.txt") } else { include_str!("../../../../prompts/execution_mode/macos.txt") };
+    render(template, &[
+        ("execution_mode", mode), ("execution_mode_label", label),
+        ("environment_rules", ""), ("rules", rules),
         ("network_rules", ""), ("switch_invariant", ""),
-    ]);
-    let (work, label, detail) = match mode("work_mode", "default_work_mode") {
-        Some("ask") => ("ask", "询问", "根据当前用户的任务说明澄清必要的范围。"),
-        Some("execute") => ("execute", "执行", "按当前用户指示推进任务并遵循当前工具权限。"),
+    ])
+}
+
+/// 运行模式段落。
+pub(crate) fn work_section(mode: &str) -> String {
+    let (mode, label, detail) = match mode {
+        "ask" => ("ask", "询问", "根据当前用户的任务说明澄清必要的范围。"),
+        "execute" => ("execute", "执行", "按当前用户指示推进任务并遵循当前工具权限。"),
         _ => ("plan", "计划", "需要确认的变更，先与用户确认方案。"),
     };
-    let work = render(include_str!("../../../../prompts/work_mode.txt"), &[
-        ("work_mode", work), ("work_mode_label", label), ("mode_description", ""), ("detailed_rules", detail),
-    ]);
-    [permission, execution, work]
+    render(include_str!("../../../../prompts/work_mode.txt"), &[
+        ("work_mode", mode), ("work_mode_label", label), ("mode_description", ""), ("detailed_rules", detail),
+    ])
 }
 
 pub(super) fn recent_conversations(store: &Store, workspace: &str, conversation: &str, prefs: &Value) -> String {

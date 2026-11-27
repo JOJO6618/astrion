@@ -44,7 +44,8 @@
 9. **ollama/lmstudio 是 auth=none**：本地服务无需 key，connect 直接探 `/models`。
 10. **models.dev 数据源（D 方案）**：`config/modelsdev_snapshot.json` 仓库瘦身快照兄底（`scripts/update_modelsdev_snapshot.py` 生成）+ 在线缓存 6h 节流刷新（connect/refresh_models 顺带）；`protocol_source` 门控必须存在（openai 官方 npm=@ai-sdk/openai、xai/openrouter 用自家包名，无脑按 npm 裁决会误判单协议 provider）。
 11. **跨协议切换**：Agent、Chat 和定时任务可在 Chat Completions 与 Responses 之间切换。历史正文、工具调用及结果仍使用共享的消息表示。仅向同一 Responses 连接回插加密推理。模型暂缺时保留对话和设置的已有模型 key，对话显示「未选择模型」。OAuth 重连使用原连接的身份校验和凭证更新流程，保持连接 ID，后台刷新一次该账号的模型后才返回登录完成。前端收到完成状态后同步各视图的模型目录。
-12. **codex 身份已彻底泛化（2026-09-25，无向后兼容）**：`provider_type="codex"` 消亡，`codex/mixin.py`（chat_codex）已删，身份标识改 `responses_auth="codex_oauth"`（api_key 豁免/instructions 注入/effort 档位校验/429 订阅文案都按它判定）；老对话 `codex/xxx` model_key 直接失效需重新选择。`x-opencode-session` 头开关 `external_session_header` 默认开启（opt-out，仅 opencode.ai 域名下发）。
+12. **codex 身份已彻底泛化（2026-09-25，无向后兼容）**：`provider_type="codex"` 消亡，`codex/mixin.py`（chat_codex）已删，身份标识改 `responses_auth="codex_oauth"`（api_key 豁免/instructions 注入/effort 档位校验/429 订阅文案都按它判定）；老对话 `codex/xxx` model_key 直接失效需重新选择。
+13. **`x-opencode-session` 无条件下发（2026-11-27 移除开关）**：原 `external_session_header` opt-out 开关及前后端 UI 已删除，只要模型端点是 OpenCode 就发送会话头（缺头时网关直接 400 `MissingSessionID`）。全链统一走 `ModelConfig::with_opencode_headers`（同时注入 user-agent）：主对话、Chat、自动标题、子智能体，以及三个审核智能体（`runtime/approval.rs`、`goals/review.rs`、`runtime/workflow.rs` → `workflows/reviewer.rs`）。目标审核与工作流审核按 `conversation_id` 反查会话身份（`automatic_title::external_session_id`），workspace 为空时扫描 `data_dir/conversations/*` 定位。
 
 
 ---

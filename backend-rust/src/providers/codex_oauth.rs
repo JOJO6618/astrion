@@ -345,7 +345,7 @@ impl CodexTransport {
             .json(body)
             .send()
             .await
-            .map_err(|error| format!("request_error: {}", error.without_url()))
+            .map_err(|error| format!("request_error: {}", crate::net::describe_error(&error)))
     }
 
     fn validate_authorization(
@@ -752,14 +752,15 @@ pub(super) async fn oauth_client_with_connect_timeout(
     })
     .await
     .map_err(|error| format!("proxy_read_error: {error}"))?;
-    let configured = settings::effective_proxy(&config_file);
-    let mut builder = reqwest::Client::builder()
-        .connect_timeout(connect_timeout)
-        .redirect(reqwest::redirect::Policy::none());
-    if let Some(proxy) = configured {
-        builder = builder
-            .proxy(reqwest::Proxy::all(proxy).map_err(|error| format!("proxy_invalid: {error}"))?);
-    }
+    // 显式配置低于环境变量、高于系统代理；三者都为空时直连。
+    let configured = settings::configured_proxy(&config_file);
+    let proxy = crate::net::resolve(configured.as_deref());
+    let builder = crate::net::apply(
+        reqwest::Client::builder()
+            .connect_timeout(connect_timeout)
+            .redirect(reqwest::redirect::Policy::none()),
+        proxy.as_ref(),
+    );
     builder
         .build()
         .map_err(|error| format!("client_error: {error}"))
@@ -823,7 +824,12 @@ pub(super) async fn refresh_access_token(
         .body(form)
         .send()
         .await
-        .map_err(|error| format!("刷新 Codex token 网络失败: {error}"))?;
+        .map_err(|error| {
+            format!(
+                "刷新 Codex token 网络失败: {}",
+                crate::net::describe_error(&error)
+            )
+        })?;
     if response.status() != reqwest::StatusCode::OK {
         let status = response.status().as_u16();
         let text = response.text().await.unwrap_or_default();

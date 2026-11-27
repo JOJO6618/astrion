@@ -372,12 +372,21 @@ impl Runtime {
                     return Ok(json!({"success":true, "message":progress.message}));
                 }
                 Advance::Review(request) => {
-                    let data_dir=self.store().map_err(map_runtime)?.data_dir.clone();
+                    // OpenCode endpoints reject requests without the session header, so the
+                    // workflow reviewer carries this conversation's identity too.
+                    let (data_dir, session) = {
+                        let store = self.store().map_err(map_runtime)?;
+                        let workspace_id = store.tasks.get(task_id).map(|task| task.workspace_id.clone()).unwrap_or_default();
+                        let data_dir = store.data_dir.clone();
+                        let session = crate::runtime::automatic_title::external_session_id(&data_dir, &workspace_id, &conversation_id).ok();
+                        (data_dir, session)
+                    };
                     let audit=crate::conversation_db::reviews::Record::begin(&data_dir,"workflow_review",&conversation_id,task_id,&workspace,true)?;
                     audit.event(&json!({"request":request.payload}))?;
                     let decision = run_recorded_review(
                         &request,
                         &selected,
+                        session.as_deref(),
                         rounds,
                         &workspace,
                         workflow.evidence.as_deref(),

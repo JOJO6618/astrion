@@ -5,7 +5,7 @@ pub(crate) mod sse;
 #[path = "../../test/2026-11-24_Rust后端/chat_stream.rs"]
 mod tests;
 
-use std::{sync::OnceLock, time::Duration};
+use std::{sync::Mutex, time::Duration};
 
 use futures_util::StreamExt;
 use reqwest::{
@@ -31,6 +31,20 @@ pub(crate) enum StreamDelta<'a> {
     Thinking(&'a str),
     NativeSummary(&'a str),
     Usage(&'a Value),
+    ToolCall(ToolCallDelta<'a>),
+}
+
+/// Accumulated state of one tool call after the latest stream fragment.
+///
+/// Both protocols report tool calls the same way once Responses items are
+/// translated: a fragment carries an index plus whatever `id`, `name` and
+/// `arguments` bytes arrived. The accumulated values let the caller detect a
+/// new tool and extract the streamed `intent` without keeping its own buffers.
+pub(crate) struct ToolCallDelta<'a> {
+    pub index: u64,
+    pub id: &'a str,
+    pub name: &'a str,
+    pub arguments: &'a str,
 }
 
 /// Provider-supplied configuration read by the trusted server.
@@ -170,7 +184,7 @@ pub(crate) async fn post_sse(
     let response = request
         .send()
         .await
-        .map_err(|error| format!("{protocol} request failed: {}", error.without_url()))?;
+        .map_err(|error| format!("{protocol} request failed: {}", crate::net::describe_error(&error)))?;
     let status = response.status();
     if !status.is_success() {
         return Err(format!(
@@ -265,19 +279,25 @@ pub(crate) fn apply_extra_params(body: &mut Value, values: &Map<String, Value>) 
     }
 }
 
-fn client() -> Result<&'static Client, String> {
-    static CLIENT: OnceLock<Result<Client, String>> = OnceLock::new();
-    CLIENT
-        .get_or_init(|| {
-            Client::builder()
-                .connect_timeout(Duration::from_secs(300))
-                .read_timeout(Duration::from_secs(300))
-                .redirect(reqwest::redirect::Policy::none())
-                .build()
-                .map_err(|error| format!("model HTTP client initialization failed: {error}"))
-        })
-        .as_ref()
-        .map_err(Clone::clone)
+/// 模型请求客户端：代理设置变化（用户开关系统代理）时自动重建。
+fn client() -> Result<Client, String> {
+    static CACHE: Mutex<Option<(String, Client)>> = Mutex::new(None);
+    let proxy = crate::net::resolve(None);
+    let key = crate::net::fingerprint(proxy.as_ref());
+    let mut cache = CACHE.lock().unwrap_or_else(|error| error.into_inner());
+    if let Some((cached, client)) = cache.as_ref()
+        && *cached == key
+    {
+        return Ok(client.clone());
+    }
+    let client = crate::net::apply(Client::builder(), proxy.as_ref())
+        .connect_timeout(Duration::from_secs(300))
+        .read_timeout(Duration::from_secs(300))
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .map_err(|error| format!("model HTTP client initialization failed: {error}"))?;
+    *cache = Some((key, client.clone()));
+    Ok(client)
 }
 
 pub(crate) fn response_is_json(response: &Response) -> bool {

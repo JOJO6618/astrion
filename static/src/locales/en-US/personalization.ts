@@ -545,8 +545,6 @@ export default {
   thinkingSummaryModelRequired: 'Select a model',
   thinkingSummaryIntervalTitle: 'Summary interval (seconds)',
   thinkingSummaryIntervalDesc: 'How often the thinking summary updates',
-  externalSessionHeaderTitle: 'External session header',
-  externalSessionHeaderDesc: 'Let OpenCode recognize requests from the same conversation',
   titleDefaultModelDesc:
     'First available model in the registry; prefers a -luna fast model when only Codex models exist',
   maxRoundsTitle: 'Max review rounds',

@@ -113,8 +113,7 @@ const SEARCH_ENTRIES: SearchEntry[] = [
   ...entries('model-pref', [
     `${P}defaultModelTitle`,
     `${P}defaultThinkingModeTitle`,
-    `${P}reasoningEffortTitle`,
-    `${P}externalSessionHeaderTitle`
+    `${P}reasoningEffortTitle`
   ]),
   ...entries('codex', [
     `${P}codexAccountSelectorTitle`,

@@ -119,10 +119,13 @@ pub(super) async fn opencode_usage(
         return success_response(payload);
     }
     let client = match state.config.client.clone().map(Ok).unwrap_or_else(|| {
-        reqwest::Client::builder()
-            .connect_timeout(std::time::Duration::from_secs(5))
-            .redirect(reqwest::redirect::Policy::none())
-            .build()
+        crate::net::apply(
+            reqwest::Client::builder()
+                .connect_timeout(std::time::Duration::from_secs(5))
+                .redirect(reqwest::redirect::Policy::none()),
+            crate::net::resolve(None).as_ref(),
+        )
+        .build()
     }) {
         Ok(client) => client,
         Err(_) => return error(provider_id, "network_error"),

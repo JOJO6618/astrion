@@ -2,7 +2,6 @@
 import { computed, inject } from 'vue';
 import UiModelSelect from '@/components/ui/UiModelSelect.vue';
 import UiSelect from '@/components/ui/UiSelect.vue';
-import UiSwitch from '@/components/ui/UiSwitch.vue';
 import { t } from '@/locales';
 
 defineOptions({ name: 'ModelPrefTab' });
@@ -13,7 +12,6 @@ defineOptions({ name: 'ModelPrefTab' });
  */
 const ctx = inject<Record<string, any>>('personalizationDrawer')!;
 const {
-  personalization,
   form,
   filteredModelOptions,
   selectDefaultModel,
@@ -81,23 +79,6 @@ const updateReasoningEffort = (value: string) => selectDefaultReasoningEffort(va
         />
       </div>
       <!-- 标题生成模型选择器已挪到「常规」页 autoTitle 开关下方 -->
-      <!-- 外部会话标识：opt-in，开启后向 opencode.ai 端点发送每对话稳定的 session 头 -->
-      <label class="stg-toggle-row"
-        ><span class="stg-row-copy"
-          ><span class="stg-row-title">{{ $t('personalization.externalSessionHeaderTitle') }}</span
-          ><span class="stg-row-desc">{{
-            $t('personalization.externalSessionHeaderDesc')
-          }}</span></span
-        ><input
-          type="checkbox"
-          :checked="form.external_session_header"
-          @change="
-            personalization.updateField({
-              key: 'external_session_header',
-              value: $event.target.checked
-            })
-          " /><UiSwitch decorative :checked="form.external_session_header"
-      /></label>
     </div>
   </section>
 </template>

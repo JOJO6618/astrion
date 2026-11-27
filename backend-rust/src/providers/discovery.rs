@@ -28,11 +28,12 @@ pub(super) struct Discovery {
     pub error: Option<String>,
 }
 
-/// The production client follows the same environment proxy settings as
-/// httpx (`HTTPS_PROXY`, `HTTP_PROXY`, `ALL_PROXY`, `NO_PROXY`) because reqwest
-/// reads them by default. Redirects are not followed, matching httpx's default.
+/// The production client follows the same proxy resolution as every other
+/// outbound request: environment variables, then the configured proxy, then the
+/// operating system proxy (macOS CFNetwork / Windows Internet settings).
+/// Redirects are not followed, matching httpx's default.
 pub(super) fn system_client() -> Result<Client, String> {
-    Client::builder()
+    crate::net::apply(Client::builder(), crate::net::resolve(None).as_ref())
         .timeout(FETCH_TIMEOUT)
         .redirect(reqwest::redirect::Policy::none())
         .build()
@@ -76,9 +77,11 @@ pub(super) async fn fetch_models(
         Ok(response) => response,
         Err(error) if error.is_timeout() => return error_out("timeout".into()),
         Err(error) if error.is_connect() => {
-            return error_out(format!("connect_error: {}", error.without_url()));
+            return error_out(format!("connect_error: {}", crate::net::describe_error(&error)));
         }
-        Err(error) => return error_out(format!("request_error: {}", error.without_url())),
+        Err(error) => {
+            return error_out(format!("request_error: {}", crate::net::describe_error(&error)));
+        }
     };
     let status = response.status();
     if status == reqwest::StatusCode::UNAUTHORIZED || status == reqwest::StatusCode::FORBIDDEN {

@@ -1,13 +1,16 @@
-use std::time::Duration;
+use std::{
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
 use serde_json::{Value, json};
 use uuid::Uuid;
 
-use super::{ModelConfig, Runtime, RuntimeError, Status, Store};
+use super::{ModelConfig, Runtime, RuntimeError, Status};
 use crate::{
     catalog::CatalogSource,
     conversation_db::Database,
-    web_assets::personalization::{external_session_enabled, title_preferences},
+    web_assets::personalization::title_preferences,
 };
 
 const TITLE_PROMPT: &str = include_str!("../../../prompts/title_generation_prompt.txt");
@@ -42,14 +45,16 @@ impl Runtime {
     }
 
     fn with_external_session(&self, model: ModelConfig, workspace: &str, id: &str) -> ModelConfig {
-        let session = if model.is_opencode_endpoint() {
-            self.store().ok().and_then(|store| {
-                external_session_enabled(&store.data_dir).then(||external_session_id(&store,workspace,id).ok()).flatten()
-            })
-        } else {
-            None
-        };
-        model.with_opencode_headers(session.as_deref(),false)
+        let session = self.opencode_session(workspace, id);
+        model.with_opencode_headers(session.as_deref(), false)
+    }
+
+    /// Every OpenCode request carries a per-conversation session identifier.
+    /// This is unconditional: no preference can disable it, because the upstream
+    /// gateway rejects requests that omit the header.
+    pub(super) fn opencode_session(&self, workspace: &str, id: &str) -> Option<String> {
+        let data = self.store().ok()?.data_dir.clone();
+        external_session_id(&data, workspace, id).ok()
     }
 
     pub(crate) fn spawn_automatic_title(
@@ -94,7 +99,7 @@ impl Runtime {
         store.pending_titles.remove(key);
         let Some(title) = title.filter(|_| !store.shutting_down) else { return };
         let (workspace, id) = key;
-        let saved = conversation_db(&store, workspace, id)
+        let saved = conversation_db(&store.data_dir, workspace, id)
             .and_then(|mut db| db.save_title(id, title, Some(expected)));
         if saved == Ok(true)
             && let Some(task) = store.tasks.values_mut().find(|task| {
@@ -143,18 +148,29 @@ async fn generate_title(model: ModelConfig, first_message: &str) -> Option<Strin
     (!title.is_empty()).then(|| title.to_owned())
 }
 
-fn conversation_db(store: &Store, workspace: &str, id: &str) -> Result<Database, String> {
-    let root = if workspace.is_empty() {
-        store.data_dir.join("chat/conversations")
-    } else {
-        let path = store.conversation_path(workspace, id).map_err(|error| error.message)?;
-        path.parent().expect("workspace conversation parent").to_owned()
+fn conversation_db(data_dir: &Path, workspace: &str, id: &str) -> Result<Database, String> {
+    let root = match workspace {
+        "" => conversation_dir_by_id(data_dir, id).unwrap_or_else(|| data_dir.join("chat/conversations")),
+        workspace => {
+            super::store::validate_workspace(workspace).map_err(|error| error.message)?;
+            data_dir.join("conversations").join(workspace)
+        }
     };
     Database::open(&root)
 }
 
-fn external_session_id(store: &Store, workspace: &str, id: &str) -> Result<String, String> {
-    let mut db = conversation_db(store, workspace, id)?;
+/// Reviewers know the conversation ID but not always the workspace ID.
+fn conversation_dir_by_id(data_dir: &Path, id: &str) -> Option<PathBuf> {
+    let file = format!("{id}.json");
+    std::fs::read_dir(data_dir.join("conversations"))
+        .ok()?
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .find(|dir| dir.join(&file).is_file())
+}
+
+pub(crate) fn external_session_id(data_dir: &Path, workspace: &str, id: &str) -> Result<String, String> {
+    let mut db = conversation_db(data_dir, workspace, id)?;
     if let Some(Value::String(value)) = db.field(id, "metadata", "external_session_id")?
         && !value.trim().is_empty()
     {

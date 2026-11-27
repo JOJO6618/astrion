@@ -77,7 +77,10 @@ async fn run_inner(
             messages.push(notice);
         }
         if workflow {
-            runtime.apply_pending_host_modes(task_id, rounds == 1)?;
+            // 运行期模式切换在完整工具批次后生效；通知必须随本轮请求送达模型。
+            for notice in runtime.apply_pending_host_modes(task_id, rounds == 1)? {
+                messages.push(json!({"role": "user", "content": notice["content"].clone()}));
+            }
         }
         if workflow && let Some(compacted) = runtime.compress_turn(task_id, &model).await? {
             messages=compacted;
@@ -510,6 +513,7 @@ async fn stream_completion(
     let response_id = format!("msg_{}", uuid::Uuid::new_v4().simple());
     let mut thinking = super::thinking::ThinkingStream::new(runtime, task_id, &response_id, work);
     let mut preview = track_preview.then(super::preview_tracking::ModelText::default);
+    let mut tool_stream = super::tool_call_stream::ToolCallStream::default();
     let (abort, failed) = oneshot::channel();
     let mut abort = Some(abort);
     let mut completion = tokio::select! {
@@ -521,6 +525,16 @@ async fn stream_completion(
                 StreamDelta::Thinking(delta) => thinking.push(delta),
                 StreamDelta::NativeSummary(summary) => { thinking.native_summary(summary); Ok(()) }
                 StreamDelta::Usage(_) => Ok(()),
+                StreamDelta::ToolCall(update) => {
+                    let events = tool_stream.push(update);
+                    // Arguments are streaming: the reasoning display closes before
+                    // the preparing blocks open, matching the previous backend.
+                    thinking.end().and_then(|()| {
+                        events.iter().try_for_each(|event| {
+                            super::tool_call_stream::publish(event, |kind, data| runtime.emit(task_id, kind, data))
+                        })
+                    })
+                }
                 StreamDelta::Text(delta) => {
                     bill.observe_text(delta);
                     thinking.end().and_then(|()| emit_text(runtime, task_id, &response_id, &mut text_started, delta))

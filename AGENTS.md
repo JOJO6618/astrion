@@ -373,6 +373,7 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 9. **模型切换与重连**：Chat Completions 与 Responses 可互切；只向同一 Responses 连接回放加密推理。OAuth 重连验证账号身份并保留连接 ID，刷新目录后报告完成。目录暂缺时对话与设置保留原模型 key，无法使用的对话模型显示「未选择模型」。细则见 `AD/settings_and_providers.md`。
 10. **模型目录自动刷新**：`POST /api/providers/refresh-all` 刷全部已连接 + Codex，前端进入应用与每小时各调一次（挂在 `app/lifecycle.ts` 的 settingsRoute 分支之前），进程内每小时最多真跑一次、重复调用返回 `skipped`。**不要在 `start_background_jobs` 加后端定时器**（会变成应用关着也刷）。
 11. **Responses 请求形状（绕开 OpenAI 6.2 缓存回归）**：gpt-6.2 系**不缓存 `instructions`**（缓存缺口≈system 大小），`input` 前缀照常缓存；工具 schema 编译更严（`propertyNames` 直接 `invalid_json_schema`）。`translate.py` 两条硬约定：① OpenAI 系端点把 system 作为 `input` 首条 `role:"developer"` 发送且**完全不写 `instructions`**（第三方网关上的非 OpenAI 模型保持原形状）；② `flatten_tools()` 前必须过 `sanitize_json_schema()`（剥 `propertyNames`／`patternProperties`／`if-then-else`，参数名不动）。只做减法；`prompt_cache_key` 只对 codex_oauth／openai-api／第一方端点下发。**改前先确认 OpenAI 是否已修复**；回归 `test/2026-11-19_*`。
+12. **出站代理统一走 `net` 模块**（`backend-rust/src/net.rs`）：优先级 环境变量 → 显式配置（`codex_models.json` 的 `proxy`）→ 操作系统系统代理（macOS `SCDynamicStoreCopyProxies`，回退 CFNetwork；Windows 注册表 `Internet Settings` 的 `ProxyEnable/ProxyServer/ProxyOverride`）；`localhost/127.0.0.1/::1` 强制直连。所有对外客户端（模型请求 `chat.rs`、模型发现、Codex OAuth、额度、网页工具、参考数据）必须 `net::apply` + `net::resolve`，**不要再自建裸 `Client::builder()`**；本机通信（MCP transport、preview、native_browser、desktop_bridge）保持直连。绕过列表里**单独一项 `*`** 才是「全部直连」，`*.local` 这类通配不能判成全局绕过（否则代理被整个丢弃）。
 
 ## 16) 预览面板（Preview Panel）
 
@@ -539,6 +540,19 @@ vite 构建的 PostCSS 配置搜索会向上冒泡读工作区外文件，宿主
 - **检索范围 = read_skill 可读范围**：两者共用 `tools_read._enabled_skills_catalog()`；执行后端读取失败即报错，不回退本机遍历。工具定义文案唯一来源 `skills_manager.SEARCH_SKILLS_DESCRIPTION/PARAMETERS`（主子共用）。
 - 纯子串匹配，中文关键词搜不到英文正文；静态规则「关键词带英文词」不可删。`search_skills` 只回片段，不进已读白名单。
 - 回归 `test/2026-11-19_技能检索/`。
+
+## 30) 运行期模式切换通知（Rust 后端）
+
+> 唯一权威 `backend-rust/src/runtime/mode_notice.rs`（2026-11-27 补齐 Python 旧语义）。
+
+- **为什么必须有**：系统提示词首次受理后冻结，切换权限 / 执行环境 / 网络 / 运行模式不会重写它；变化必须以 user 消息注入对话，否则模型按冻结的旧规则静默降级。
+- **两处注入点**：① admission（`runtime.rs`，`system_prompt::freeze` 之后、`guidance::admit` 之前）补发空闲期切换；② `runtime/agent.rs` 轮次起点 `apply_pending_host_modes` 应用排队切换后注入。**只在完整工具批次边界注入**，禁止插进 `assistant.tool_calls` 与工具结果之间。
+- **基线去重**：metadata `runtime_mode_baseline` = 模型已知晓的模式。基线缺失（新对话 / 历史对话）静默对齐、不通知；**只有通知真正落库后才 `mark_known`**，因此同一变化只发一次。
+- **文本同源**：通知正文由 `system_prompt/sections.rs` 的 `permission_section` / `execution_section` / `work_section` 渲染，与冻结提示词共用模板，**禁止另写一份规则文案**。
+- **归一化复用** `web_status::preferences::effective_modes`（含 plan→readonly、readonly→sandbox 联动），**禁止在通知模块重复实现**。
+- **消息形态**：`visibility: compact` + `starts_work: false` + `runtime_mode_notice: true`，`source` 仍按 kind 分 `permission_change` / `execution_change` / `network_change` / `work_mode_change`；前端靠 `visibility` 与 `runtime_mode_notice` 识别，无需改动。
+- **已知边界**：Chat 模式（`allows_workflow()==false`）只在 admission 补发，运行中排队切换不注入；系统提示词 execution 段仍固定渲染 `sandbox`，direct 只在切换通知里表达。
+- 回归 `test/2026-11-27_运行期模式通知/mode_notice_contract.rs`（经 `#[path]` 挂进 `mode_notice` 模块）。
 
 ---
 

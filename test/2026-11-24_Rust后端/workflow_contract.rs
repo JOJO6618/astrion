@@ -401,6 +401,7 @@ async fn readonly_review_needs_a_real_report_tool_from_upstream() {
     let verdict = run_model_review(
         &request,
         &selected,
+        None,
         2,
         &temp.0,
         None,
@@ -568,6 +569,7 @@ async fn active_review_waits_for_a_trusted_read_only_executor() {
     let result = run_model_review(
         &request,
         &profile,
+        None,
         2,
         &temp.0,
         None,
@@ -585,6 +587,7 @@ async fn active_review_waits_for_a_trusted_read_only_executor() {
     let verdict = run_model_review(
         &request,
         &profile,
+        None,
         2,
         &temp.0,
         Some(&evidence),
@@ -956,6 +959,7 @@ async fn subscription_review_reuses_the_workflow_session_with_fast_disabled() {
     let result = run_model_review(
         &request,
         &selected,
+        None,
         2,
         &temp.0,
         Some(&evidence),
@@ -990,6 +994,7 @@ async fn subscription_review_reuses_the_workflow_session_with_fast_disabled() {
         run_model_review(
             &request,
             &selected,
+            None,
             2,
             &temp.0,
             Some(&evidence),

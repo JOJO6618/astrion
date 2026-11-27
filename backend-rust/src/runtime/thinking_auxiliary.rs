@@ -161,6 +161,7 @@ impl SummaryJob {
                 }
                 StreamDelta::Usage(value) => usage = Some(value.clone()),
                 StreamDelta::NativeSummary(_) => (),
+                StreamDelta::ToolCall(_) => (),
             }
         })).await;
         let completion = result.ok().and_then(Result::ok);

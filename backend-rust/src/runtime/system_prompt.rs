@@ -2,6 +2,9 @@
 
 mod sections;
 
+/// 运行期模式切换通知复用同一份段落渲染，避免与首次冻结的系统提示词规则漂移。
+pub(super) use sections::{execution_section, permission_section, work_section};
+
 use std::path::Path;
 
 use serde_json::{Map, Value, json};

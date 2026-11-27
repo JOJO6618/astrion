@@ -141,6 +141,21 @@ impl Modes {
     }
 }
 
+/// 当前对话实际生效的四个运行期模式（已含 plan → 只读、只读 → 沙箱联动）。
+/// 供运行期模式切换通知比对，避免两处各写一份归一化规则。
+pub(crate) fn effective_modes(
+    data_dir: &Path,
+    metadata: &Value,
+) -> [(&'static str, &'static str); 4] {
+    let modes = Personalization::load(data_dir).modes(metadata);
+    [
+        ("work_mode", modes.work_mode),
+        ("permission_mode", modes.permission_mode),
+        ("execution_mode", modes.execution_mode),
+        ("network_permission", modes.network_permission),
+    ]
+}
+
 fn normalize(value: &Value, allowed: &[&'static str]) -> Option<&'static str> {
     let text = value.as_str()?.trim();
     allowed

@@ -168,7 +168,6 @@ interface PersonalForm {
   default_model: string | null;
   /** 用户级模型可见性：模型选择器中隐藏的注册表模型 key 列表（每用户独立） */
   hidden_models: string[];
-  external_session_header: boolean;
   image_compression: string;
   auto_shallow_compress_enabled: boolean;
   auto_deep_compress_enabled: boolean;
@@ -413,7 +412,6 @@ const defaultForm = (): PersonalForm => ({
   versioning_restore_mode: 'overwrite',
   default_model: null,
   hidden_models: [],
-  external_session_header: true,
   image_compression: 'original',
   auto_shallow_compress_enabled: false,
   auto_deep_compress_enabled: true,
@@ -793,7 +791,6 @@ export const usePersonalizationStore = defineStore('personalization', {
         hidden_models: Array.isArray(data.hidden_models)
           ? data.hidden_models.filter((item: unknown) => typeof item === 'string' && item.trim())
           : [],
-        external_session_header: !!data.external_session_header,
         image_compression:
           typeof data.image_compression === 'string' ? data.image_compression : 'original',
         auto_shallow_compress_enabled: !!data.auto_shallow_compress_enabled,

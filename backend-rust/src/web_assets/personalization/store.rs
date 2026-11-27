@@ -81,11 +81,6 @@ impl Store {
         ))
     }
 
-    pub(super) fn external_session_enabled(&self) -> io::Result<bool> {
-        let personal = read_strict(&self.personal)?.unwrap_or_default();
-        Ok(personal.get("external_session_header").and_then(Value::as_bool).unwrap_or(true))
-    }
-
     pub(super) fn agent_creation_tools(&self) -> io::Result<Object> {
         let preferences = read_strict(&self.personal)?.unwrap_or_default();
         let mut tools = Object::new();

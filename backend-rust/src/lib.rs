@@ -15,6 +15,7 @@ pub mod interactions;
 pub mod mcp;
 pub mod model;
 pub mod native_actions;
+pub mod net;
 pub mod navigation;
 pub use runtime::preview;
 pub mod process_runtime;
