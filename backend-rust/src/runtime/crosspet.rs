@@ -1,8 +1,14 @@
 use super::{Runtime, RuntimeError, Status, Store, Task};
 use crate::crosspet::{
-    Action, CrossPetEvents, SessionIdentity, TaskEvent, TaskRef, TerminalStatus, WaitReason,
+    Action, CrossPetEvents, SessionIdentity, TaskEvent, TaskObservation, TaskRef, TerminalStatus,
+    WaitReason,
 };
+use crate::workspace_catalog::RegisteredWorkspace;
 use serde_json::Value;
+
+#[cfg(all(test, unix))]
+#[path = "../../../test/2026-11-27_CrossPet后台状态/runtime_observation.rs"]
+mod tests;
 
 impl Runtime {
     pub fn set_crosspet_events(&self, events: CrossPetEvents) -> Result<(), RuntimeError> {
@@ -10,7 +16,9 @@ impl Runtime {
         Ok(())
     }
 
-    pub fn crosspet_status(&self, id: &TaskRef) -> Option<TerminalStatus> {
+    pub fn crosspet_observation(
+        &self, id: &TaskRef, workspace: Option<&RegisteredWorkspace>,
+    ) -> Option<TaskObservation> {
         let store = self.store().ok()?;
         let task = store.tasks.get(&id.task_id)?;
         if task.workspace_id != id.session.workspace_id
@@ -18,7 +26,13 @@ impl Runtime {
         {
             return None;
         }
-        terminal(task.status)
+        let background = workspace
+            .filter(|entry| entry.id == task.workspace_id)
+            .filter(|entry| store.workspaces.get(&entry.id) == Some(&entry.path))
+            .map(|_| Self::conversation_has_background(
+                &store, &task.workspace_id, &task.conversation_id,
+            ));
+        Some(TaskObservation { terminal: terminal(task.status), background })
     }
 }
 
