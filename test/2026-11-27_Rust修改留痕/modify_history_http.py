@@ -4,14 +4,17 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 import tempfile
 import threading
+import time
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent/'2026-11-27_RustAgent工具对照'))
 from knowledge_media_http import (
     Browser, LocalServices, ROOT, call, fixture_environment, model_catalog_host,
-    stored_document, wait_for_task,
+    stored_document,
 )
 
 
@@ -20,7 +23,7 @@ class Services(LocalServices):
         messages = body['messages']
         system = next(m['content'] for m in messages if m['role'] == 'system')
         user = next(m['content'] for m in messages if m['role'] == 'user')
-        enabled = user.startswith('Archive')
+        enabled = user != 'Keep only UI history'
         assert ('本对话修改留痕' in system) == enabled, system
         out = {m['tool_call_id']: json.loads(m['content']) for m in messages if m['role'] == 'tool'}
         if 'create' not in out:
@@ -29,7 +32,30 @@ class Services(LocalServices):
         if 'replace' not in out:
             return [call('write_file', 'replace', {'file_path':'notes.txt', 'content':'final\n'})]
         assert out['replace']['success'], out
+        if user == 'Fail after edits':
+            raise AssertionError('planned fixture failure')
+        if user == 'Stop after edits':
+            self.server.stop_ready.set()
+            assert self.server.stop_release.wait(15), 'test never requested cancellation'
         return 'Both fixture writes completed.'
+
+    def write(self, *args):
+        try:
+            return super().write(*args)
+        except (BrokenPipeError, ConnectionResetError):
+            if not self.server.stop_release.is_set():
+                raise
+
+
+def wait_for_status(browser, route, expected):
+    deadline = time.monotonic() + 8
+    while time.monotonic() < deadline:
+        snapshot = browser.api('GET', route)['data']
+        if snapshot['status'] != 'running':
+            assert snapshot['status'] == expected, snapshot
+            return snapshot
+        time.sleep(.02)
+    raise AssertionError(f'Agent did not reach {expected}')
 
 
 def run():
@@ -44,6 +70,8 @@ def run():
         data.mkdir()
         workspace = Path(env['HOST_PROJECT_PATH'])
         service.errors = []
+        service.stop_ready = threading.Event()
+        service.stop_release = threading.Event()
         preferences = data/'personalization.json'
         config = Path(env['DEPLOY_CONFIG_DIR'])/'custom_models.json'
         config.write_text(json.dumps({'models':[{'model_name':'chat-local','model_id':'chat-local',
@@ -53,7 +81,11 @@ def run():
         try:
             with model_catalog_host(binary, env, root/'host.log') as listening:
                 browser = Browser(listening)
-                for enabled in (True, False):
+                for message, expected in (
+                    ('Archive both edits','succeeded'), ('Keep only UI history','succeeded'),
+                    ('Stop after edits','stopped'), ('Fail after edits','failed'),
+                ):
+                    enabled = message != 'Keep only UI history'
                     path = workspace/'notes.txt'
                     path.unlink(missing_ok=True)
                     preferences.write_text(json.dumps({
@@ -67,18 +99,32 @@ def run():
                     }}, status=201)
                     cid = created['conversation_id']
                     reply = browser.api('POST','/api/tasks?workspace_id=default', {
-                        'message':'Archive both edits' if enabled else 'Keep only UI history',
+                        'message':message,
                         'conversation_id':cid, 'model_key':'chat-local',
                     }, status=202)
-                    assert wait_for_task(browser, reply) == cid, service.errors
+                    task = reply.get('data', reply)
+                    task_id = task.get('task_id') or task['id']
+                    route = f'/api/tasks/{task_id}'
+                    history = workspace/'.astrion/modify_history'/cid
+                    if expected == 'stopped':
+                        assert service.stop_ready.wait(10), service.errors
+                        patch, = history.glob('*.diff')
+                        assert '进行中' in patch.read_text(encoding='utf-8')
+                        running = browser.api('GET', route+'?workspace_id=default')['data']
+                        assert any(ev['type'] == 'edit_summary_updated' and ev['data']['edit_summary']['in_progress']
+                                   for ev in running['events']), running
+                        browser.api('POST', route+'/cancel?workspace_id=default', {})
+                        service.stop_release.set()
+                    wait_for_status(browser, route+'?workspace_id=default', expected)
                     document = stored_document(data/'conversations/default/conversations.sqlite3', cid)
                     user = next(m for m in document['messages'] if m['role'] == 'user')
-                    entry, = user['metadata']['edit_summary']['files']
+                    summary = user['metadata']['edit_summary']
+                    assert summary['in_progress'] is False, summary
+                    entry, = summary['files']
                     assert entry['status'] == 'added' and entry['added'] == 1, entry
                     assert entry['lines'] == [{'type':'add','content':'final','new_no':1}], entry
                     edited, = document['metadata']['edited_files']
                     assert edited['path'] == 'notes.txt' and edited['op'] == 'write', edited
-                    history = workspace/'.astrion/modify_history'/cid
                     if enabled:
                         patch, = history.glob('*.diff')
                         text = patch.read_text(encoding='utf-8')
@@ -90,10 +136,11 @@ def run():
                     else:
                         assert not history.exists(), history
         finally:
+            service.stop_release.set()
             service.shutdown()
             worker.join()
-        assert not service.errors, service.errors
-    print('Production Agent: persisted cards and Quick list, two writes yield one apply/reverse patch, and archive setting is independent.')
+        assert service.errors == ['planned fixture failure'], service.errors
+    print('Production Agent: live and persisted cards, isolated Quick list, apply/reverse patch, independent setting, finish/cancel/error.')
 
 
 if __name__ == '__main__':

@@ -431,7 +431,9 @@ impl Runtime {
                             && let Err(error) = super::modify_history::record(&mut store, &task_id, scope.workspace_root(), receipt,
                                 if request.tool_name == EDIT_NAME { "edit" } else { "write" })
                         {
-                            eprintln!("Agent modify history: {}", error.message);
+                            if let Some(task) = store.tasks.get_mut(&task_id) {
+                                task.emit("edit_history_error", json!({"phase":"write","message":error.message}));
+                            }
                         }
                         return Ok(result);
                     }

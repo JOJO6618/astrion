@@ -218,9 +218,6 @@ fn build(metadata: &mut Map<String, Value>, input: Inputs<'_>) -> Result<String,
     if !recent.is_empty() {
         parts.push(render(dynamic!("recent_conversations"), &[("recent_conversations", &recent)]));
     }
-    if let Some(history) = history_dir {
-        parts.push(render(dynamic!("modify_history"), &[("modify_history_dir", &history.to_string_lossy())]));
-    }
     let started = sections::start_time(created_at);
     let tree = format!("（以下为工作区根目录的部分文件和文件夹）\n{}", knowledge.prompt_tree());
     let limits = format!("工作区：{}。可用能力由当前对话的工具及审批配置确定。", root.display());
@@ -230,6 +227,9 @@ fn build(metadata: &mut Map<String, Value>, input: Inputs<'_>) -> Result<String,
         ("resource_limit", &limits), ("conversation_start_time", &started),
         ("file_tree", &tree), ("recent_uploads", ""),
     ]));
+    if let Some(history) = history_dir {
+        parts.push(render(dynamic!("modify_history"), &[("modify_history_dir", &history.to_string_lossy())]));
+    }
     Ok(parts.join("\n\n"))
 }
 
