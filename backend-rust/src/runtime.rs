@@ -37,6 +37,8 @@ mod task_list;
 pub(crate) mod thinking;
 pub(crate) mod thinking_auxiliary;
 mod tool_loading;
+mod tool_intent;
+pub(crate) mod tool_call_stream;
 mod knowledge_tools;
 mod schedule_tools;
 pub mod transfer;

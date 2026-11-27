@@ -31,6 +31,20 @@ pub(crate) enum StreamDelta<'a> {
     Thinking(&'a str),
     NativeSummary(&'a str),
     Usage(&'a Value),
+    ToolCall(ToolCallDelta<'a>),
+}
+
+/// Accumulated state of one tool call after the latest stream fragment.
+///
+/// Both protocols report tool calls the same way once Responses items are
+/// translated: a fragment carries an index plus whatever `id`, `name` and
+/// `arguments` bytes arrived. The accumulated values let the caller detect a
+/// new tool and extract the streamed `intent` without keeping its own buffers.
+pub(crate) struct ToolCallDelta<'a> {
+    pub index: u64,
+    pub id: &'a str,
+    pub name: &'a str,
+    pub arguments: &'a str,
 }
 
 /// Provider-supplied configuration read by the trusted server.

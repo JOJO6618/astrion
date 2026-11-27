@@ -430,6 +430,7 @@ impl ChatMode {
                 text.clear();
             }
             let mut started = false;
+            let mut tool_stream = crate::runtime::tool_call_stream::ToolCallStream::default();
             let mut thinking = crate::runtime::thinking::ThinkingStream::new(&self.runtime, task_id, &response_message_id, work);
             let mut completion = match model
                 .complete_with_updates(&messages, &tools, &mut RoundBudget::default(), |update| {
@@ -437,6 +438,16 @@ impl ChatMode {
                         StreamDelta::Thinking(delta) => { let _ = thinking.push(delta); return; }
                         StreamDelta::NativeSummary(summary) => { thinking.native_summary(summary); return; }
                         StreamDelta::Usage(_) => return,
+                        StreamDelta::ToolCall(update) => {
+                            let events = tool_stream.push(update);
+                            let _ = thinking.end();
+                            for event in &events {
+                                let _ = crate::runtime::tool_call_stream::publish(event, |kind, data| {
+                                    if self.emit(task_id, kind, data) { Ok(()) } else { Err("Chat task stopped".into()) }
+                                });
+                            }
+                            return;
+                        }
                         StreamDelta::Text(delta) => delta,
                     };
                     let _ = thinking.end();

@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, HashSet};
 use serde::Deserialize;
 use serde_json::{Value, json};
 
-use super::{Completion, StreamDelta, provider_error};
+use super::{Completion, StreamDelta, ToolCallDelta, provider_error};
 
 #[derive(Default)]
 pub(crate) struct Assistant {
@@ -12,6 +12,9 @@ pub(crate) struct Assistant {
     calls: BTreeMap<u64, ToolCall>,
     finish_reason: Option<FinishReason>,
     usage: Option<Value>,
+    /// Some providers leak argument fragments into `content` once tool calls
+    /// start streaming; like the previous backend, those bytes are not content.
+    streamed_tool_calls: bool,
 }
 
 #[derive(Deserialize)]
@@ -127,19 +130,29 @@ impl Assistant {
             on_delta(StreamDelta::Thinking(&thinking));
         }
         if let Some(calls) = delta.tool_calls {
+            self.streamed_tool_calls = true;
             for fragment in calls {
                 if let Some(kind) = fragment.kind.as_deref().filter(|kind| *kind != "function") {
                     return Err(format!(
                         "unsupported Chat Completions tool call type {kind:?}"
                     ));
                 }
-                self.calls
-                    .entry(fragment.index)
-                    .or_default()
-                    .append(fragment);
+                let index = fragment.index;
+                self.calls.entry(index).or_default().append(fragment);
+                // Publish the accumulated call so the caller can open its display
+                // block before the model finishes the remaining arguments.
+                let call = self.calls.get(&index).expect("tool call was just appended");
+                on_delta(StreamDelta::ToolCall(ToolCallDelta {
+                    index,
+                    id: &call.id,
+                    name: &call.name,
+                    arguments: &call.arguments,
+                }));
             }
         }
-        if let Some(text) = delta.content.filter(|text| !text.is_empty()) {
+        if let Some(text) = delta.content.filter(|text| !text.is_empty())
+            && !self.streamed_tool_calls
+        {
             self.content.push_str(&text);
             on_delta(StreamDelta::Text(&text));
         }
