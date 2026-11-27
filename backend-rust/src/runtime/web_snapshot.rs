@@ -13,7 +13,9 @@ pub struct WebConversationSnapshot {
     pub compression: Value,
     pub pending_user_questions: Vec<Value>,
     pub pending_plan_approvals: Vec<Value>,
-    pub pending_tool_approvals: Vec<crate::approval::Approval>,
+    pub pending_tool_approvals: Vec<Value>,
+    pub approval_review_records: Vec<Value>,
+    pub resolved_tool_approval_ids: Vec<String>,
     pub has_running_background_commands: bool,
     pub has_running_multi_agent: bool,
 }
@@ -47,6 +49,18 @@ impl Runtime {
             || Ok(Vec::new()),
             |principal| store.approvals.list_pending(principal, Some(conversation_id)),
         ).map_err(RuntimeError::storage)?;
+        // Pending approvals come from the trusted store; enrich them only with the
+        // task's UI projection, captured at the same cursor under the same lock.
+        let task = activity.as_ref().and_then(|value| value["task_id"].as_str())
+            .and_then(|id| store.tasks.get(id));
+        let pending = tool_approvals.into_iter().map(|approval| {
+            let mut row = serde_json::to_value(approval).expect("approval is serializable");
+            if let Some(task) = task { task.approval_display.decorate_pending(&mut row); }
+            row
+        }).collect();
+        let (approval_review_records, resolved_tool_approval_ids) = task
+            .map(|task| (task.approval_display.records(), task.approval_display.resolved()))
+            .unwrap_or_default();
         let mut document = public_document(document);
         let path = store.conversation_path(workspace_id, conversation_id)?;
         super::thinking::decorate(path.parent().expect("conversation parent"), conversation_id, &mut document);
@@ -57,7 +71,9 @@ impl Runtime {
             compression,
             pending_user_questions: questions,
             pending_plan_approvals: plans,
-            pending_tool_approvals: tool_approvals,
+            pending_tool_approvals: pending,
+            approval_review_records,
+            resolved_tool_approval_ids,
             has_running_background_commands,
             has_running_multi_agent: children_running || children_pending,
         })

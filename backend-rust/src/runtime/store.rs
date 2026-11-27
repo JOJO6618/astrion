@@ -89,6 +89,7 @@ pub(super) struct Task {
     pub guidance_count: usize,
     pub runtime_queue: Value,
     events: VecDeque<Event>,
+    pub(super) approval_display: super::approval_display::ApprovalDisplay,
     next_offset: u64,
     committed_event_offset: u64,
     api_request_pending: bool,
@@ -610,6 +611,7 @@ impl Task {
             guidance_count: 0,
             runtime_queue: json!({"paused":false,"messages":[]}),
             events: VecDeque::new(),
+            approval_display: Default::default(),
             next_offset: 0,
             committed_event_offset: 0,
             api_request_pending: false,
@@ -687,6 +689,7 @@ impl Task {
             self.monitor_execution_ids.insert(call.to_owned(), execution.to_owned());
         }
         self.crosspet_event(kind, &data);
+        self.approval_display.apply(self.next_offset, kind, &data);
         if matches!(kind, "goal_progress" | "goal_completed" | "goal_stopped") {
             self.goal_progress = data.clone();
         }
