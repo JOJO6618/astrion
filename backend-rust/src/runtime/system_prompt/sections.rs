@@ -120,7 +120,7 @@ pub(super) fn modes(metadata: &Map<String, Value>, prefs: &Value, writer: bool) 
 /// 权限模式段落。系统提示词首次冻结与运行期切换通知共用同一份模板，避免两处规则漂移。
 pub(crate) fn permission_section(mode: &str) -> String {
     let (mode, label, detail) = match mode {
-        "unrestricted" => ("unrestricted", "完全权限", "可以在当前运行方式允许时使用已提供的工作区文件修改工具。"),
+        "unrestricted" => ("unrestricted", "无限制", "可以在当前运行方式允许时使用已提供的工作区文件修改工具。"),
         "auto_approval" => ("auto_approval", "自动审核", "文件工具按当前任务的能力及自动审核结果执行。"),
         "approval" => ("approval", "人工审批", "文件修改须由当前任务的审批流程批准。"),
         _ => ("readonly", "只读", "请使用当前提供的只读工具，文件修改受当前任务能力限制。"),

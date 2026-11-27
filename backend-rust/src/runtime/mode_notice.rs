@@ -35,7 +35,7 @@ fn label(kind: &str, mode: &str) -> String {
         ("permission_mode", "readonly") => "只读",
         ("permission_mode", "approval") => "人工审批",
         ("permission_mode", "auto_approval") => "自动审核",
-        ("permission_mode", "unrestricted") => "完全权限",
+        ("permission_mode", "unrestricted") => "无限制",
         ("execution_mode", "direct") => "完全访问",
         ("execution_mode", _) => "受限执行",
         ("network_permission", "restricted") => "受限",

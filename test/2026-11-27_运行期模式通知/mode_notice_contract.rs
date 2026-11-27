@@ -94,6 +94,12 @@ fn message_carries_compact_runtime_notice_metadata() {
     let text = notice["content"].as_str().expect("content");
     assert!(text.contains("权限模式：只读（readonly）"), "{text}");
     assert!(text.contains("以本次规则为准"), "{text}");
+
+    let unrestricted = message("permission_mode", "unrestricted");
+    let text = unrestricted["content"].as_str().expect("content");
+    assert_eq!(unrestricted["metadata"]["mode"], "unrestricted");
+    assert!(text.starts_with("权限模式被用户修改为无限制。"), "{text}");
+    assert!(text.contains("权限模式：无限制（unrestricted）"), "{text}");
 }
 
 #[test]
