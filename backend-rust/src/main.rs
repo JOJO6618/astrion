@@ -104,7 +104,7 @@ async fn serve() -> io::Result<()> {
         catalog.clone(),
         global_skills,
         paths.host_libraries.join("agentskills"),
-    );
+    ).with_workspace_skill_mirror();
     let runtime = runtime.with_personalization(preferences.clone());
     let web = if config.web {
         let mut auth_cfg = WebAuthConfig::new(&config.data, listener.local_addr()?.port());

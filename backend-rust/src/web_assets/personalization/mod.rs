@@ -2,6 +2,7 @@
 
 mod metadata;
 mod skill_archive;
+mod skill_mirror;
 mod schema;
 mod store;
 
@@ -32,6 +33,7 @@ use metadata::{Policy, skill_selection, skills_catalog};
 use schema::{Object, compression, compression_triggers, normalize, resolved_deep_trigger, schema};
 use serde_json::{Map, Value, json};
 use std::{
+    collections::HashSet,
     io,
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
@@ -72,13 +74,14 @@ type SkillSync =
 pub struct Personalization {
     preferences: Arc<HostPreferences>,
     skill_sync: Option<Arc<SkillSync>>,
+    workspace_skill_mirror: bool,
 }
 
 struct HostPreferences {
     catalog: CatalogSource,
     global_skills: PathBuf,
     private_skills: PathBuf,
-    updates: Mutex<()>,
+    updates: Mutex<HashSet<PathBuf>>,
 }
 
 impl Personalization {
@@ -88,9 +91,10 @@ impl Personalization {
                 catalog,
                 global_skills,
                 private_skills,
-                updates: Mutex::new(()),
+                updates: Mutex::new(HashSet::new()),
             }),
             skill_sync: None,
+            workspace_skill_mirror: false,
         }
     }
 
@@ -104,6 +108,31 @@ impl Personalization {
     ) -> Self {
         self.skill_sync = Some(Arc::new(sync));
         self
+    }
+
+    /// Enable built-in/private library mirroring for the production local Host.
+    pub fn with_workspace_skill_mirror(mut self) -> Self {
+        self.workspace_skill_mirror = true;
+        self
+    }
+
+    /// Called only after the workspace has been resolved by the Host.
+    pub(crate) fn prepare_workspace_skills(&self, workspace: &Path) -> io::Result<()> {
+        if !self.workspace_skill_mirror {
+            return Ok(());
+        }
+        let prefs = &self.preferences;
+        let mut prepared = prefs.updates.lock()
+            .map_err(|_| io::Error::other("personalization settings lock is poisoned"))?;
+        if !prepared.contains(workspace) {
+            let config = Store::open(prefs.catalog.host_data_dir())?.read(&prefs.catalog.load())?;
+            let catalog = skills_catalog(&prefs.global_skills, &prefs.private_skills);
+            let (selected, _) = skill_selection(&config, &catalog);
+            let selected = selected.into_iter().map(str::to_owned).collect::<Vec<_>>();
+            prefs.mirror(workspace, &selected, &catalog)?;
+            prepared.insert(workspace.to_owned());
+        }
+        Ok(())
     }
 
     /// Snapshot the persisted Agent preferences used when creating a conversation.
@@ -246,6 +275,15 @@ pub(crate) fn english(data: &Path) -> bool {
     store::english(data)
 }
 
+pub(crate) fn skill_mirror_warning(data: &Path) -> &'static str {
+    skill_mirror_warning_localized(english(data))
+}
+
+fn skill_mirror_warning_localized(english: bool) -> &'static str {
+    localized(english, "无法同步当前工作区的技能，请检查目录和权限。",
+        "Could not sync skills to this workspace. Check its directory and permissions.")
+}
+
 async fn load(State(preferences): State<Personalization>) -> Response {
     run(preferences, None, None).await
 }
@@ -284,7 +322,9 @@ async fn run(
     let result = tokio::task::spawn_blocking(move || {
         preferences.preferences.update(
             patch,
-            workspace.as_ref().zip(preferences.skill_sync.as_deref()),
+            workspace.as_ref(),
+            preferences.skill_sync.as_deref(),
+            preferences.workspace_skill_mirror,
         )
     })
     .await;
@@ -296,12 +336,19 @@ async fn run(
 }
 
 impl HostPreferences {
+    fn mirror(&self, workspace: &Path, selected: &[String], catalog: &[Value]) -> io::Result<()> {
+        skill_mirror::sync(workspace, self.catalog.host_data_dir(), &self.global_skills,
+            &self.private_skills, selected, catalog)
+    }
+
     fn update(
         &self,
         patch: Option<Object>,
-        skill_sync: Option<(&RegisteredWorkspace, &SkillSync)>,
+        workspace: Option<&RegisteredWorkspace>,
+        skill_sync: Option<&SkillSync>,
+        workspace_skill_mirror: bool,
     ) -> io::Result<Response> {
-        let _lock = self
+        let mut prepared = self
             .updates
             .lock()
             .map_err(|_| io::Error::other("personalization settings lock is poisoned"))?;
@@ -322,6 +369,8 @@ impl HostPreferences {
         let catalog = self.catalog.load();
         let mut config = store.read(&catalog)?;
         let is_update = patch.is_some();
+        let old_selection = config["enabled_skills"].clone();
+        let old_snapshot = config["skills_catalog_snapshot"].clone();
         if let Some(patch) = patch {
             let english = config["ui_locale"] == "en-US";
             config = match normalize(&patch, &config, &catalog, true) {
@@ -348,6 +397,7 @@ impl HostPreferences {
         }
         let skills = skills_catalog(&self.global_skills, &self.private_skills);
         let (selected, snapshot) = skill_selection(&config, &skills);
+        let mut mirror_warning = false;
         if is_update {
             config["enabled_skills"] = if selected == snapshot {
                 Value::Null
@@ -356,11 +406,19 @@ impl HostPreferences {
             };
             config["skills_catalog_snapshot"] = json!(snapshot);
             store.write(&config)?;
-            if let Some((workspace, sync)) = skill_sync {
-                let enabled = selected
-                    .iter()
-                    .map(|id| (*id).to_owned())
-                    .collect::<Vec<_>>();
+            let enabled = selected.iter().map(|id| (*id).to_owned()).collect::<Vec<_>>();
+            if workspace_skill_mirror {
+                if old_selection != config["enabled_skills"] || old_snapshot != config["skills_catalog_snapshot"] {
+                    prepared.clear();
+                }
+                if let Some(workspace) = workspace.filter(|space| !prepared.contains(&space.path)) {
+                    match self.mirror(&workspace.path, &enabled, &skills) {
+                        Ok(()) => { prepared.insert(workspace.path.clone()); }
+                        Err(_) => mirror_warning = true,
+                    }
+                }
+            }
+            if let Some((workspace, sync)) = workspace.zip(skill_sync) {
                 if let Err(error) = sync(
                     workspace,
                     &self.global_skills,
@@ -380,6 +438,9 @@ impl HostPreferences {
             "recent_conversations_prompt_limit_range": {"min":1,"max":30},
             "project_memory_inject_limit_range": {"min":5,"max":null},
         });
+        if mirror_warning {
+            response["skill_sync_warning"] = json!(skill_mirror_warning_localized(config["ui_locale"] == "en-US"));
+        }
         if !is_update {
             response["tool_loading_registry"] = json!(schema().tool_loading_registry);
         }
