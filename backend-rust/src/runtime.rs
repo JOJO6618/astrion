@@ -1,6 +1,7 @@
 mod agent;
 mod admission_recovery;
 mod approval;
+mod approval_display;
 pub(crate) mod automatic_title;
 mod billing;
 mod chat;
