@@ -19,6 +19,7 @@ import { desktopWindowControl, desktopWindowState } from './window.js';
 import { createUpdaterLogger } from './updater-log.js';
 import { migrationPageHtml } from './migration-window.js';
 import { applyRunDataRoot, getMigrationProgress, getRunDataInfo } from './rundata.js';
+import { createRunDataRestart } from './rundata-restart.js';
 import { handleBrowserRequest, setBrowserToken } from './browser/ai/endpoint.js';
 import { checkUpdatePolicy, currentUpdatePolicy, desktopUpdateIdentity, openPolicyDownload } from './update-policy.js';
 import { authorizeUpdatePolicyWindow, serveUpdatePolicyPage } from './update-policy-window.js';
@@ -153,6 +154,14 @@ async function tryStartInstall(isPackaged) {
  */
 export function startBridge(ctx) {
   setBrowserToken(ctx.browserToken);
+  const restartRunData = createRunDataRestart({
+    app,
+    stopBackend: shutdownBackend,
+    onFailure: error => {
+      console.error('[astrion-desktop] 运行数据重启失败:', error);
+      dialog.showErrorBox('无法安全重启 Astrion', '请先完全退出 Astrion，再重新打开。若仍有 Astrion 后端进程，请等它退出后重试。');
+    },
+  });
   const server = http.createServer((req, res) => {
     const send = (status, obj) => {
       const body = JSON.stringify(obj);
@@ -294,11 +303,7 @@ export function startBridge(ctx) {
     }
     if (req.method === 'POST' && pathname === '/rundata/restart') {
       send(202, { success: true, restarting: true });
-      setTimeout(() => {
-        shutdownBackend();
-        app.relaunch();
-        app.exit(0);
-      }, 250);
+      restartRunData();
       return;
     }
     send(404, { error: 'not_found' });
