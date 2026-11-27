@@ -22,9 +22,22 @@ import { focusMainWindow } from './window.js';
 import { isUpdaterInstalling } from './updater-state.js';
 import { focusUpdatePolicyWindow, updatePolicyTransitioning } from './update-policy-window.js';
 import { resolveDesktopBackend } from './rust-backend.js';
+import { resolveStartupBackend, writeStartupFailure } from './startup-diagnostics.js';
+
+function reportStartupFailure(error, profile) {
+  let directory = profile;
+  if (!directory) {
+    try { directory = app.getPath('logs'); } catch { /* Fall back to a private temp directory. */ }
+  }
+  const log = writeStartupFailure(error, directory);
+  console.error('[astrion-desktop] 启动失败:', error, log ? `(${log})` : '');
+}
 
 const quickDebug = !app.isPackaged && process.argv.includes('--quick-debug');
-const rust = quickDebug ? null : resolveDesktopBackend({ resourcesPath: app.isPackaged ? process.resourcesPath : undefined });
+const rust = quickDebug ? null : resolveStartupBackend(
+  () => resolveDesktopBackend({ resourcesPath: app.isPackaged ? process.resourcesPath : undefined }),
+  reportStartupFailure,
+);
 app.setName(rust?.experimental ? 'Astrion Rust Experiment' : 'Astrion');
 const isolatedUserData = rust?.profile || process.env.ASTRION_ELECTRON_USER_DATA;
 if (isolatedUserData) {
@@ -64,17 +77,12 @@ if (!app.requestSingleInstanceLock()) {
         await startBackendAndCreateWindow(rust);
       }
     } catch (err) {
-      await shutdownBackend();
-      // 后端起不来属致命错误：写日志 + 落盘临时文件（GUI 进程无控制台可见性），退出
-      console.error('[astrion-desktop] 启动失败:', err);
-      const fs = await import('node:fs');
-      const os = await import('node:os');
-      const logPath = path.join(rust?.profile || os.tmpdir(), 'astrion-desktop-startup.log');
       try {
-        fs.writeFileSync(logPath, `[astrion-desktop] 启动失败\n${err?.stack || err}\n`);
-      } catch {
-        /* 落盘失败不阻断退出 */
+        await shutdownBackend();
+      } catch (stopError) {
+        console.error('[astrion-desktop] 启动失败后无法停止 Rust 后端:', stopError);
       }
+      reportStartupFailure(err, rust?.profile);
       app.exit(1);
     }
   });
